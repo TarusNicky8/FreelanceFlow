@@ -1,0 +1,55 @@
+git config --global user.name "NicodemusKiptoo"
+git config --global user.email "nicodemuskiptoo88@gmail.com"
+
+Network Name: Lisk Testnet
+RPC URL: https://testnet-rpc.lisk.com
+Chain ID: 4202
+Currency Symbol: LSK
+Block Explorer URL: https://testnet-blockscout.lisk.com
+
+npm init -y (creates package.json).
+
+npm install @liskhq/lisk-client
+
+Create a test file: touch test-lisk.js (or echo. > test-lisk.js)
+
+node test-lisk.js
+
+npm install --save-dev hardhat
+
+npx hardhat init
+
+npm install --save-dev @nomicfoundation/hardhat-toolbox
+Adds testing and deployment tools.
+
+Install dotenv: npm install dotenv.
+
+In MetaMask: Account > Export Private Key (copy 64-character hex).
+In .env: PRIVATE_KEY=your_private_key_here
+
+Run: npm install @openzeppelin/contracts
+
+Create a test contract: touch contracts/Test.sol.
+
+Run: npm install ethers
+
+Run: node test-lisk.js
+
+Run: npm install --save-dev mocha chai
+
+Run: npx hardhat test
+
+In VS Code terminal (any folder): npm install -g vercel
+
+Run: vercel login
+
+nitialize React Project:
+Run: npx create-react-app . (installs in current folder).
+
+Run: npm install -D tailwindcss postcss autoprefixer
+Initialize: npx tailwindcss init -p
+
+
+
+
+
