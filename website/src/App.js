@@ -14,7 +14,7 @@ function App() {
   return (
     <div className="bg-gradient-to-br from-gray-50 to-gray-200 min-h-screen font-sans text-gray-800">
       
-      <header className="bg-primary-blue text-white p-4 shadow-lg sticky top-0 z-50">
+      <header className="bg-primary-blue text-white p-4 shadow-lg sticky top-0 z-50 transition duration-300 ease-in-out">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <a href="/" className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
             <img src={logo} alt="FreelanceFlow Logo" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 border-white" />
@@ -34,10 +34,18 @@ function App() {
       </header>
 
       
-      <section className="relative bg-gradient-to-r from-primary-blue to-secondary-purple text-white py-24 text-center overflow-hidden">
-        
+      <section className="relative bg-gradient-to-r from-primary-blue to-secondary-purple text-white py-24 text-center overflow-hidden animate-gradient">
+        {/* Dynamic Background Lines - Middle line removed, others remain */}
+        <div className="absolute inset-0 z-0 overflow-hidden">
+          <div className="absolute top-0 left-1/4 h-full w-px bg-white/30 animate-line-flow"></div> 
+          {/* <div className="absolute top-0 left-1/2 h-full w-px bg-white/30 animate-line-flow-delay-1"></div>  -- This is the removed middle line */}
+          <div className="absolute top-0 left-3/4 h-full w-px bg-white/30 animate-line-flow-delay-2"></div> 
+          <div className="absolute top-0 left-1/6 h-full w-px bg-white/30 animate-line-flow-delay-1"></div> 
+          <div className="absolute top-0 left-5/6 h-full w-px bg-white/30 animate-line-flow-delay-2"></div> 
+        </div>
+
         <div className="max-w-5xl mx-auto relative z-10 px-4">
-          <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold mb-6 animate-fade-in-down">
+          <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold mb-6 animate-fade-in-down tracking-tight animate-text-glow">
             FreelanceFlow
           </h1>
           <p className="text-xl md:text-2xl lg:text-3xl font-light mb-8 animate-fade-in-up">
@@ -47,7 +55,7 @@ function App() {
             href="https://discord.gg/7TVd2ZdP9h"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-block px-10 py-4 bg-white text-secondary-purple font-bold rounded-full shadow-lg hover:bg-gray-100 hover:scale-105 transition duration-300 ease-in-out transform"
+            className="inline-block px-10 py-4 bg-white text-secondary-purple font-bold rounded-full shadow-lg hover:bg-gray-100 hover:scale-105 transition duration-300 ease-in-out transform animate-pulse-slow animate-glowing-border"
           >
             Join Our Discord Community
           </a>
@@ -56,7 +64,7 @@ function App() {
 
       
       <section id="about" className="py-16 sm:py-20 bg-white shadow-inner">
-        <div className="max-w-5xl mx-auto text-center px-4">
+        <div className="max-w-5xl mx-auto text-center px-4 transition duration-300 ease-in-out">
           <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-6">About FreelanceFlow</h2>
           <p className="text-lg sm:text-xl text-gray-700 max-w-3xl mx-auto leading-relaxed">
             FreelanceFlow is a pioneering blockchain-powered platform, proudly supported by a <span className="font-semibold">LiskDAO Builder Grant</span>. Our mission is to revolutionize how African freelancers receive payments, enabling them to accept stablecoin <span className="font-semibold">USDC payments with minimal fees</span>. By leveraging Lisk's cutting-edge Layer 2 Testnet, we ensure exceptionally fast, secure, and transparent transactions, empowering gig workers across the continent.
@@ -66,23 +74,23 @@ function App() {
 
       
       <section id="features" className="py-16 sm:py-20 bg-gray-100">
-        <div className="max-w-6xl mx-auto px-4">
+        <div className="max-w-6xl mx-auto px-4 transition duration-300 ease-in-out">
           <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue text-center mb-8 sm:mb-12">Key Features Designed for You</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-10">
             
-            <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl text-center hover:scale-105 transition duration-300 ease-in-out transform">
+            <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl text-center hover:scale-105 transition duration-300 ease-in-out transform animate-icon-float animate-glowing-border">
               <UsdcIcon />
               <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple mt-4 mb-2">Low-Cost USDC Payments</h3>
-              <p className="text-base sm:text-lg text-gray-700">Receive and send USDC stablecoin with significantly reduced transaction fees, maximizing your earnings.</p>
+              <p className="text-base sm:text-lg text-gray-700 transition duration-300 ease-in-out">Receive and send USDC stablecoin with significantly reduced transaction fees, maximizing your earnings.</p>
             </div>
             
-            <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl text-center hover:scale-105 transition duration-300 ease-in-out transform"> 
+            <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl text-center hover:scale-105 transition duration-300 ease-in-out transform animate-icon-float animate-glowing-border"> 
               <SecurityIcon />
               <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple mt-4 mb-2">Built-in Escrow Security</h3>
               <p className="text-base sm:text-lg text-gray-700">Funds are held securely by smart contracts and released only when both parties confirm work completion, ensuring trust and fairness and mitigating disputes.</p> 
             </div>
             
-            <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl text-center hover:scale-105 transition duration-300 ease-in-out transform"> 
+            <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl text-center hover:scale-105 transition duration-300 ease-in-out transform animate-icon-float animate-glowing-border"> 
               <LiskIcon />
               <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple mt-4 mb-2">Robust Lisk Integration</h3>
               <p className="text-base sm:text-lg text-gray-700">Powered by the scalable and efficient Lisk Testnet, providing a reliable and future-proof blockchain foundation for decentralized applications.</p> 
@@ -93,7 +101,7 @@ function App() {
 
       
       <section id="team" className="py-16 sm:py-20 bg-white shadow-inner">
-        <div className="max-w-4xl mx-auto text-center px-4">
+        <div className="max-w-4xl mx-auto text-center px-4 transition duration-300 ease-in-out">
           <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-8">Meet Our Visionary Team</h2>
           <div className="flex flex-col items-center">
             <img 
@@ -116,7 +124,7 @@ function App() {
 
       
       <section id="roadmap" className="py-16 sm:py-20 bg-gray-100">
-        <div className="max-w-4xl mx-auto text-center px-4">
+        <div className="max-w-4xl mx-auto text-center px-4 transition duration-300 ease-in-out">
           <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-8">Our Visionary Roadmap</h2>
           <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl text-left">
             <ul className="space-y-4 sm:space-y-6 text-base sm:text-lg text-gray-700">
@@ -148,7 +156,7 @@ function App() {
 
       
       <section id="docs" className="py-12 sm:py-16 bg-primary-blue text-white text-center">
-        <div className="max-w-4xl mx-auto px-4">
+        <div className="max-w-4xl mx-auto px-4 transition duration-300 ease-in-out">
           <h2 className="text-3xl sm:text-4xl font-bold mb-4">Dive Deeper into FreelanceFlow</h2>
           <p className="text-lg sm:text-xl mb-8">Explore our comprehensive documentation to understand the technology, learn how to get started, or contribute to our open-source project.</p>
           <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
@@ -172,10 +180,10 @@ function App() {
 
       
       <footer className="bg-gray-800 text-white py-6 sm:py-8 text-center text-sm">
-        <div className="max-w-5xl mx-auto px-4">
+        <div className="max-w-5xl mx-auto px-4 transition duration-300 ease-in-out">
           <p className="mb-3">&copy; {new Date().getFullYear()} FreelanceFlow. All rights reserved. Built with passion and a LiskDAO Builder Grant.</p>
           <div className="mt-2 flex flex-wrap justify-center gap-x-6 gap-y-3 text-2xl">
-            <a href="https://github.com/TarusNicky8/FreelanceFlow" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition duration-300">
+            <a href="https://github.com/TarusNicky8" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition duration-300">
               <i className="fab fa-github"></i>
             </a>
             <a href="https://discord.gg/7TVd2ZdP9h" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition duration-300">
