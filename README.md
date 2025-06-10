@@ -1,3 +1,4 @@
+markdown
 # FreelanceFlow
 
 **Problem:** African freelancers often face significant hurdles with high international payment fees, slow transfers, and a lack of trust in cross-border transactions.
@@ -28,20 +29,21 @@ To get FreelanceFlow running on your local machine for development and testing, 
 
 ### **Smart Contracts**
 1. Clone the repository and navigate to the contracts directory:
+
    ```bash
    git clone https://github.com/TarusNicky8/FreelanceFlow.git
    cd FreelanceFlow/contracts
-Install project dependencies:
+**Install project dependencies:**
 bash
 npm install
-Configure your environment: Create a .env file in the contracts directory and add your PRIVATE_KEY. Refer to .env.example for the required format.
-Compile the smart contracts:
+**Configure your environment:** Create a .env file in the contracts directory and add your PRIVATE_KEY. Refer to .env.example for the required format.
+**Compile the smart contracts:**
 bash
 npx hardhat compile
 Run contract tests:
 bash
 npx hardhat test
-Deploy contracts to Lisk Testnet:
+**Deploy contracts to Lisk Testnet:**
 bash
 npx hardhat run scripts/deploy.js --network liskTestnet
 Website (Frontend)
@@ -51,37 +53,68 @@ bash
 cd ../website
 # If you are in the root 'FreelanceFlow' directory:
 cd website
+
 Install website dependencies:
+
 bash
+
 npm install
-Run the local development server:
+
+**Run the local development server:**
+
 bash
+
 npm start
+
 Your website should now be running at http://localhost:3000.
-Deploy to Vercel (for production/staging):
+
+**Deploy to Vercel (for production/staging):**
+
 bash
+
 vercel --prod
-Technical Details
+
+**Technical Details**
+
 USDC (Mock ERC20 Token): This is a simulated ERC20 token designed for use on the Testnet. It functions as the primary currency for payments within FreelanceFlow's test environment, with an initial supply of 1,000,000 tokens minted.
+
 Escrow Contract: Our robust escrow smart contract securely holds funds between freelancers and clients. It features deposit, release, and refund functions, ensuring that payments are only released upon mutual agreement or successful dispute resolution, thereby enhancing trust and mitigating risks.
+
 Lisk Integration: FreelanceFlow is built entirely on the Lisk Sepolia Testnet. We leverage Lisk's Layer 2 scalability and efficiency for fast, low-cost, and reliable decentralized transactions.
+
 Chain ID: 4202
+
 RPC URL: https://rpc.sepolia-api.lisk.com
-Roadmap & Future Development
-We're committed to continuously enhancing FreelanceFlow to better serve African freelancers and grow our ecosystem. Our upcoming milestones include:
+
+**Roadmap & Future Development**
+
+We're committed to continuously enhancing FreelanceFlow to better serve African freelancers and grow our ecosystem.
+Our upcoming milestones include:
+
 Q3 2025: Minimum Viable Product (MVP) Beta Launch: We will roll out the platform to a curated group of 50 users to gather crucial real-world feedback for optimization and iterative refinement.
+
 Q4 2025: Growth & Ecosystem Expansion: Our goal is to scale to 150 active users and achieve $40,000 LSK Total Value Locked (TVL) within the platform's secure escrow system.
 Future Enhancements: Plans include integrating with fiat on/off-ramps, implementing advanced dispute resolution mechanisms, and expanding participation within the wider Lisk ecosystem.
-Contributing
+
+**Contributing**
+
 We welcome contributions from the community!
+
 Fork and Contribute: Feel free to fork the repository and submit pull requests with your improvements.
+
 Code Style: Please adhere to our coding style, using Prettier for JavaScript and the Solidity Plugin for smart contracts.
+
 Report Issues: If you encounter any bugs or have feature suggestions, please report them on our GitHub Issues page: https://github.com/TarusNicky8/FreelanceFlow/issues
-License
+
+**License**
+
 This project is licensed under the Apache 2.0 License. See the LICENSE file for more details.
-Contact
+
+**Contact**
+
 Email: nicodemuskiptoo88@gmail.com
+
 X (Twitter): 
 https://x.com/nicodemuskipto0
-Discord: https://discord.gg/7TVd2ZdP9h
 
+Discord: https://discord.gg/7TVd2ZdP9h
