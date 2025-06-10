@@ -12,8 +12,10 @@ Key Achievements:
 Core Smart Contracts Deployed: Our secure Escrow and Mock USDC contracts are live and functional on the Lisk Sepolia Testnet, enabling transparent and affordable payments.
 
 USDC Contract Address: 0xFD2A349A744616C6077978A3D463C82Ac00A37c1
+https://sepolia-blockscout.lisk.com/address/0xFD2A349A744616C6077978A3D463C82Ac00A37c1
 
 Escrow Contract Address: 0x83C9919341aa0705b6b0d79420EfAAE27B53ADCf
+https://sepolia-blockscout.lisk.com/address/0x83C9919341aa0705b6b0d79420EfAAE27B53ADCf
 
 Source Code: /contracts/USDC.sol, /contracts/Escrow.sol
 
@@ -23,11 +25,11 @@ Official Project Website: Our introductory website is launched at freelanceflow.
 
 Community Building: We've established an engaged Discord community (currently 31 members and growing!) for discussions, feedback, and support.
 
-Join us here: FreelanceFlow Discord
+Join us here: https://discord.gg/7TVd2ZdP9h
 
 Project Documentation & Outreach: Initial blog posts and comprehensive documentation are available.
 
-Medium Blog: Read our latest updates
+Medium Blog: https://medium.com/@nicodemuskiptoo8/freelanceflow-empowering-african-freelancers-b85936f28f25
 
 Getting Started (Local Development)
 To get FreelanceFlow running on your local machine for development and testing, follow these steps:
@@ -38,11 +40,9 @@ Clone the repository and navigate to the contracts directory:
 git clone https://github.com/TarusNicky8/FreelanceFlow.git
 cd FreelanceFlow/contracts
 
-
 Install project dependencies:
 
 npm install
-
 
 Configure your environment: Create a .env file in the contracts directory and add your PRIVATE_KEY. Refer to .env.example for the required format.
 
@@ -50,16 +50,13 @@ Compile the smart contracts:
 
 npx hardhat compile
 
-
 Run contract tests:
 
 npx hardhat test
 
-
 Deploy contracts to Lisk Testnet:
 
 npx hardhat run scripts/deploy.js --network liskTestnet
-
 
 Website (Frontend)
 Navigate to the website directory:
@@ -69,23 +66,19 @@ cd ../website
 # If you are in the root 'FreelanceFlow' directory:
 # cd website
 
-
 Install website dependencies:
 
 npm install
 
-
 Run the local development server:
 
 npm start
-
 
 Your website should now be running at http://localhost:3000.
 
 Deploy to Vercel (for production/staging):
 
 vercel --prod
-
 
 Technical Details
 USDC (Mock ERC20 Token): This is a simulated ERC20 token designed for use on the Testnet. It functions as the primary currency for payments within FreelanceFlow's test environment, with an initial supply of 1,000,000 tokens minted.
@@ -96,7 +89,7 @@ Lisk Integration: FreelanceFlow is built entirely on the Lisk Sepolia Testnet. W
 
 Chain ID: 4202
 
-RPC URL: https://testnet-rpc.lisk.com
+RPC URL: https://rpc.sepolia-api.lisk.com
 
 Roadmap & Future Development
 We're committed to continuously enhancing FreelanceFlow to better serve African freelancers and grow our ecosystem. Our upcoming milestones include:
@@ -114,7 +107,7 @@ Fork and Contribute: Feel free to fork the repository and submit pull requests w
 
 Code Style: Please adhere to our coding style, using Prettier for JavaScript and the Solidity Plugin for smart contracts.
 
-Report Issues: If you encounter any bugs or have feature suggestions, please report them on our GitHub Issues page.
+Report Issues: If you encounter any bugs or have feature suggestions, please report them on our GitHub Issues page: https://github.com/TarusNicky8/FreelanceFlow/issues
 
 License
 This project is licensed under the Apache 2.0 License. See the LICENSE file for more details.
@@ -124,4 +117,4 @@ Email: nicodemuskiptoo88@gmail.com
 
 X (Twitter): @nicodemuskipto0
 
-Discord: FreelanceFlow Discord Server
+Discord: https://discord.gg/7TVd2ZdP9h
