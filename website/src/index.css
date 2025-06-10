@@ -16,7 +16,6 @@ code {
     monospace;
 }
 
-/* Custom Keyframes for Animations */
 @keyframes gradientAnimation {
     0% { background-position: 0% 50%; }
     50% { background-position: 100% 50%; }
@@ -25,31 +24,30 @@ code {
 
 @keyframes pulse-slow {
     0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.8; transform: scale(1.05); } /* Less aggressive opacity change and smaller scale */
+    50% { opacity: 0.8; transform: scale(1.05); } 
 }
 
-@keyframes lineFlow { /* Keyframe for vertical line movement */
+@keyframes lineFlow { 
     0% { transform: translateY(-100%); }
     100% { transform: translateY(100%); }
 }
 
-@keyframes iconFloat { /* Keyframe for subtle icon floating */
+@keyframes iconFloat { 
     0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-8px); } /* Less noticeable float */
+    50% { transform: translateY(-8px); } 
 }
 
-@keyframes textGlow { /* Keyframe for text glowing */
-    0%, 100% { text-shadow: 0 0 3px rgba(255,255,255,0.6), 0 0 8px rgba(255,255,255,0.3); } /* Further reduced brightness */
-    50% { text-shadow: 0 0 7px rgba(255,255,255,0.8), 0 0 15px rgba(255,255,255,0.5); } /* Further reduced brightness */
+@keyframes textGlow { 
+    0%, 100% { text-shadow: 0 0 1px rgba(255,255,255,0.2), 0 0 2px rgba(255,255,255,0.1); }
+    50% { text-shadow: 0 0 3px rgba(255,255,255,0.5), 0 0 6px rgba(255,255,255,0.3); }
 }
 
-@keyframes glowingBorder { /* Keyframe for glowing border */
-    0%, 100% { border-color: #f472b6; box-shadow: 0 0 0 0 rgba(244, 114, 182, 0.5); } /* Fuchsia-ish, lower opacity shadow start */
-    50% { border-color: #a3e635; box-shadow: 0 0 0 5px rgba(163, 230, 53, 0.3); } /* Lime-ish, smaller, subtler shadow */
+@keyframes glowingBorder { 
+    0%, 100% { border-color: #f472b6; box-shadow: 0 0 0 0 rgba(244, 114, 182, 0.5); } 
+    50% { border-color: #a3e635; box-shadow: 0 0 0 5px rgba(163, 230, 53, 0.3); } 
 }
 
 
-/* Base Transition Classes for Smoothness */
 .transition {
     transition-property: all;
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
@@ -64,44 +62,41 @@ code {
     transition-duration: 300ms;
 }
 
-/* Specific Utility Classes for Animations (referenced in App.js) */
 .animate-gradient {
     background-size: 200% 200%;
-    animation: gradientAnimation 6s infinite linear; /* Slower gradient */
+    animation: gradientAnimation 6s infinite linear; 
 }
 
 .animate-pulse-slow {
-    animation: pulse-slow 3s infinite ease-in-out; /* Slower pulse animation */
+    animation: pulse-slow 3s infinite ease-in-out; 
 }
 
 .animate-line-flow {
-    animation: lineFlow 15s infinite linear; /* Slower lines */
+    animation: lineFlow 15s infinite linear; 
 }
 .animate-line-flow-delay-1 {
-    animation: lineFlow 15s infinite linear 2s; /* Delayed lines */
+    animation: lineFlow 15s infinite linear 2s; 
 }
 .animate-line-flow-delay-2 {
     animation: lineFlow 15s infinite linear 4s;
 }
 
 .animate-icon-float {
-    animation: iconFloat 4s infinite ease-in-out; /* Slower icon float */
+    animation: iconFloat 4s infinite ease-in-out; 
 }
 
 .animate-text-glow {
-    animation: textGlow 2s infinite ease-in-out alternate; /* Slower text glow */
+    animation: textGlow 2s infinite ease-in-out alternate; 
 }
 
 .animate-glowing-border {
-    animation: glowingBorder 3s infinite ease-in-out; /* Slower glowing border */
+    animation: glowingBorder 3s infinite ease-in-out; 
 }
 
-/* Custom hover effects for elements */
 .hover\:shadow-lg:hover {
     box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }
 
-/* Custom tracking for text */
 .tracking-tight {
     letter-spacing: -0.025em;
 }

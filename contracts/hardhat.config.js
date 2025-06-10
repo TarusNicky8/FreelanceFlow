@@ -3,12 +3,9 @@ require("dotenv").config();
 
 module.exports = {
   solidity: {
-    // Configure multiple compilers if your project has contracts
-    // with different pragma versions.
-    // The 'compilers' array allows you to specify configurations for each.
     compilers: [
       {
-        version: "0.8.20", // For your Escrow, USDC (if they use this pragma)
+        version: "0.8.20", 
         settings: {
           optimizer: {
             enabled: true,
@@ -17,11 +14,11 @@ module.exports = {
         },
       },
       {
-        version: "0.8.28", // For contracts/Lock.sol
+        version: "0.8.28", 
         settings: {
           optimizer: {
             enabled: true,
-            runs: 200, // Apply optimization to this version too
+            runs: 200, 
           },
         },
       },

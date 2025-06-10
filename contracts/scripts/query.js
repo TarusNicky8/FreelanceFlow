@@ -8,4 +8,3 @@ async function queryEscrow(escrowAddress, freelancerAddress) {
   console.log(`Freelancer ${freelancerAddress} has ${balance} USDC in escrow`);
 }
 
-// Run with: node scripts/query.js <escrowAddress> <freelancerAddress>

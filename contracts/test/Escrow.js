@@ -54,10 +54,8 @@ describe("Escrow", function () {
       throw error;
     }
 
-    // Attempt USDC transfer for client
-    try {
+        try {
       console.log("DEBUG: Transferring 1000 USDC to client address:", client.address);
-      // *** FIX: Changed ethers.utils.parseUnits to ethers.parseUnits ***
       await usdc.transfer(client.address, ethers.parseUnits("1000", 6)); 
       console.log("DEBUG: USDC transferred to client successfully.");
     } catch (error) {
@@ -66,28 +64,20 @@ describe("Escrow", function () {
     }
   });
 
-  // Your original test cases
-  it("should deposit USDC", async function () {
+    it("should deposit USDC", async function () {
     console.log("DEBUG: Running 'should deposit USDC' test.");
-    // *** FIX: Changed ethers.utils.parseUnits to ethers.parseUnits ***
-    await usdc.connect(client).approve(escrow.target, ethers.parseUnits("100", 6));
-    // *** FIX: Changed ethers.utils.parseUnits to ethers.parseUnits ***
-    await escrow.connect(client).deposit(freelancer.address, ethers.parseUnits("100", 6));
-    // *** FIX: Changed ethers.utils.parseUnits to ethers.parseUnits ***
-    expect(await escrow.deposits(freelancer.address)).to.equal(ethers.parseUnits("100", 6));
+        await usdc.connect(client).approve(escrow.target, ethers.parseUnits("100", 6));
+        await escrow.connect(client).deposit(freelancer.address, ethers.parseUnits("100", 6));
+        expect(await escrow.deposits(freelancer.address)).to.equal(ethers.parseUnits("100", 6));
     console.log("DEBUG: 'should deposit USDC' test completed.");
   });
 
   it("should release USDC", async function () {
     console.log("DEBUG: Running 'should release USDC' test.");
-    // *** FIX: Changed ethers.utils.parseUnits to ethers.parseUnits ***
-    await usdc.connect(client).approve(escrow.target, ethers.parseUnits("100", 6));
-    // *** FIX: Changed ethers.utils.parseUnits to ethers.parseUnits ***
-    await escrow.connect(client).deposit(freelancer.address, ethers.parseUnits("100", 6));
-    // *** FIX: Changed ethers.utils.parseUnits to ethers.parseUnits ***
-    await escrow.connect(owner).release(freelancer.address, ethers.parseUnits("100", 6));
-    // *** FIX: Changed ethers.utils.parseUnits to ethers.parseUnits ***
-    expect(await usdc.balanceOf(freelancer.address)).to.equal(ethers.parseUnits("100", 6));
+        await usdc.connect(client).approve(escrow.target, ethers.parseUnits("100", 6));
+        await escrow.connect(client).deposit(freelancer.address, ethers.parseUnits("100", 6));
+        await escrow.connect(owner).release(freelancer.address, ethers.parseUnits("100", 6));
+       expect(await usdc.balanceOf(freelancer.address)).to.equal(ethers.parseUnits("100", 6));
     console.log("DEBUG: 'should release USDC' test completed.");
   });
 });

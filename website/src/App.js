@@ -35,10 +35,8 @@ function App() {
 
       
       <section className="relative bg-gradient-to-r from-primary-blue to-secondary-purple text-white py-24 text-center overflow-hidden animate-gradient">
-        {/* Dynamic Background Lines - Middle line removed, others remain */}
-        <div className="absolute inset-0 z-0 overflow-hidden">
+          <div className="absolute inset-0 z-0 overflow-hidden">
           <div className="absolute top-0 left-1/4 h-full w-px bg-white/30 animate-line-flow"></div> 
-          {/* <div className="absolute top-0 left-1/2 h-full w-px bg-white/30 animate-line-flow-delay-1"></div>  -- This is the removed middle line */}
           <div className="absolute top-0 left-3/4 h-full w-px bg-white/30 animate-line-flow-delay-2"></div> 
           <div className="absolute top-0 left-1/6 h-full w-px bg-white/30 animate-line-flow-delay-1"></div> 
           <div className="absolute top-0 left-5/6 h-full w-px bg-white/30 animate-line-flow-delay-2"></div> 
