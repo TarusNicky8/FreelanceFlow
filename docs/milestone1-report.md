@@ -15,12 +15,12 @@ Completed and enhanced smart contracts, website, Discord, and blog posts for Lis
 - **Discord:** (https://discord.gg/7TVd2ZdP9h)
   - 31 members, active with polls and updates 
 - **Blog Posts:** (https://medium.com/@nicodemuskiptoo8/freelanceflow-empowering-african-freelancers-b85936f28f25)
-  - 2 posts, 100+ views.
+  - 2 posts
 
 ## Metrics
 - Open-source code: Apache 2.0, GitHub repo with detailed README.
 - Community: 31 Discord members, active engagement.
-- Blog: 2 posts, exceeding requirement.
+- Blog: 2 posts.
 
 ## Feedback Addressed
 - **Website:** Added informative sections (about, features, team, roadmap).
