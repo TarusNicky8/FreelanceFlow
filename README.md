@@ -22,7 +22,7 @@ https://sepolia-blockscout.lisk.com/address/0x83C9919341aa0705b6b0d79420EfAAE27B
 
 * **Tests:** /test/Escrow.js
 
-* **Official Project Website:** Our introductory website is launched at https://freelanceflow-lisk.vercel.app.
+* **Official Project Website:** Our introductory website is launched at https://freelanceflow.net.
 
 * **Community Building:** We've established an engaged Discord community (currently 31 members and growing!) for discussions, feedback, and support.
 
