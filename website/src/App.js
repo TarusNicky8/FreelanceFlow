@@ -1,16 +1,15 @@
 import React from 'react';
 import logo from './Logo.png'; 
-import { getDataSuffix, submitReferral } from '@divvi/referral-sdk'; // Import Divvi SDK
-import { createWalletClient, custom, parseUnits, encodeFunctionData, createPublicClient, http } from 'viem'; // Import Viem for wallet interaction and encoding
+import { getDataSuffix, submitReferral } from '@divvi/referral-sdk'; 
+import { createWalletClient, custom, parseUnits, encodeFunctionData, createPublicClient, http } from 'viem'; 
 
-// Define your Lisk Sepolia chain configuration for Viem
 const liskSepolia = {
   id: 4202,
   name: 'Lisk Sepolia Testnet',
   network: 'lisk-sepolia',
   nativeCurrency: {
     decimals: 18,
-    name: 'ETH', // Lisk Testnet uses ETH as native currency for gas
+    name: 'ETH', 
     symbol: 'ETH',
   },
   rpcUrls: {
@@ -23,7 +22,6 @@ const liskSepolia = {
   testnet: true,
 };
 
-// Simplified ABI for USDC (only 'approve' function needed for this example)
 const usdcAbi = [
   {
     "inputs": [
@@ -37,7 +35,6 @@ const usdcAbi = [
   }
 ];
 
-// Simplified ABI for Escrow (only 'deposit' function needed for this example)
 const escrowAbi = [
   {
     "inputs": [
@@ -51,13 +48,10 @@ const escrowAbi = [
   }
 ];
 
-// Your deployed contract addresses (replace with actual deployed addresses on Lisk Sepolia)
-// For demonstration, these are pulled from your README.md
 const usdcContractAddress = '0xFD2A349A744616C6077978A3D463C82Ac00A37c1'; 
 const escrowContractAddress = '0x83C9919341aa0705b6b0d79420EfAAE27B53ADCf';
 
-// Placeholder for freelancer address (in a real dApp, this would come from user input or project data)
-const defaultFreelancerAddress = '0x0000000000000000000000000000000000000001'; // Example: A known test freelancer address
+const defaultFreelancerAddress = '0x0000000000000000000000000000000000000001'; 
 
 const UsdcIcon = () => (
   <img src={process.env.PUBLIC_URL + '/icons/usdc.png'} alt="USDC Icon" className="h-14 w-14 text-blue-600 mb-4 mx-auto" />
@@ -72,13 +66,12 @@ const LiskIcon = () => (
 function App() {
 
   const [walletClient, setWalletClient] = React.useState(null);
-  const [publicClient, setPublicClient] = React.useState(null); // Added publicClient for transaction confirmation
+  const [publicClient, setPublicClient] = React.useState(null); 
   const [account, setAccount] = React.useState(null);
   const [status, setStatus] = React.useState('');
-  const [amountToDeposit, setAmountToDeposit] = React.useState('100'); // Default deposit amount
+  const [amountToDeposit, setAmountToDeposit] = React.useState('100'); 
 
-  // Function to connect wallet
-  const connectWallet = async () => {
+    const connectWallet = async () => {
     setStatus('Connecting wallet...');
     try {
       if (typeof window.ethereum === 'undefined') {
@@ -89,8 +82,7 @@ function App() {
         chain: liskSepolia,
         transport: custom(window.ethereum),
       });
-      // Also create a public client to read blockchain data and wait for tx confirmation
-      const publicClient = createPublicClient({ 
+            const publicClient = createPublicClient({ 
         chain: liskSepolia,
         transport: http(liskSepolia.rpcUrls.default.http[0]),
       });
@@ -106,8 +98,7 @@ function App() {
     }
   };
 
-  // Handles the USDC deposit transaction with Divvi tracking
-  const handleDepositUSDC = async () => {
+    const handleDepositUSDC = async () => {
     if (!account || !walletClient || !publicClient) {
       setStatus('Please connect your wallet first.');
       return;
@@ -119,14 +110,11 @@ function App() {
 
     setStatus('Initiating USDC deposit with Divvi tracking...');
     try {
-      // Amount in smallest unit (USDC has 6 decimals, so 100 USDC = 100 * 10^6)
-      const amountInSmallestUnit = parseUnits(amountToDeposit, 6); 
+            const amountInSmallestUnit = parseUnits(amountToDeposit, 6); 
 
-      // Divvi Specific: Your unique Divvi Identifier and subscribed campaigns
-      const divviConsumerAddress = '0x58ccf714F804a10cd9FE22fCcc044d77Ea34e5b1';
+            const divviConsumerAddress = '0x58ccf714F804a10cd9FE22fCcc044d77Ea34e5b1';
       const divviProviderAddresses = ['0x0423189886d7966f0dd7e7d256898daeee625dca','0xc95876688026be9d6fa7a7c33328bd013effa2bb','0x7beb0e14f8d2e6f6678cc30d867787b384b19e20'];
 
-      // 🧩 Step 1a: Encode the `approve` function call for USDC
       const approveCallData = encodeFunctionData({
         abi: usdcAbi,
         functionName: 'approve',
@@ -134,7 +122,6 @@ function App() {
       });
 
       setStatus('Approving USDC for Escrow contract...');
-      // Send the approval transaction
       const approveTxHash = await walletClient.sendTransaction({
         account,
         to: usdcContractAddress,
@@ -145,33 +132,28 @@ function App() {
       await publicClient.waitForTransactionReceipt({ hash: approveTxHash });
       setStatus('USDC Approved. Now initiating deposit...');
 
-      // 🧩 Step 1b: Encode the `deposit` function call for Escrow
-      // This is the value-generating transaction where Divvi data will be appended
       const depositCallData = encodeFunctionData({
         abi: escrowAbi,
         functionName: 'deposit',
         args: [defaultFreelancerAddress, amountInSmallestUnit],
       });
 
-      // 🧩 Step 1c (Divvi Specific): Get the data suffix for referral tracking
       const dataSuffix = getDataSuffix({
         consumer: divviConsumerAddress,
         providers: divviProviderAddresses,
       });
 
-      // 📤 Step 2: Send the deposit transaction, appending the referral `dataSuffix`
       const depositTxHash = await walletClient.sendTransaction({
         account,
         to: escrowContractAddress,
-        data: depositCallData + dataSuffix, // Append dataSuffix to the deposit transaction's calldata
-        value: 0n, // No native ETH sent with USDC deposit
+        data: depositCallData + dataSuffix, 
+        value: 0n, 
       });
 
       setStatus(`Deposit transaction sent! Hash: ${depositTxHash}. Waiting for confirmation...`);
       await publicClient.waitForTransactionReceipt({ hash: depositTxHash });
       setStatus('Deposit confirmed. Now reporting referral to Divvi...');
 
-      // 📝 Step 3: Report the transaction to Divvi by calling `submitReferral`.
       const chainId = await walletClient.getChainId();
       await submitReferral({
         txHash: depositTxHash,
@@ -212,10 +194,8 @@ function App() {
 
       
       <section className="relative bg-gradient-to-r from-primary-blue to-secondary-purple text-white py-24 text-center overflow-hidden animate-gradient">
-        {/* Dynamic Background Lines - Middle line removed, others remain. Opacity reduced to 20% for subtlety. */}
         <div className="absolute inset-0 z-0 overflow-hidden">
           <div className="absolute top-0 left-1/4 h-full w-px bg-white/20 animate-line-flow"></div> 
-          {/* <div className="absolute top-0 left-1/2 h-full w-px bg-white/20 animate-line-flow-delay-1"></div>  -- This is the removed middle line */}
           <div className="absolute top-0 left-3/4 h-full w-px bg-white/20 animate-line-flow-delay-2"></div> 
           <div className="absolute top-0 left-1/6 h-full w-px bg-white/20 animate-line-flow-delay-1"></div> 
           <div className="absolute top-0 left-5/6 h-full w-px bg-white/20 animate-line-flow-delay-2"></div> 
@@ -237,7 +217,6 @@ function App() {
             Join Our Discord Community
           </a>
 
-          {/* Divvi Integration Demonstration Area */}
           <div className="mt-12 p-6 bg-white/10 rounded-lg shadow-inner text-white">
             <h3 className="text-2xl font-bold mb-4">Divvi Integration Demo: Deposit USDC</h3>
             <div className="mb-4">
@@ -268,8 +247,7 @@ function App() {
               </button>
             )}
           </div>
-          {/* End Divvi Integration Demo Area */}
-
+          
 
         </div>
       </section>
