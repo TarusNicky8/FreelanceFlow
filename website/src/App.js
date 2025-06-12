@@ -1,5 +1,64 @@
 import React from 'react';
 import logo from './Logo.png'; 
+import { getDataSuffix, submitReferral } from '@divvi/referral-sdk'; // Import Divvi SDK
+import { createWalletClient, custom, parseUnits, encodeFunctionData, createPublicClient, http } from 'viem'; // Import Viem for wallet interaction and encoding
+
+// Define your Lisk Sepolia chain configuration for Viem
+const liskSepolia = {
+  id: 4202,
+  name: 'Lisk Sepolia Testnet',
+  network: 'lisk-sepolia',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'ETH', // Lisk Testnet uses ETH as native currency for gas
+    symbol: 'ETH',
+  },
+  rpcUrls: {
+    default: { http: ['[https://testnet-rpc.lisk.com](https://testnet-rpc.lisk.com)'] },
+    public: { http: ['[https://testnet-rpc.lisk.com](https://testnet-rpc.lisk.com)'] },
+  },
+  blockExplorers: {
+    default: { name: 'Lisk Sepolia Blockscout', url: '[https://sepolia-blockscout.lisk.com/](https://sepolia-blockscout.lisk.com/)' },
+  },
+  testnet: true,
+};
+
+// Simplified ABI for USDC (only 'approve' function needed for this example)
+const usdcAbi = [
+  {
+    "inputs": [
+      { "internalType": "address", "name": "spender", "type": "address" },
+      { "internalType": "uint256", "name": "amount", "type": "uint256" }
+    ],
+    "name": "approve",
+    "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+];
+
+// Simplified ABI for Escrow (only 'deposit' function needed for this example)
+const escrowAbi = [
+  {
+    "inputs": [
+      { "internalType": "address", "name": "freelancer", "type": "address" },
+      { "internalType": "uint256", "name": "amount", "type": "uint256" }
+    ],
+    "name": "deposit",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+];
+
+// Your deployed contract addresses (replace with actual deployed addresses on Lisk Sepolia)
+// For demonstration, these are pulled from your README.md
+const usdcContractAddress = '0xFD2A349A744616C6077978A3D463C82Ac00A37c1'; 
+const escrowContractAddress = '0x83C9919341aa0705b6b0d79420EfAAE27B53ADCf';
+
+// Placeholder for freelancer address (in a real dApp, this would come from user input or project data)
+const defaultFreelancerAddress = '0x0000000000000000000000000000000000000001'; // Example: A known test freelancer address
+
 const UsdcIcon = () => (
   <img src={process.env.PUBLIC_URL + '/icons/usdc.png'} alt="USDC Icon" className="h-14 w-14 text-blue-600 mb-4 mx-auto" />
 );
@@ -11,6 +70,124 @@ const LiskIcon = () => (
 );
 
 function App() {
+
+  const [walletClient, setWalletClient] = React.useState(null);
+  const [publicClient, setPublicClient] = React.useState(null); // Added publicClient for transaction confirmation
+  const [account, setAccount] = React.useState(null);
+  const [status, setStatus] = React.useState('');
+  const [amountToDeposit, setAmountToDeposit] = React.useState('100'); // Default deposit amount
+
+  // Function to connect wallet
+  const connectWallet = async () => {
+    setStatus('Connecting wallet...');
+    try {
+      if (typeof window.ethereum === 'undefined') {
+        setStatus('MetaMask or similar wallet not detected!');
+        return;
+      }
+      const client = createWalletClient({
+        chain: liskSepolia,
+        transport: custom(window.ethereum),
+      });
+      // Also create a public client to read blockchain data and wait for tx confirmation
+      const publicClient = createPublicClient({ 
+        chain: liskSepolia,
+        transport: http(liskSepolia.rpcUrls.default.http[0]),
+      });
+      
+      const addresses = await client.getAddresses();
+      setWalletClient(client);
+      setPublicClient(publicClient);
+      setAccount(addresses[0]);
+      setStatus(`Wallet connected: ${addresses[0]}`);
+    } catch (error) {
+      console.error("Error connecting wallet:", error);
+      setStatus(`Error connecting wallet: ${error.message}`);
+    }
+  };
+
+  // Handles the USDC deposit transaction with Divvi tracking
+  const handleDepositUSDC = async () => {
+    if (!account || !walletClient || !publicClient) {
+      setStatus('Please connect your wallet first.');
+      return;
+    }
+    if (isNaN(parseFloat(amountToDeposit)) || parseFloat(amountToDeposit) <= 0) {
+      setStatus('Please enter a valid amount to deposit.');
+      return;
+    }
+
+    setStatus('Initiating USDC deposit with Divvi tracking...');
+    try {
+      // Amount in smallest unit (USDC has 6 decimals, so 100 USDC = 100 * 10^6)
+      const amountInSmallestUnit = parseUnits(amountToDeposit, 6); 
+
+      // Divvi Specific: Your unique Divvi Identifier and subscribed campaigns
+      const divviConsumerAddress = '0x58ccf714F804a10cd9FE22fCcc044d77Ea34e5b1';
+      const divviProviderAddresses = ['0x0423189886d7966f0dd7e7d256898daeee625dca','0xc95876688026be9d6fa7a7c33328bd013effa2bb','0x7beb0e14f8d2e6f6678cc30d867787b384b19e20'];
+
+      // 🧩 Step 1a: Encode the `approve` function call for USDC
+      const approveCallData = encodeFunctionData({
+        abi: usdcAbi,
+        functionName: 'approve',
+        args: [escrowContractAddress, amountInSmallestUnit],
+      });
+
+      setStatus('Approving USDC for Escrow contract...');
+      // Send the approval transaction
+      const approveTxHash = await walletClient.sendTransaction({
+        account,
+        to: usdcContractAddress,
+        data: approveCallData,
+      });
+
+      setStatus(`Approval transaction sent! Hash: ${approveTxHash}. Waiting for confirmation...`);
+      await publicClient.waitForTransactionReceipt({ hash: approveTxHash });
+      setStatus('USDC Approved. Now initiating deposit...');
+
+      // 🧩 Step 1b: Encode the `deposit` function call for Escrow
+      // This is the value-generating transaction where Divvi data will be appended
+      const depositCallData = encodeFunctionData({
+        abi: escrowAbi,
+        functionName: 'deposit',
+        args: [defaultFreelancerAddress, amountInSmallestUnit],
+      });
+
+      // 🧩 Step 1c (Divvi Specific): Get the data suffix for referral tracking
+      const dataSuffix = getDataSuffix({
+        consumer: divviConsumerAddress,
+        providers: divviProviderAddresses,
+      });
+
+      // 📤 Step 2: Send the deposit transaction, appending the referral `dataSuffix`
+      const depositTxHash = await walletClient.sendTransaction({
+        account,
+        to: escrowContractAddress,
+        data: depositCallData + dataSuffix, // Append dataSuffix to the deposit transaction's calldata
+        value: 0n, // No native ETH sent with USDC deposit
+      });
+
+      setStatus(`Deposit transaction sent! Hash: ${depositTxHash}. Waiting for confirmation...`);
+      await publicClient.waitForTransactionReceipt({ hash: depositTxHash });
+      setStatus('Deposit confirmed. Now reporting referral to Divvi...');
+
+      // 📝 Step 3: Report the transaction to Divvi by calling `submitReferral`.
+      const chainId = await walletClient.getChainId();
+      await submitReferral({
+        txHash: depositTxHash,
+        chainId,
+      });
+
+      setStatus(`Deposit successful and referral submitted to Divvi! Tx Hash: ${depositTxHash}`);
+      console.log('Divvi referral submitted successfully!');
+
+    } catch (error) {
+      console.error("Error during USDC deposit or Divvi integration:", error);
+      setStatus(`Transaction failed or Divvi submission error: ${error.message}`);
+    }
+  };
+
+
   return (
     <div className="bg-gradient-to-br from-gray-50 to-gray-200 min-h-screen font-sans text-gray-800">
       
@@ -35,11 +212,13 @@ function App() {
 
       
       <section className="relative bg-gradient-to-r from-primary-blue to-secondary-purple text-white py-24 text-center overflow-hidden animate-gradient">
-          <div className="absolute inset-0 z-0 overflow-hidden">
-          <div className="absolute top-0 left-1/4 h-full w-px bg-white/30 animate-line-flow"></div> 
-          <div className="absolute top-0 left-3/4 h-full w-px bg-white/30 animate-line-flow-delay-2"></div> 
-          <div className="absolute top-0 left-1/6 h-full w-px bg-white/30 animate-line-flow-delay-1"></div> 
-          <div className="absolute top-0 left-5/6 h-full w-px bg-white/30 animate-line-flow-delay-2"></div> 
+        {/* Dynamic Background Lines - Middle line removed, others remain. Opacity reduced to 20% for subtlety. */}
+        <div className="absolute inset-0 z-0 overflow-hidden">
+          <div className="absolute top-0 left-1/4 h-full w-px bg-white/20 animate-line-flow"></div> 
+          {/* <div className="absolute top-0 left-1/2 h-full w-px bg-white/20 animate-line-flow-delay-1"></div>  -- This is the removed middle line */}
+          <div className="absolute top-0 left-3/4 h-full w-px bg-white/20 animate-line-flow-delay-2"></div> 
+          <div className="absolute top-0 left-1/6 h-full w-px bg-white/20 animate-line-flow-delay-1"></div> 
+          <div className="absolute top-0 left-5/6 h-full w-px bg-white/20 animate-line-flow-delay-2"></div> 
         </div>
 
         <div className="max-w-5xl mx-auto relative z-10 px-4">
@@ -50,13 +229,48 @@ function App() {
             Empowering African freelancers with secure, low-cost USDC payments on <span className="font-semibold">Lisk Testnet</span>.
           </p>
           <a
-            href="https://discord.gg/7TVd2ZdP9h"
+            href="[https://discord.gg/7TVd2ZdP9h](https://discord.gg/7TVd2ZdP9h)"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-block px-10 py-4 bg-white text-secondary-purple font-bold rounded-full shadow-lg hover:bg-gray-100 hover:scale-105 transition duration-300 ease-in-out transform animate-pulse-slow animate-glowing-border"
           >
             Join Our Discord Community
           </a>
+
+          {/* Divvi Integration Demonstration Area */}
+          <div className="mt-12 p-6 bg-white/10 rounded-lg shadow-inner text-white">
+            <h3 className="text-2xl font-bold mb-4">Divvi Integration Demo: Deposit USDC</h3>
+            <div className="mb-4">
+              <label htmlFor="depositAmount" className="block text-lg font-medium mb-2">Amount to Deposit (USDC):</label>
+              <input
+                type="number"
+                id="depositAmount"
+                value={amountToDeposit}
+                onChange={(e) => setAmountToDeposit(e.target.value)}
+                placeholder="e.g., 100"
+                className="w-full max-w-xs p-2 rounded-md bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-primary-blue"
+              />
+            </div>
+            <p className="mb-4 text-center">{status}</p>
+            {!account ? (
+              <button
+                onClick={connectWallet}
+                className="px-6 py-3 bg-accent-green text-white font-semibold rounded-full hover:bg-green-600 transition duration-300"
+              >
+                Connect Wallet
+              </button>
+            ) : (
+              <button
+                onClick={handleDepositUSDC} 
+                className="px-6 py-3 bg-secondary-purple text-white font-semibold rounded-full hover:bg-purple-700 transition duration-300"
+              >
+                Deposit USDC to Escrow (with Divvi Tracking)
+              </button>
+            )}
+          </div>
+          {/* End Divvi Integration Demo Area */}
+
+
         </div>
       </section>
 
@@ -112,9 +326,9 @@ function App() {
               A dedicated MERN stack developer and blockchain enthusiast, Nicodemus leads FreelanceFlow with a passion for creating impactful decentralized solutions for the African gig economy.
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-2">
-              <a href="https://github.com/TarusNicky8" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:text-blue-800 transition duration-300">GitHub</a>
-              <a href="https://www.linkedin.com/in/nicodemus-kiptoo-8116271a1" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:text-blue-800 transition duration-300">LinkedIn</a>
-              <a href="https://x.com/nicodemuskipto0" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:text-blue-800 transition duration-300">X (Twitter)</a>
+              <a href="[https://github.com/TarusNicky8](https://github.com/TarusNicky8)" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:text-blue-800 transition duration-300">GitHub</a>
+              <a href="[https://www.linkedin.com/in/nicodemus-kiptoo-8116271a1](https://www.linkedin.com/in/nicodemus-kiptoo-8116271a1)" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:text-blue-800 transition duration-300">LinkedIn</a>
+              <a href="[https://x.com/nicodemuskipto0](https://x.com/nicodemuskipto0)" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:text-blue-800 transition duration-300">X (Twitter)</a>
             </div>
           </div>
         </div>
@@ -159,7 +373,7 @@ function App() {
           <p className="text-lg sm:text-xl mb-8">Explore our comprehensive documentation to understand the technology, learn how to get started, or contribute to our open-source project.</p>
           <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
             <a
-              href="https://github.com/TarusNicky8/FreelanceFlow/blob/main/README.md" 
+              href="[https://github.com/TarusNicky8/FreelanceFlow/blob/main/README.md](https://github.com/TarusNicky8/FreelanceFlow/blob/main/README.md)" 
               target="_blank"
               rel="noopener noreferrer"
               className="inline-block px-8 py-3 bg-secondary-purple text-white font-semibold rounded-lg hover:bg-purple-700 shadow-lg transition duration-300"
@@ -181,13 +395,13 @@ function App() {
         <div className="max-w-5xl mx-auto px-4 transition duration-300 ease-in-out">
           <p className="mb-3">&copy; {new Date().getFullYear()} FreelanceFlow. All rights reserved. Built with passion and a LiskDAO Builder Grant.</p>
           <div className="mt-2 flex flex-wrap justify-center gap-x-6 gap-y-3 text-2xl">
-            <a href="https://github.com/TarusNicky8" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition duration-300">
+            <a href="[https://github.com/TarusNicky8](https://github.com/TarusNicky8)" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition duration-300">
               <i className="fab fa-github"></i>
             </a>
-            <a href="https://discord.gg/7TVd2ZdP9h" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition duration-300">
+            <a href="[https://discord.gg/7TVd2ZdP9h](https://discord.gg/7TVd2ZdP9h)" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition duration-300">
               <i className="fab fa-discord"></i>
             </a>
-            <a href="https://x.com/nicodemuskipto0" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition duration-300">
+            <a href="[https://x.com/nicodemuskipto0](https://x.com/nicodemuskipto0)" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition duration-300">
               <i className="fab fa-twitter"></i>
             </a>
           </div>
