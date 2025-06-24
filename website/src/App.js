@@ -13,11 +13,11 @@ const liskSepolia = {
     symbol: 'ETH',
   },
   rpcUrls: {
-    default: { http: ['[https://testnet-rpc.lisk.com](https://testnet-rpc.lisk.com)'] },
-    public: { http: ['[https://testnet-rpc.lisk.com](https://testnet-rpc.lisk.com)'] },
+    default: { http: ['https://testnet-rpc.lisk.com'] },
+    public: { http: ['https://testnet-rpc.lisk.com'] },
   },
   blockExplorers: {
-    default: { name: 'Lisk Sepolia Blockscout', url: '[https://sepolia-blockscout.lisk.com/](https://sepolia-blockscout.lisk.com/)' },
+    default: { name: 'Lisk Sepolia Blockscout', url: 'https://sepolia-blockscout.lisk.com/' },
   },
   testnet: true,
 };
@@ -209,7 +209,7 @@ function App() {
             Empowering African freelancers with secure, low-cost USDC payments on <span className="font-semibold">Lisk Testnet</span>.
           </p>
           <a
-            href="[https://discord.gg/7TVd2ZdP9h](https://discord.gg/7TVd2ZdP9h)"
+            href="https://discord.gg/7TVd2ZdP9h"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-block px-10 py-4 bg-white text-secondary-purple font-bold rounded-full shadow-lg hover:bg-gray-100 hover:scale-105 transition duration-300 ease-in-out transform animate-pulse-slow animate-glowing-border"
@@ -304,9 +304,9 @@ function App() {
               A dedicated MERN stack developer and blockchain enthusiast, Nicodemus leads FreelanceFlow with a passion for creating impactful decentralized solutions for the African gig economy.
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-2">
-              <a href="[https://github.com/TarusNicky8](https://github.com/TarusNicky8)" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:text-blue-800 transition duration-300">GitHub</a>
-              <a href="[https://www.linkedin.com/in/nicodemus-kiptoo-8116271a1](https://www.linkedin.com/in/nicodemus-kiptoo-8116271a1)" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:text-blue-800 transition duration-300">LinkedIn</a>
-              <a href="[https://x.com/nicodemuskipto0](https://x.com/nicodemuskipto0)" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:text-blue-800 transition duration-300">X (Twitter)</a>
+              <a href="https://github.com/TarusNicky8" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:text-blue-800 transition duration-300">GitHub</a>
+              <a href="https://www.linkedin.com/in/freelanceflow-usdc-29a495371/" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:text-blue-800 transition duration-300">LinkedIn</a>
+              <a href="https://x.com/freelanceflo" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:text-blue-800 transition duration-300">X (Twitter)</a>
             </div>
           </div>
         </div>
@@ -351,7 +351,7 @@ function App() {
           <p className="text-lg sm:text-xl mb-8">Explore our comprehensive documentation to understand the technology, learn how to get started, or contribute to our open-source project.</p>
           <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
             <a
-              href="[https://github.com/TarusNicky8/FreelanceFlow/blob/main/README.md](https://github.com/TarusNicky8/FreelanceFlow/blob/main/README.md)" 
+              href="https://github.com/TarusNicky8/FreelanceFlow/blob/main/README.md" 
               target="_blank"
               rel="noopener noreferrer"
               className="inline-block px-8 py-3 bg-secondary-purple text-white font-semibold rounded-lg hover:bg-purple-700 shadow-lg transition duration-300"
@@ -373,13 +373,13 @@ function App() {
         <div className="max-w-5xl mx-auto px-4 transition duration-300 ease-in-out">
           <p className="mb-3">&copy; {new Date().getFullYear()} FreelanceFlow. All rights reserved. Built with passion and a LiskDAO Builder Grant.</p>
           <div className="mt-2 flex flex-wrap justify-center gap-x-6 gap-y-3 text-2xl">
-            <a href="[https://github.com/TarusNicky8](https://github.com/TarusNicky8)" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition duration-300">
+            <a href="https://github.com/TarusNicky8" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition duration-300">
               <i className="fab fa-github"></i>
             </a>
-            <a href="[https://discord.gg/7TVd2ZdP9h](https://discord.gg/7TVd2ZdP9h)" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition duration-300">
+            <a href="https://discord.gg/7TVd2ZdP9h" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition duration-300">
               <i className="fab fa-discord"></i>
             </a>
-            <a href="[https://x.com/nicodemuskipto0](https://x.com/nicodemuskipto0)" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition duration-300">
+            <a href="https://x.com/freelanceflo" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition duration-300">
               <i className="fab fa-twitter"></i>
             </a>
           </div>
