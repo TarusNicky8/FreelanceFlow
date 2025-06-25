@@ -3,14 +3,14 @@ import logo from './Logo.png';
 import { getDataSuffix, submitReferral } from '@divvi/referral-sdk'; 
 import { createWalletClient, custom, parseUnits, encodeFunctionData, createPublicClient, http } from 'viem'; 
 
-// Define your Lisk Sepolia chain configuration for Viem
+// Define your Lisk Sepolia chain configuration for Viem (kept for backend interaction, not emphasized on frontend)
 const liskSepolia = {
   id: 4202,
-  name: 'Lisk Sepolia Testnet',
+  name: 'Lisk Sepolia Testnet', // Internal label, not public-facing
   network: 'lisk-sepolia',
   nativeCurrency: {
     decimals: 18,
-    name: 'ETH', // Lisk Testnet uses ETH as native currency for gas
+    name: 'ETH', 
     symbol: 'ETH',
   },
   rpcUrls: {
@@ -52,24 +52,23 @@ const escrowAbi = [
 ];
 
 // Your deployed contract addresses (replace with actual deployed addresses on Lisk Sepolia)
-// For demonstration, these are pulled from your README.md
 const usdcContractAddress = '0xFD2A349A744616C6077978A3D463C82Ac00A37c1'; 
 const escrowContractAddress = '0x83C9919341aa0705b6b0d79420EfAAE27B53ADCf';
 
 // Placeholder for freelancer address (in a real dApp, this would come from user input or project data)
-const defaultFreelancerAddress = '0x0000000000000000000000000000000000000001'; // Example: A known test freelancer address
+const defaultFreelancerAddress = '0x0000000000000000000000000000000000000001'; 
 
-// Icons (LiskIcon removed from here to de-emphasize its direct display in features)
+// Icons for features
 const UsdcIcon = () => (
   <img src={process.env.PUBLIC_URL + '/icons/usdc.png'} alt="USDC Icon" className="h-14 w-14 text-blue-600 mb-4 mx-auto" />
 );
 const SecurityIcon = () => (
   <img src={process.env.PUBLIC_URL + '/icons/security.png'} alt="Security Icon" className="h-14 w-14 text-purple-600 mb-4 mx-auto" />
 );
-// LiskIcon component is no longer used directly in the features section
-// const LiskIcon = () => (
-//   <img src={process.env.PUBLIC_URL + '/icons/lisk.webp'} alt="Lisk Icon" className="h-14 w-14 text-lisk-blue mb-4 mx-auto" />
-// );
+// New icon for 'Global & Secure Infrastructure' feature (ensure this image exists in public/icons)
+const GlobalIcon = () => (
+  <img src={process.env.PUBLIC_URL + '/icons/global.png'} alt="Global Reach Icon" className="h-14 w-14 text-blue-600 mb-4 mx-auto" />
+);
 
 
 function App() {
@@ -189,15 +188,19 @@ function App() {
       <header className="bg-primary-blue text-white p-4 shadow-lg sticky top-0 z-50 transition duration-300 ease-in-out">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <a href="/" className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
+            {/* User requested 'logo (branding)' - this assumes Logo.png is your final logo */}
             <img src={logo} alt="FreelanceFlow Logo" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 border-white" />
             <span className="text-lg sm:text-2xl font-bold whitespace-nowrap">FreelanceFlow</span>
           </a>
           <nav className="hidden md:flex space-x-6 text-lg"> 
             <a href="#about" className="hover:text-blue-200 transition duration-300 ease-in-out">About</a>
+            <a href="#vision" className="hover:text-blue-200 transition duration-300 ease-in-out">Vision</a> {/* New link */}
+            <a href="#mission" className="hover:text-blue-200 transition duration-300 ease-in-out">Mission</a> {/* New link */}
             <a href="#features" className="hover:text-blue-200 transition duration-300 ease-in-out">Features</a>
             <a href="#team" className="hover:text-blue-200 transition duration-300 ease-in-out">Team</a>
             <a href="#roadmap" className="hover:text-blue-200 transition duration-300 ease-in-out">Roadmap</a>
-            <a href="#docs" className="hover:text-blue-200 transition duration-300 ease-in-out">Docs</a>
+            <a href="#whitepaper" className="hover:text-blue-200 transition duration-300 ease-in-out">Whitepaper</a> {/* New link */}
+            <a href="#contact" className="hover:text-blue-200 transition duration-300 ease-in-out">Contact</a>
           </nav>
           {/* Mobile menu button */}
           <button 
@@ -213,10 +216,13 @@ function App() {
           <nav className="md:hidden bg-primary-blue pb-2 pt-1">
             <ul className="flex flex-col items-center space-y-2 text-lg">
               <li><a href="#about" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">About</a></li>
+              <li><a href="#vision" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Vision</a></li> {/* New link */}
+              <li><a href="#mission" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Mission</a></li> {/* New link */}
               <li><a href="#features" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Features</a></li>
               <li><a href="#team" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Team</a></li>
               <li><a href="#roadmap" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Roadmap</a></li>
-              <li><a href="#docs" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Docs</a></li>
+              <li><a href="#whitepaper" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Whitepaper</a></li> {/* New link */}
+              <li><a href="#contact" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Contact</a></li>
             </ul>
           </nav>
         )}
@@ -236,9 +242,9 @@ function App() {
           <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold mb-6 animate-fade-in-down tracking-tight animate-text-glow">
             FreelanceFlow
           </h1>
-          {/* Updated tagline to focus on user value, remove specific Lisk Testnet mention */}
+          {/* Updated tagline to focus purely on user value and product vision */}
           <p className="text-xl md:text-2xl lg:text-3xl font-light mb-8 animate-fade-in-up">
-            Empowering African freelancers with secure, low-cost USDC payments to maximize their earnings and global opportunities.
+            Your gateway to secure, low-cost USDC payments, empowering African freelancers to thrive globally.
           </p>
           <a
             href="https://discord.gg/7TVd2ZdP9h"
@@ -246,10 +252,10 @@ function App() {
             rel="noopener noreferrer"
             className="inline-block px-10 py-4 bg-white text-secondary-purple font-bold rounded-full shadow-lg hover:bg-gray-100 hover:scale-105 transition duration-300 ease-in-out transform animate-pulse-slow animate-glowing-border"
           >
-            Join Our Discord Community
+            Join Our Community
           </a>
 
-          {/* Divvi Integration Demonstration Area */}
+          {/* Divvi Integration Demonstration Area - remains for functionality demo */}
           <div className="mt-12 p-6 bg-white/10 rounded-lg shadow-inner text-white">
             <h3 className="text-2xl font-bold mb-4">Divvi Integration Demo: Deposit USDC</h3>
             <div className="mb-4">
@@ -286,40 +292,59 @@ function App() {
         </div>
       </section>
 
-      
-      <section id="about" className="py-16 sm:py-20 bg-white shadow-inner">
-        <div className="max-w-5xl mx-auto text-center px-4 transition duration-300 ease-in-out">
-          <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-6">About FreelanceFlow</h2>
+      {/* New Vision Section */}
+      <section id="vision" className="py-16 sm:py-20 bg-gray-100 text-center shadow-inner">
+        <div className="max-w-5xl mx-auto px-4">
+          <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-6">Our Vision</h2>
           <p className="text-lg sm:text-xl text-gray-700 max-w-3xl mx-auto leading-relaxed">
-            FreelanceFlow is a pioneering blockchain-powered platform, proudly supported by a <span className="font-semibold">LiskDAO Builder Grant</span>. Our mission is to revolutionize how African freelancers receive payments, enabling them to accept stablecoin <span className="font-semibold">USDC payments with minimal fees</span>. By leveraging Lisk's cutting-edge Layer 2 Testnet, we ensure exceptionally fast, secure, and transparent transactions, empowering gig workers across the continent.
+            To create a world where every African freelancer has seamless access to global opportunities, empowered by secure, transparent, and equitable payment solutions that truly value their work.
+          </p>
+        </div>
+      </section>
+
+      {/* New Mission Section */}
+      <section id="mission" className="py-16 sm:py-20 bg-white text-center shadow-inner">
+        <div className="max-w-5xl mx-auto px-4">
+          <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-6">Our Mission</h2>
+          <p className="text-lg sm:text-xl text-gray-700 max-w-3xl mx-auto leading-relaxed">
+            FreelanceFlow is dedicated to building and continuously refining a decentralized platform that provides African freelancers with the tools for secure, low-cost USDC payments, utilizing innovative blockchain technology to foster trust, efficiency, and financial growth.
           </p>
         </div>
       </section>
 
       
-      <section id="features" className="py-16 sm:py-20 bg-gray-100">
+      <section id="about" className="py-16 sm:py-20 bg-gray-100 shadow-inner">
+        <div className="max-w-5xl mx-auto text-center px-4 transition duration-300 ease-in-out">
+          <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-6">About FreelanceFlow</h2>
+          {/* Rephrased About section */}
+          <p className="text-lg sm:text-xl text-gray-700 max-w-3xl mx-auto leading-relaxed">
+            FreelanceFlow is a pioneering blockchain-powered platform dedicated to revolutionizing how African freelancers engage with the global gig economy. We provide a robust ecosystem enabling secure, transparent, and significantly low-cost stablecoin **USDC payments** through advanced smart contract escrow. Our solution leverages cutting-edge blockchain technology to ensure fast, reliable, and equitable transactions, empowering gig workers across the continent to maximize their earnings and opportunities.
+          </p>
+        </div>
+      </section>
+
+      
+      <section id="features" className="py-16 sm:py-20 bg-white">
         <div className="max-w-6xl mx-auto px-4 transition duration-300 ease-in-out">
           <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue text-center mb-8 sm:mb-12">Key Features Designed for You</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-10">
             {/* Feature 1: Low-Cost USDC Payments */}
-            <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl text-center hover:scale-105 transition duration-300 ease-in-out transform animate-icon-float animate-glowing-border">
+            <div className="bg-gray-50 p-6 sm:p-8 rounded-lg shadow-xl text-center hover:scale-105 transition duration-300 ease-in-out transform animate-icon-float animate-glowing-border">
               <UsdcIcon />
               <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple mt-4 mb-2">Low-Cost USDC Payments</h3>
               <p className="text-base sm:text-lg text-gray-700 transition duration-300 ease-in-out">Receive and send USDC stablecoin with significantly reduced transaction fees, maximizing your earnings.</p>
             </div>
             
             {/* Feature 2: Built-in Escrow Security */}
-            <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl text-center hover:scale-105 transition duration-300 ease-in-out transform animate-icon-float animate-glowing-border"> 
+            <div className="bg-gray-50 p-6 sm:p-8 rounded-lg shadow-xl text-center hover:scale-105 transition duration-300 ease-in-out transform animate-icon-float animate-glowing-border"> 
               <SecurityIcon />
               <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple mt-4 mb-2">Built-in Escrow Security</h3>
               <p className="text-base sm:text-lg text-gray-700">Funds are held securely by smart contracts and released only when both parties confirm work completion, ensuring trust and fairness and mitigating disputes.</p> 
             </div>
             
-            {/* Feature 3: Reframed/Generic Benefit (Removed LiskIcon for de-emphasis) */}
-            <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl text-center hover:scale-105 transition duration-300 ease-in-out transform animate-icon-float animate-glowing-border"> 
-              {/* No specific tech icon here to align with "focus on product, not Lisk" */}
-              {/* Placeholder for a more generic icon or just rely on heading/text for a feature like "Seamless Global Reach" or "Decentralized Foundation" */}
-              <img src={process.env.PUBLIC_URL + '/icons/global.png'} alt="Global Reach Icon" className="h-14 w-14 text-blue-600 mb-4 mx-auto" />
+            {/* Feature 3: Global & Secure Infrastructure (Replaced Lisk specific feature) */}
+            <div className="bg-gray-50 p-6 sm:p-8 rounded-lg shadow-xl text-center hover:scale-105 transition duration-300 ease-in-out transform animate-icon-float animate-glowing-border"> 
+              <GlobalIcon /> {/* Using the new generic global icon */}
               <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple mt-4 mb-2">Global & Secure Infrastructure</h3>
               <p className="text-base sm:text-lg text-gray-700">Built on a scalable and efficient blockchain, providing a reliable and future-proof foundation for decentralized payments worldwide.</p> 
             </div>
@@ -332,6 +357,8 @@ function App() {
         <div className="max-w-4xl mx-auto text-center px-4 transition duration-300 ease-in-out">
           <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-8">Meet Our Visionary Team</h2>
           <div className="flex flex-col items-center">
+            {/* External Task: Replace 'nicodemus-photo.jpg' with a professional portrait image. */}
+            {/* Ensure you have a 'global.png' in your public/icons folder, or use a placeholder URL. */}
             <img 
               src={process.env.PUBLIC_URL + "/images/nicodemus-photo.jpg"} 
               alt="Nicodemus Kiptoo Profile" 
@@ -339,16 +366,27 @@ function App() {
             />
             <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple">Nicodemus Kiptoo</h3>
             <p className="text-base sm:text-lg text-gray-700 mt-2 max-w-xl mx-auto">
-              A dedicated MERN stack developer and blockchain enthusiast, Nicodemus leads FreelanceFlow with a passion for creating impactful decentralized solutions for the African gig economy.
+              Founder & Lead Developer. A dedicated MERN stack developer and blockchain enthusiast, Nicodemus leads FreelanceFlow with a passion for creating impactful decentralized solutions for the African gig economy.
             </p>
-            {/* External Task Reminder: Update this section with professional portraits and concise bios. 
-                Consider expanding to showcase key advisors or future core team members.*/}
+            {/* External Task: When you have them, add professional portraits and concise bios for these roles. */}
+            <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-xl mx-auto">
+              <div className="p-4 rounded-lg bg-gray-50 shadow-md">
+                <h4 className="font-bold text-lg text-primary-blue">Web Designer (Figma)</h4>
+                <p className="text-gray-700 text-sm">Shaping our intuitive user experience. (Placeholder - Add Name/Bio)</p>
+              </div>
+              <div className="p-4 rounded-lg bg-gray-50 shadow-md">
+                <h4 className="font-bold text-lg text-primary-blue">Business Strategist</h4>
+                <p className="text-gray-700 text-sm">Guiding market entry and growth. (Placeholder - Add Name/Bio)</p>
+              </div>
+            </div>
+
             <div className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-2">
               <a href="https://github.com/TarusNicky8" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:text-blue-800 transition duration-300">GitHub</a>
               {/* Updated LinkedIn to project's account */}
               <a href="https://www.linkedin.com/in/freelanceflow-usdc-29a495371/" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:text-blue-800 transition duration-300">LinkedIn</a>
               {/* Updated X (Twitter) to project's account */}
               <a href="https://x.com/freelanceflo" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:text-blue-800 transition duration-300">X (Twitter)</a>
+              {/* External Task: Consider adding TikTok link here once content is ready */}
             </div>
           </div>
         </div>
@@ -358,42 +396,64 @@ function App() {
       <section id="roadmap" className="py-16 sm:py-20 bg-gray-100">
         <div className="max-w-4xl mx-auto text-center px-4 transition duration-300 ease-in-out">
           {/* Roadmap title remains focused on "Our Visionary Roadmap" */}
-          <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-8">Our Visionary Roadmap</h2>
+          <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-8">Our Product Roadmap</h2> {/* Renamed title */}
           <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl text-left">
             <ul className="space-y-4 sm:space-y-6 text-base sm:text-lg text-gray-700">
               <li className="flex items-start">
                 <span className="text-secondary-purple font-bold mr-3 text-xl sm:text-2xl">✔</span>
                 <div>
-                  {/* Descriptions are already product-centric */}
-                  <strong className="text-lg sm:text-xl text-primary-blue">Milestone 1 (July 2025): Initial Foundations & Community</strong><br />
-                  Deployment of core smart contracts, establishment of the official website, and initial community building and outreach initiatives.
+                  {/* Rephrased for product phases, removed 'Milestone' term */}
+                  <strong className="text-lg sm:text-xl text-primary-blue">Phase 1 (Initial Launch & Foundation)</strong><br />
+                  Core smart contracts deployed, secure payment infrastructure established, and initial community outreach. (Completed: July 2025)
                 </div>
               </li>
               <li className="flex items-start">
                 <span className="text-blue-600 font-bold mr-3 text-xl sm:text-2xl">⏳</span>
                 <div>
-                  <strong className="text-lg sm:text-xl text-primary-blue">Milestone 2 (Q3 2025): Minimum Viable Product (MVP) Beta Launch</strong><br />
-                  Launch of the beta platform to 50 curated users, gathering crucial feedback for optimization and iterative refinement.
+                  <strong className="text-lg sm:text-xl text-primary-blue">Phase 2 (Minimum Viable Product Beta)</strong><br />
+                  Launch of the core platform to a curated group of 50 beta users, enabling USDC payment processing and escrow, gathering crucial feedback for optimization. (Target: Q3 2025)
                 </div>
               </li>
               <li className="flex items-start">
                 <span className="text-green-600 font-bold mr-3 text-xl sm:text-2xl">🚀</span>
                 <div>
-                  <strong className="text-lg sm:text-xl text-primary-blue">Milestone 3 (Q4 2025): Growth & Ecosystem Expansion</strong><br />
-                  Scaling to 150 active users, achieving $40,000 LSK Total Value Locked (TVL) within the platform's secure escrow system.
+                  <strong className="text-lg sm:text-xl text-primary-blue">Phase 3 (Growth & Ecosystem Expansion)</strong><br />
+                  Scaling user base to 150 active users, achieving $40,000 USDC Total Value Locked (TVL), and enhancing platform with advanced features. (Target: Q4 2025)
+                </div>
+              </li>
+              <li className="flex items-start">
+                <span className="text-gray-500 font-bold mr-3 text-xl sm:text-2xl">💡</span>
+                <div>
+                  <strong className="text-lg sm:text-xl text-primary-blue">Future Enhancements: Scaling & Accessibility</strong><br />
+                  Plans include integrating seamless fiat on/off-ramps, implementing sophisticated dispute resolution mechanisms, and expanding global participation.
                 </div>
               </li>
             </ul>
           </div>
-          {/* External Task Reminder: Consider creating a separate Whitepaper document linked here for detailed technical and business plans. */}
         </div>
       </section>
 
-      
-      <section id="docs" className="py-12 sm:py-16 bg-primary-blue text-white text-center">
+      {/* Whitepaper Section - Placeholder for a future document */}
+      <section id="whitepaper" className="py-12 sm:py-16 bg-white text-center shadow-inner">
         <div className="max-w-4xl mx-auto px-4 transition duration-300 ease-in-out">
-          <h2 className="text-3xl sm:text-4xl font-bold mb-4">Dive Deeper into FreelanceFlow</h2>
-          <p className="text-lg sm:text-xl mb-8">Explore our comprehensive documentation to understand the technology, learn how to get started, or contribute to our open-source project.</p>
+          <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-4">Deep Dive: Our Whitepaper</h2>
+          <p className="text-lg sm:text-xl mb-8">Explore the comprehensive technical architecture, economic model, and long-term vision of FreelanceFlow in our detailed Whitepaper.</p>
+          <a
+            href="#" // Placeholder for Whitepaper URL
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block px-8 py-3 bg-secondary-purple text-white font-semibold rounded-lg hover:bg-purple-700 shadow-lg transition duration-300"
+          >
+            Read the Whitepaper
+          </a>
+        </div>
+      </section>
+      
+      {/* Docs and Contact remain, but 'Docs' might need to be rephrased */}
+      <section id="contact" className="py-12 sm:py-16 bg-primary-blue text-white text-center">
+        <div className="max-w-4xl mx-auto px-4 transition duration-300 ease-in-out">
+          <h2 className="text-3xl sm:text-4xl font-bold mb-4">Connect with FreelanceFlow</h2>
+          <p className="text-lg sm:text-xl mb-8">Have questions, feedback, or want to partner? Reach out to us!</p>
           <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
             <a
               href="https://github.com/TarusNicky8/FreelanceFlow/blob/main/README.md" 
@@ -401,13 +461,13 @@ function App() {
               rel="noopener noreferrer"
               className="inline-block px-8 py-3 bg-secondary-purple text-white font-semibold rounded-lg hover:bg-purple-700 shadow-lg transition duration-300"
             >
-              Read the Docs
+              Explore Our GitHub
             </a>
             <a
               href="mailto:nicodemuskiptoo88@gmail.com" 
               className="inline-block px-8 py-3 bg-gray-200 text-primary-blue font-semibold rounded-lg hover:bg-gray-300 shadow-lg transition duration-300"
             >
-              Contact Us
+              Email Us Directly
             </a>
           </div>
         </div>
@@ -416,7 +476,7 @@ function App() {
       
       <footer className="bg-gray-800 text-white py-6 sm:py-8 text-center text-sm">
         <div className="max-w-5xl mx-auto px-4 transition duration-300 ease-in-out">
-          <p className="mb-3">&copy; {new Date().getFullYear()} FreelanceFlow. All rights reserved. Built with passion and a LiskDAO Builder Grant.</p>
+          <p className="mb-3">&copy; {new Date().getFullYear()} FreelanceFlow. All rights reserved. Your gateway to global opportunities.</p> {/* Removed grant mention */}
           <div className="mt-2 flex flex-wrap justify-center gap-x-6 gap-y-3 text-2xl">
             <a href="https://github.com/TarusNicky8" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition duration-300">
               <i className="fab fa-github"></i>
@@ -424,11 +484,14 @@ function App() {
             <a href="https://discord.gg/7TVd2ZdP9h" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition duration-300">
               <i className="fab fa-discord"></i>
             </a>
-            {/* Updated X (Twitter) to project's account */}
             <a href="https://x.com/freelanceflo" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition duration-300">
               <i className="fab fa-twitter"></i>
             </a>
-            {/* External Task Reminder: Consider adding other social links (e.g., TikTok) if relevant */}
+            <a href="https://www.linkedin.com/in/freelanceflow-usdc-29a495371/" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition duration-300">
+              <i className="fab fa-linkedin"></i>
+            </a>
+            {/* External Task: Add TikTok link here once content is ready */}
+            {/* Placeholder for TikTok: <a href="YOUR_TIKTOK_URL" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition duration-300"><i className="fab fa-tiktok"></i></a> */}
           </div>
           <p className="mt-4 text-gray-400">Connecting African Talent to Global Opportunities.</p>
         </div>
