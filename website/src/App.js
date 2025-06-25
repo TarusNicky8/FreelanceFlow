@@ -3,10 +3,9 @@ import logo from './Logo.png';
 import { getDataSuffix, submitReferral } from '@divvi/referral-sdk'; 
 import { createWalletClient, custom, parseUnits, encodeFunctionData, createPublicClient, http } from 'viem'; 
 
-// Define your Lisk Sepolia chain configuration for Viem (kept for backend interaction, not emphasized on frontend)
 const liskSepolia = {
   id: 4202,
-  name: 'Lisk Sepolia Testnet', // Internal label, not public-facing
+  name: 'Lisk Sepolia Testnet', 
   network: 'lisk-sepolia',
   nativeCurrency: {
     decimals: 18,
@@ -65,9 +64,9 @@ const UsdcIcon = () => (
 const SecurityIcon = () => (
   <img src={process.env.PUBLIC_URL + '/icons/security.png'} alt="Security Icon" className="h-14 w-14 text-purple-600 mb-4 mx-auto" />
 );
-// New icon for 'Global & Secure Infrastructure' feature (ensure this image exists in public/icons)
-const GlobalIcon = () => (
-  <img src={process.env.PUBLIC_URL + '/icons/global.png'} alt="Global Reach Icon" className="h-14 w-14 text-blue-600 mb-4 mx-auto" />
+// Re-added LiskIcon for features section - highlights the underlying robust infrastructure
+const LiskIcon = () => (
+  <img src={process.env.PUBLIC_URL + '/icons/lisk.webp'} alt="Lisk Icon" className="h-14 w-14 text-lisk-blue mb-4 mx-auto" />
 );
 
 
@@ -188,18 +187,17 @@ function App() {
       <header className="bg-primary-blue text-white p-4 shadow-lg sticky top-0 z-50 transition duration-300 ease-in-out">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <a href="/" className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
-            {/* User requested 'logo (branding)' - this assumes Logo.png is your final logo */}
             <img src={logo} alt="FreelanceFlow Logo" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 border-white" />
             <span className="text-lg sm:text-2xl font-bold whitespace-nowrap">FreelanceFlow</span>
           </a>
           <nav className="hidden md:flex space-x-6 text-lg"> 
             <a href="#about" className="hover:text-blue-200 transition duration-300 ease-in-out">About</a>
-            <a href="#vision" className="hover:text-blue-200 transition duration-300 ease-in-out">Vision</a> {/* New link */}
-            <a href="#mission" className="hover:text-blue-200 transition duration-300 ease-in-out">Mission</a> {/* New link */}
+            <a href="#vision" className="hover:text-blue-200 transition duration-300 ease-in-out">Vision</a> 
+            <a href="#mission" className="hover:text-blue-200 transition duration-300 ease-in-out">Mission</a> 
             <a href="#features" className="hover:text-blue-200 transition duration-300 ease-in-out">Features</a>
             <a href="#team" className="hover:text-blue-200 transition duration-300 ease-in-out">Team</a>
             <a href="#roadmap" className="hover:text-blue-200 transition duration-300 ease-in-out">Roadmap</a>
-            <a href="#whitepaper" className="hover:text-blue-200 transition duration-300 ease-in-out">Whitepaper</a> {/* New link */}
+            <a href="#whitepaper" className="hover:text-blue-200 transition duration-300 ease-in-out">Whitepaper</a> 
             <a href="#contact" className="hover:text-blue-200 transition duration-300 ease-in-out">Contact</a>
           </nav>
           {/* Mobile menu button */}
@@ -216,12 +214,12 @@ function App() {
           <nav className="md:hidden bg-primary-blue pb-2 pt-1">
             <ul className="flex flex-col items-center space-y-2 text-lg">
               <li><a href="#about" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">About</a></li>
-              <li><a href="#vision" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Vision</a></li> {/* New link */}
-              <li><a href="#mission" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Mission</a></li> {/* New link */}
+              <li><a href="#vision" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Vision</a></li> 
+              <li><a href="#mission" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Mission</a></li> 
               <li><a href="#features" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Features</a></li>
               <li><a href="#team" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Team</a></li>
               <li><a href="#roadmap" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Roadmap</a></li>
-              <li><a href="#whitepaper" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Whitepaper</a></li> {/* New link */}
+              <li><a href="#whitepaper" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Whitepaper</a></li> 
               <li><a href="#contact" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Contact</a></li>
             </ul>
           </nav>
@@ -342,11 +340,11 @@ function App() {
               <p className="text-base sm:text-lg text-gray-700">Funds are held securely by smart contracts and released only when both parties confirm work completion, ensuring trust and fairness and mitigating disputes.</p> 
             </div>
             
-            {/* Feature 3: Global & Secure Infrastructure (Replaced Lisk specific feature) */}
+            {/* Feature 3: Robust Blockchain Infrastructure (Re-added Lisk Icon and text focusing on benefit) */}
             <div className="bg-gray-50 p-6 sm:p-8 rounded-lg shadow-xl text-center hover:scale-105 transition duration-300 ease-in-out transform animate-icon-float animate-glowing-border"> 
-              <GlobalIcon /> {/* Using the new generic global icon */}
-              <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple mt-4 mb-2">Global & Secure Infrastructure</h3>
-              <p className="text-base sm:text-lg text-gray-700">Built on a scalable and efficient blockchain, providing a reliable and future-proof foundation for decentralized payments worldwide.</p> 
+              <LiskIcon /> {/* Re-added Lisk icon */}
+              <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple mt-4 mb-2">Robust Blockchain Infrastructure</h3>
+              <p className="text-base sm:text-lg text-gray-700">Powered by a scalable and efficient Layer 2 blockchain, providing a reliable and future-proof foundation for decentralized payments worldwide.</p> 
             </div>
           </div>
         </div>
@@ -358,7 +356,6 @@ function App() {
           <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-8">Meet Our Visionary Team</h2>
           <div className="flex flex-col items-center">
             {/* External Task: Replace 'nicodemus-photo.jpg' with a professional portrait image. */}
-            {/* Ensure you have a 'global.png' in your public/icons folder, or use a placeholder URL. */}
             <img 
               src={process.env.PUBLIC_URL + "/images/nicodemus-photo.jpg"} 
               alt="Nicodemus Kiptoo Profile" 
@@ -369,6 +366,7 @@ function App() {
               Founder & Lead Developer. A dedicated MERN stack developer and blockchain enthusiast, Nicodemus leads FreelanceFlow with a passion for creating impactful decentralized solutions for the African gig economy.
             </p>
             {/* External Task: When you have them, add professional portraits and concise bios for these roles. */}
+            {/* Consider linking to their professional profiles/portfolios/company sites here */}
             <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-xl mx-auto">
               <div className="p-4 rounded-lg bg-gray-50 shadow-md">
                 <h4 className="font-bold text-lg text-primary-blue">Web Designer (Figma)</h4>
@@ -395,8 +393,8 @@ function App() {
       
       <section id="roadmap" className="py-16 sm:py-20 bg-gray-100">
         <div className="max-w-4xl mx-auto text-center px-4 transition duration-300 ease-in-out">
-          {/* Roadmap title remains focused on "Our Visionary Roadmap" */}
-          <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-8">Our Product Roadmap</h2> {/* Renamed title */}
+          {/* Roadmap title remains focused on "Our Product Roadmap" */}
+          <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-8">Our Product Roadmap</h2> 
           <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl text-left">
             <ul className="space-y-4 sm:space-y-6 text-base sm:text-lg text-gray-700">
               <li className="flex items-start">
@@ -476,7 +474,7 @@ function App() {
       
       <footer className="bg-gray-800 text-white py-6 sm:py-8 text-center text-sm">
         <div className="max-w-5xl mx-auto px-4 transition duration-300 ease-in-out">
-          <p className="mb-3">&copy; {new Date().getFullYear()} FreelanceFlow. All rights reserved. Your gateway to global opportunities.</p> {/* Removed grant mention */}
+          <p className="mb-3">&copy; {new Date().getFullYear()} FreelanceFlow. All rights reserved. Your gateway to global opportunities.</p> 
           <div className="mt-2 flex flex-wrap justify-center gap-x-6 gap-y-3 text-2xl">
             <a href="https://github.com/TarusNicky8" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition duration-300">
               <i className="fab fa-github"></i>
@@ -490,8 +488,6 @@ function App() {
             <a href="https://www.linkedin.com/in/freelanceflow-usdc-29a495371/" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition duration-300">
               <i className="fab fa-linkedin"></i>
             </a>
-            {/* External Task: Add TikTok link here once content is ready */}
-            {/* Placeholder for TikTok: <a href="YOUR_TIKTOK_URL" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition duration-300"><i className="fab fa-tiktok"></i></a> */}
           </div>
           <p className="mt-4 text-gray-400">Connecting African Talent to Global Opportunities.</p>
         </div>
