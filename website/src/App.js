@@ -22,7 +22,6 @@ const liskSepolia = {
   testnet: true,
 };
 
-// Simplified ABI for USDC (only 'approve' function needed for this example)
 const usdcAbi = [
   {
     "inputs": [
@@ -36,7 +35,6 @@ const usdcAbi = [
   }
 ];
 
-// Simplified ABI for Escrow (only 'deposit' function needed for this example)
 const escrowAbi = [
   {
     "inputs": [
@@ -50,21 +48,16 @@ const escrowAbi = [
   }
 ];
 
-// Your deployed contract addresses (replace with actual deployed addresses on Lisk Sepolia)
 const usdcContractAddress = '0xFD2A349A744616C6077978A3D463C82Ac00A37c1'; 
 const escrowContractAddress = '0x83C9919341aa0705b6b0d79420EfAAE27B53ADCf';
-
-// Placeholder for freelancer address (in a real dApp, this would come from user input or project data)
 const defaultFreelancerAddress = '0x0000000000000000000000000000000000000001'; 
 
-// Icons for features
 const UsdcIcon = () => (
   <img src={process.env.PUBLIC_URL + '/icons/usdc.png'} alt="USDC Icon" className="h-14 w-14 text-blue-600 mb-4 mx-auto" />
 );
 const SecurityIcon = () => (
   <img src={process.env.PUBLIC_URL + '/icons/security.png'} alt="Security Icon" className="h-14 w-14 text-purple-600 mb-4 mx-auto" />
 );
-// Re-added LiskIcon for features section - highlights the underlying robust infrastructure
 const LiskIcon = () => (
   <img src={process.env.PUBLIC_URL + '/icons/lisk.webp'} alt="Lisk Icon" className="h-14 w-14 text-lisk-blue mb-4 mx-auto" />
 );
@@ -76,7 +69,7 @@ function App() {
   const [account, setAccount] = React.useState(null);
   const [status, setStatus] = React.useState('');
   const [amountToDeposit, setAmountToDeposit] = React.useState('100'); 
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false); // State for mobile menu
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
   const connectWallet = async () => {
     setStatus('Connecting wallet...');
@@ -176,7 +169,6 @@ function App() {
     }
   };
 
-  // Function to toggle mobile menu
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
@@ -200,7 +192,6 @@ function App() {
             <a href="#whitepaper" className="hover:text-blue-200 transition duration-300 ease-in-out">Whitepaper</a> 
             <a href="#contact" className="hover:text-blue-200 transition duration-300 ease-in-out">Contact</a>
           </nav>
-          {/* Mobile menu button */}
           <button 
             onClick={toggleMobileMenu}
             className="md:hidden text-white text-2xl focus:outline-none p-2 -mr-2"
@@ -209,7 +200,6 @@ function App() {
             &#9776; 
           </button>
         </div>
-        {/* Mobile Navigation (simple conditional rendering) */}
         {isMobileMenuOpen && (
           <nav className="md:hidden bg-primary-blue pb-2 pt-1">
             <ul className="flex flex-col items-center space-y-2 text-lg">
@@ -228,7 +218,6 @@ function App() {
 
       
       <section className="relative bg-gradient-to-r from-primary-blue to-secondary-purple text-white py-24 text-center overflow-hidden animate-gradient">
-        {/* Dynamic Background Lines */}
         <div className="absolute inset-0 z-0 overflow-hidden">
           <div className="absolute top-0 left-1/4 h-full w-px bg-white/20 animate-line-flow"></div> 
           <div className="absolute top-0 left-3/4 h-full w-px bg-white/20 animate-line-flow-delay-2"></div> 
@@ -240,7 +229,6 @@ function App() {
           <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold mb-6 animate-fade-in-down tracking-tight animate-text-glow">
             FreelanceFlow
           </h1>
-          {/* Updated tagline to focus purely on user value and product vision */}
           <p className="text-xl md:text-2xl lg:text-3xl font-light mb-8 animate-fade-in-up">
             Your gateway to secure, low-cost USDC payments, empowering African freelancers to thrive globally.
           </p>
@@ -252,10 +240,8 @@ function App() {
           >
             Join Our Community
           </a>
-
-          {/* Divvi Integration Demonstration Area - remains for functionality demo */}
           <div className="mt-12 p-6 bg-white/10 rounded-lg shadow-inner text-white">
-            <h3 className="text-2xl font-bold mb-4">Divvi Integration Demo: Deposit USDC</h3>
+            <h3 className="text-2xl font-bold mb-4">Divvi Integration: Deposit USDC</h3>
             <div className="mb-4">
               <label htmlFor="depositAmount" className="block text-lg font-medium mb-2">Amount to Deposit (USDC):</label>
               <input
@@ -284,13 +270,11 @@ function App() {
               </button>
             )}
           </div>
-          {/* End Divvi Integration Demo Area */}
 
 
         </div>
       </section>
 
-      {/* New Vision Section */}
       <section id="vision" className="py-16 sm:py-20 bg-gray-100 text-center shadow-inner">
         <div className="max-w-5xl mx-auto px-4">
           <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-6">Our Vision</h2>
@@ -300,7 +284,6 @@ function App() {
         </div>
       </section>
 
-      {/* New Mission Section */}
       <section id="mission" className="py-16 sm:py-20 bg-white text-center shadow-inner">
         <div className="max-w-5xl mx-auto px-4">
           <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-6">Our Mission</h2>
@@ -314,9 +297,8 @@ function App() {
       <section id="about" className="py-16 sm:py-20 bg-gray-100 shadow-inner">
         <div className="max-w-5xl mx-auto text-center px-4 transition duration-300 ease-in-out">
           <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-6">About FreelanceFlow</h2>
-          {/* Rephrased About section */}
           <p className="text-lg sm:text-xl text-gray-700 max-w-3xl mx-auto leading-relaxed">
-            FreelanceFlow is a pioneering blockchain-powered platform dedicated to revolutionizing how African freelancers engage with the global gig economy. We provide a robust ecosystem enabling secure, transparent, and significantly low-cost stablecoin **USDC payments** through advanced smart contract escrow. Our solution leverages cutting-edge blockchain technology to ensure fast, reliable, and equitable transactions, empowering gig workers across the continent to maximize their earnings and opportunities.
+            FreelanceFlow is a pioneering blockchain-powered platform dedicated to revolutionizing how African freelancers engage with the global gig economy. We provide a robust ecosystem enabling secure, transparent, and significantly low-cost stablecoin USDC payments through advanced smart contract escrow. Our solution leverages cutting-edge blockchain technology to ensure fast, reliable, and equitable transactions, empowering gig workers across the continent to maximize their earnings and opportunities.
           </p>
         </div>
       </section>
@@ -326,23 +308,20 @@ function App() {
         <div className="max-w-6xl mx-auto px-4 transition duration-300 ease-in-out">
           <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue text-center mb-8 sm:mb-12">Key Features Designed for You</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-10">
-            {/* Feature 1: Low-Cost USDC Payments */}
             <div className="bg-gray-50 p-6 sm:p-8 rounded-lg shadow-xl text-center hover:scale-105 transition duration-300 ease-in-out transform animate-icon-float animate-glowing-border">
               <UsdcIcon />
               <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple mt-4 mb-2">Low-Cost USDC Payments</h3>
               <p className="text-base sm:text-lg text-gray-700 transition duration-300 ease-in-out">Receive and send USDC stablecoin with significantly reduced transaction fees, maximizing your earnings.</p>
             </div>
             
-            {/* Feature 2: Built-in Escrow Security */}
             <div className="bg-gray-50 p-6 sm:p-8 rounded-lg shadow-xl text-center hover:scale-105 transition duration-300 ease-in-out transform animate-icon-float animate-glowing-border"> 
               <SecurityIcon />
               <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple mt-4 mb-2">Built-in Escrow Security</h3>
               <p className="text-base sm:text-lg text-gray-700">Funds are held securely by smart contracts and released only when both parties confirm work completion, ensuring trust and fairness and mitigating disputes.</p> 
             </div>
             
-            {/* Feature 3: Robust Blockchain Infrastructure (Re-added Lisk Icon and text focusing on benefit) */}
             <div className="bg-gray-50 p-6 sm:p-8 rounded-lg shadow-xl text-center hover:scale-105 transition duration-300 ease-in-out transform animate-icon-float animate-glowing-border"> 
-              <LiskIcon /> {/* Re-added Lisk icon */}
+              <LiskIcon />
               <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple mt-4 mb-2">Robust Blockchain Infrastructure</h3>
               <p className="text-base sm:text-lg text-gray-700">Powered by a scalable and efficient Layer 2 blockchain, providing a reliable and future-proof foundation for decentralized payments worldwide.</p> 
             </div>
@@ -355,7 +334,6 @@ function App() {
         <div className="max-w-4xl mx-auto text-center px-4 transition duration-300 ease-in-out">
           <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-8">Meet Our Visionary Team</h2>
           <div className="flex flex-col items-center">
-            {/* External Task: Replace 'nicodemus-photo.jpg' with a professional portrait image. */}
             <img 
               src={process.env.PUBLIC_URL + "/images/nicodemus-photo.jpg"} 
               alt="Nicodemus Kiptoo Profile" 
@@ -363,28 +341,23 @@ function App() {
             />
             <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple">Nicodemus Kiptoo</h3>
             <p className="text-base sm:text-lg text-gray-700 mt-2 max-w-xl mx-auto">
-              Founder & Lead Developer. A dedicated MERN stack developer and blockchain enthusiast, Nicodemus leads FreelanceFlow with a passion for creating impactful decentralized solutions for the African gig economy.
+             Founder. Nicodemus leads the effective use of innovative solutions that streamline work and transactions for the African gig economy.
             </p>
-            {/* External Task: When you have them, add professional portraits and concise bios for these roles. */}
-            {/* Consider linking to their professional profiles/portfolios/company sites here */}
             <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-xl mx-auto">
               <div className="p-4 rounded-lg bg-gray-50 shadow-md">
-                <h4 className="font-bold text-lg text-primary-blue">Web Designer (Figma)</h4>
-                <p className="text-gray-700 text-sm">Shaping our intuitive user experience. (Placeholder - Add Name/Bio)</p>
+                <h4 className="font-bold text-lg text-primary-blue">CTO</h4>
+                <p className="text-gray-700 text-sm">Technical architect behind FreelanceFlow's innovative platform</p>
               </div>
               <div className="p-4 rounded-lg bg-gray-50 shadow-md">
-                <h4 className="font-bold text-lg text-primary-blue">Business Strategist</h4>
-                <p className="text-gray-700 text-sm">Guiding market entry and growth. (Placeholder - Add Name/Bio)</p>
+                <h4 className="font-bold text-lg text-primary-blue">CMO</h4>
+                <p className="text-gray-700 text-sm">Guiding market entry and growth.</p>
               </div>
             </div>
 
             <div className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-2">
               <a href="https://github.com/TarusNicky8" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:text-blue-800 transition duration-300">GitHub</a>
-              {/* Updated LinkedIn to project's account */}
               <a href="https://www.linkedin.com/in/freelanceflow-usdc-29a495371/" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:text-blue-800 transition duration-300">LinkedIn</a>
-              {/* Updated X (Twitter) to project's account */}
               <a href="https://x.com/freelanceflo" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:text-blue-800 transition duration-300">X (Twitter)</a>
-              {/* External Task: Consider adding TikTok link here once content is ready */}
             </div>
           </div>
         </div>
@@ -393,16 +366,14 @@ function App() {
       
       <section id="roadmap" className="py-16 sm:py-20 bg-gray-100">
         <div className="max-w-4xl mx-auto text-center px-4 transition duration-300 ease-in-out">
-          {/* Roadmap title remains focused on "Our Product Roadmap" */}
           <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-8">Our Product Roadmap</h2> 
           <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl text-left">
             <ul className="space-y-4 sm:space-y-6 text-base sm:text-lg text-gray-700">
               <li className="flex items-start">
                 <span className="text-secondary-purple font-bold mr-3 text-xl sm:text-2xl">✔</span>
                 <div>
-                  {/* Rephrased for product phases, removed 'Milestone' term */}
                   <strong className="text-lg sm:text-xl text-primary-blue">Phase 1 (Initial Launch & Foundation)</strong><br />
-                  Core smart contracts deployed, secure payment infrastructure established, and initial community outreach. (Completed: July 2025)
+                  Core smart contracts deployed, secure payment infrastructure established, and initial community outreach.
                 </div>
               </li>
               <li className="flex items-start">
@@ -431,13 +402,12 @@ function App() {
         </div>
       </section>
 
-      {/* Whitepaper Section - Placeholder for a future document */}
       <section id="whitepaper" className="py-12 sm:py-16 bg-white text-center shadow-inner">
         <div className="max-w-4xl mx-auto px-4 transition duration-300 ease-in-out">
           <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-4">Deep Dive: Our Whitepaper</h2>
           <p className="text-lg sm:text-xl mb-8">Explore the comprehensive technical architecture, economic model, and long-term vision of FreelanceFlow in our detailed Whitepaper.</p>
           <a
-            href="#" // Placeholder for Whitepaper URL
+            href="/WHITEPAPER.md" 
             target="_blank"
             rel="noopener noreferrer"
             className="inline-block px-8 py-3 bg-secondary-purple text-white font-semibold rounded-lg hover:bg-purple-700 shadow-lg transition duration-300"
@@ -447,7 +417,6 @@ function App() {
         </div>
       </section>
       
-      {/* Docs and Contact remain, but 'Docs' might need to be rephrased */}
       <section id="contact" className="py-12 sm:py-16 bg-primary-blue text-white text-center">
         <div className="max-w-4xl mx-auto px-4 transition duration-300 ease-in-out">
           <h2 className="text-3xl sm:text-4xl font-bold mb-4">Connect with FreelanceFlow</h2>
