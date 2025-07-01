@@ -1,5 +1,5 @@
 import React from 'react';
-import logo from './Logo.png'; 
+import logo from './logo.svg'; 
 import { getDataSuffix, submitReferral } from '@divvi/referral-sdk'; 
 import { createWalletClient, custom, parseUnits, encodeFunctionData, createPublicClient, http } from 'viem'; 
 
