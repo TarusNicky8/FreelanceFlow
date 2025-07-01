@@ -1,5 +1,5 @@
 import React from 'react';
-import logo from './logo.jpg'; 
+import logo from './Logo White.png'; 
 import { getDataSuffix, submitReferral } from '@divvi/referral-sdk'; 
 import { createWalletClient, custom, parseUnits, encodeFunctionData, createPublicClient, http } from 'viem'; 
 
@@ -180,7 +180,6 @@ function App() {
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <a href="/" className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
             <img src={logo} alt="FreelanceFlow Logo" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 border-white" />
-            <span className="text-lg sm:text-2xl font-bold whitespace-nowrap">FreelanceFlow</span>
           </a>
           <nav className="hidden md:flex space-x-6 text-lg"> 
             <a href="#about" className="hover:text-blue-200 transition duration-300 ease-in-out">About</a>
