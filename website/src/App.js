@@ -370,7 +370,7 @@ function App() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-left"> 
             <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl hover:scale-105 transition duration-300 ease-in-out transform">
               <div className="flex items-center mb-4">
-                <span className="text-secondary-purple font-bold mr-3 text-xl sm:text-2xl">✔</span>
+                {/*<span className="text-secondary-purple font-bold mr-3 text-xl sm:text-2xl">✔</span>*/}
                 <h3 className="text-lg sm:text-xl font-bold text-primary-blue">Phase 1: Initial Launch & Foundation</h3>
                 <span className="ml-auto bg-green-200 text-green-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">Completed</span>
               </div>
@@ -382,7 +382,7 @@ function App() {
             
             <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl hover:scale-105 transition duration-300 ease-in-out transform">
               <div className="flex items-center mb-4">
-                <span className="text-blue-600 font-bold mr-3 text-xl sm:text-2xl">⏳</span>
+                {/*<span className="text-blue-600 font-bold mr-3 text-xl sm:text-2xl">⏳</span>*/}
                 <h3 className="text-lg sm:text-xl font-bold text-primary-blue">Phase 2: Minimum Viable Product Beta</h3>
                 <span className="ml-auto bg-blue-200 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">In Progress</span>
               </div>
@@ -394,7 +394,7 @@ function App() {
 
             <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl hover:scale-105 transition duration-300 ease-in-out transform">
               <div className="flex items-center mb-4">
-                <span className="text-green-600 font-bold mr-3 text-xl sm:text-2xl">🚀</span>
+                {/*<span className="text-green-600 font-bold mr-3 text-xl sm:text-2xl">🚀</span>*/}
                 <h3 className="text-lg sm:text-xl font-bold text-primary-blue">Phase 3: Growth & Ecosystem Expansion</h3>
                 <span className="ml-auto bg-purple-200 text-purple-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">Upcoming</span>
               </div>
@@ -406,7 +406,7 @@ function App() {
 
             <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl hover:scale-105 transition duration-300 ease-in-out transform">
               <div className="flex items-center mb-4">
-                <span className="text-gray-500 font-bold mr-3 text-xl sm:text-2xl">💡</span>
+                {/*<span className="text-gray-500 font-bold mr-3 text-xl sm:text-2xl">💡</span>*/}
                 <h3 className="text-lg sm:text-xl font-bold text-primary-blue">Future Enhancements: Scaling & Accessibility</h3>
                 <span className="ml-auto bg-gray-200 text-gray-700 text-xs font-semibold px-2.5 py-0.5 rounded-full">Future</span>
               </div>
