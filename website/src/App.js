@@ -377,7 +377,7 @@ function App() {
               <p className="text-base sm:text-lg text-gray-700 leading-relaxed">
                 Core smart contracts deployed, secure payment infrastructure established, and initial community outreach.
               </p>
-              <p className="text-sm text-gray-500 mt-2">*(July 2025)*</p>
+              <p className="text-sm text-gray-500 mt-2">(July 2025)</p>
             </div>
             
             <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl hover:scale-105 transition duration-300 ease-in-out transform">
@@ -389,7 +389,7 @@ function App() {
               <p className="text-base sm:text-lg text-gray-700 leading-relaxed">
                 Launch of the core platform to a curated group of 50 beta users, enabling USDC payment processing and escrow, gathering crucial feedback for optimization.
               </p>
-              <p className="text-sm text-gray-500 mt-2">*(Target: Q3 2025)*</p>
+              <p className="text-sm text-gray-500 mt-2">(Target: Q3 2025)</p>
             </div>
 
             <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl hover:scale-105 transition duration-300 ease-in-out transform">
@@ -401,7 +401,7 @@ function App() {
               <p className="text-base sm:text-lg text-gray-700 leading-relaxed">
                 Scaling user base to 150 active users, achieving $40,000 USDC Total Value Locked (TVL), and enhancing platform with advanced features.
               </p>
-              <p className="text-sm text-gray-500 mt-2">*(Target: Q4 2025)*</p>
+              <p className="text-sm text-gray-500 mt-2">(Target: Q4 2025)</p>
             </div>
 
             <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl hover:scale-105 transition duration-300 ease-in-out transform">
@@ -413,7 +413,7 @@ function App() {
               <p className="text-base sm:text-lg text-gray-700 leading-relaxed">
                 Plans include integrating seamless fiat on/off-ramps, implementing sophisticated dispute resolution mechanisms, and expanding global participation.
               </p>
-              <p className="text-sm text-gray-500 mt-2">*(Beyond Q4 2025)*</p>
+              <p className="text-sm text-gray-500 mt-2">(Beyond Q4 2025)</p>
             </div>
           </div>
         </div>
