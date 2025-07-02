@@ -424,7 +424,7 @@ function App() {
           <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-4">Deep Dive: Our Whitepaper</h2>
           <p className="text-lg sm:text-xl mb-8">Explore the comprehensive technical architecture, economic model, and long-term vision of FreelanceFlow in our detailed Whitepaper.</p>
           <a
-            href="/WHITEPAPER.md" 
+            href="/WHITEPAPER.pdf" 
             target="_blank"
             rel="noopener noreferrer"
             className="inline-block px-8 py-3 bg-secondary-purple text-white font-semibold rounded-lg hover:bg-purple-700 shadow-lg transition duration-300"
