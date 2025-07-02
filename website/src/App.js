@@ -1,5 +1,5 @@
 import React from 'react';
-import logo from './Logo White.png'; 
+import logo from './App icon.svg'; 
 import { getDataSuffix, submitReferral } from '@divvi/referral-sdk'; 
 import { createWalletClient, custom, parseUnits, encodeFunctionData, createPublicClient, http } from 'viem'; 
 
@@ -180,6 +180,7 @@ function App() {
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <a href="/" className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
             <img src={logo} alt="FreelanceFlow Logo" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 border-white" />
+            <span className="text-lg sm:text-2xl font-bold whitespace-nowrap">FreelanceFlow</span>
           </a>
           <nav className="hidden md:flex space-x-6 text-lg"> 
             <a href="#about" className="hover:text-blue-200 transition duration-300 ease-in-out">About</a>
@@ -365,38 +366,55 @@ function App() {
       
       <section id="roadmap" className="py-16 sm:py-20 bg-gray-100">
         <div className="max-w-4xl mx-auto text-center px-4 transition duration-300 ease-in-out">
-          <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-8">Our Product Roadmap</h2> 
-          <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl text-left">
-            <ul className="space-y-4 sm:space-y-6 text-base sm:text-lg text-gray-700">
-              <li className="flex items-start">
+          <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-8">Our Product Roadmap</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-left"> 
+            <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl hover:scale-105 transition duration-300 ease-in-out transform">
+              <div className="flex items-center mb-4">
                 <span className="text-secondary-purple font-bold mr-3 text-xl sm:text-2xl">✔</span>
-                <div>
-                  <strong className="text-lg sm:text-xl text-primary-blue">Phase 1 (Initial Launch & Foundation)</strong><br />
-                  Core smart contracts deployed, secure payment infrastructure established, and initial community outreach.
-                </div>
-              </li>
-              <li className="flex items-start">
+                <h3 className="text-lg sm:text-xl font-bold text-primary-blue">Phase 1: Initial Launch & Foundation</h3>
+                <span className="ml-auto bg-green-200 text-green-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">Completed</span>
+              </div>
+              <p className="text-base sm:text-lg text-gray-700 leading-relaxed">
+                Core smart contracts deployed, secure payment infrastructure established, and initial community outreach.
+              </p>
+              <p className="text-sm text-gray-500 mt-2">*(July 2025)*</p>
+            </div>
+            
+            <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl hover:scale-105 transition duration-300 ease-in-out transform">
+              <div className="flex items-center mb-4">
                 <span className="text-blue-600 font-bold mr-3 text-xl sm:text-2xl">⏳</span>
-                <div>
-                  <strong className="text-lg sm:text-xl text-primary-blue">Phase 2 (Minimum Viable Product Beta)</strong><br />
-                  Launch of the core platform to a curated group of 50 beta users, enabling USDC payment processing and escrow, gathering crucial feedback for optimization. (Target: Q3 2025)
-                </div>
-              </li>
-              <li className="flex items-start">
+                <h3 className="text-lg sm:text-xl font-bold text-primary-blue">Phase 2: Minimum Viable Product Beta</h3>
+                <span className="ml-auto bg-blue-200 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">In Progress</span>
+              </div>
+              <p className="text-base sm:text-lg text-gray-700 leading-relaxed">
+                Launch of the core platform to a curated group of 50 beta users, enabling USDC payment processing and escrow, gathering crucial feedback for optimization.
+              </p>
+              <p className="text-sm text-gray-500 mt-2">*(Target: Q3 2025)*</p>
+            </div>
+
+            <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl hover:scale-105 transition duration-300 ease-in-out transform">
+              <div className="flex items-center mb-4">
                 <span className="text-green-600 font-bold mr-3 text-xl sm:text-2xl">🚀</span>
-                <div>
-                  <strong className="text-lg sm:text-xl text-primary-blue">Phase 3 (Growth & Ecosystem Expansion)</strong><br />
-                  Scaling user base to 150 active users, achieving $40,000 USDC Total Value Locked (TVL), and enhancing platform with advanced features. (Target: Q4 2025)
-                </div>
-              </li>
-              <li className="flex items-start">
+                <h3 className="text-lg sm:text-xl font-bold text-primary-blue">Phase 3: Growth & Ecosystem Expansion</h3>
+                <span className="ml-auto bg-purple-200 text-purple-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">Upcoming</span>
+              </div>
+              <p className="text-base sm:text-lg text-gray-700 leading-relaxed">
+                Scaling user base to 150 active users, achieving $40,000 USDC Total Value Locked (TVL), and enhancing platform with advanced features.
+              </p>
+              <p className="text-sm text-gray-500 mt-2">*(Target: Q4 2025)*</p>
+            </div>
+
+            <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl hover:scale-105 transition duration-300 ease-in-out transform">
+              <div className="flex items-center mb-4">
                 <span className="text-gray-500 font-bold mr-3 text-xl sm:text-2xl">💡</span>
-                <div>
-                  <strong className="text-lg sm:text-xl text-primary-blue">Future Enhancements: Scaling & Accessibility</strong><br />
-                  Plans include integrating seamless fiat on/off-ramps, implementing sophisticated dispute resolution mechanisms, and expanding global participation.
-                </div>
-              </li>
-            </ul>
+                <h3 className="text-lg sm:text-xl font-bold text-primary-blue">Future Enhancements: Scaling & Accessibility</h3>
+                <span className="ml-auto bg-gray-200 text-gray-700 text-xs font-semibold px-2.5 py-0.5 rounded-full">Future</span>
+              </div>
+              <p className="text-base sm:text-lg text-gray-700 leading-relaxed">
+                Plans include integrating seamless fiat on/off-ramps, implementing sophisticated dispute resolution mechanisms, and expanding global participation.
+              </p>
+              <p className="text-sm text-gray-500 mt-2">*(Beyond Q4 2025)*</p>
+            </div>
           </div>
         </div>
       </section>
