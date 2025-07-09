@@ -338,7 +338,7 @@ function App() {
 
       <div className="flex flex-col items-center flex-1">
         <img
-          src={process.env.PUBLIC_URL + "/images/DSC_2376-1.jpg"}
+          src={process.env.PUBLIC_URL + "/images/Nick.webp"}
           alt="Nicodemus Kiptoo Profile"
           className="w-32 h-32 sm:w-40 sm:h-40 rounded-full object-cover shadow-md mb-4 border-4 border-secondary-purple"
         />
@@ -356,7 +356,7 @@ function App() {
 
       <div className="flex flex-col items-center flex-1">
         <img
-          src={process.env.PUBLIC_URL + "/images/Ashley1.jpg"}
+          src={process.env.PUBLIC_URL + "/images/Ashley.webp"}
           alt="Hacker Profile"
           className="w-32 h-32 sm:w-40 sm:h-40 rounded-full object-cover shadow-md mb-4 border-4 border-secondary-purple"
         />
