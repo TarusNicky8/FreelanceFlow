@@ -338,7 +338,7 @@ function App() {
 
       <div className="flex flex-col items-center flex-1">
         <img
-          src={process.env.PUBLIC_URL + "/images/Nick.webp"}
+          src={process.env.PUBLIC_URL + "/images/Nick copy.webp"}
           alt="Nicodemus Kiptoo Profile"
           className="w-32 h-32 sm:w-40 sm:h-40 rounded-full object-cover shadow-md mb-4 border-4 border-secondary-purple"
         />
@@ -362,7 +362,7 @@ function App() {
         />
         <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple">Ashley</h3>
         <p className="text-base sm:text-lg text-gray-700 mt-2 max-w-xs text-center">
-          Growth hacker. Ashley focuses on strategies that help freelancers have access to more secure gigs and diverse talent.
+          Growth hacker. Ashley focuses on strategies that help freelancers have access to more secure gigs and diverse talent across the continent.
         </p>
         
         <div className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-2">
