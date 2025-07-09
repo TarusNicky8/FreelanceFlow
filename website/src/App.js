@@ -330,38 +330,67 @@ function App() {
       </section>
 
       
-      <section id="team" className="py-16 sm:py-20 bg-white shadow-inner">
-        <div className="max-w-4xl mx-auto text-center px-4 transition duration-300 ease-in-out">
-          <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-8">Meet Our Visionary Team</h2>
-          <div className="flex flex-col items-center">
-            <img 
-              src={process.env.PUBLIC_URL + "/images/nicodemus-photo.jpg"} 
-              alt="Nicodemus Kiptoo Profile" 
-              className="w-32 h-32 sm:w-40 sm:h-40 rounded-full object-cover shadow-md mb-4 border-4 border-secondary-purple"
-            />
-            <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple">Nicodemus Kiptoo</h3>
-            <p className="text-base sm:text-lg text-gray-700 mt-2 max-w-xl mx-auto">
-             Founder. Nicodemus leads the effective use of innovative solutions that streamline work and transactions for the African gig economy.
-            </p>
-            <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-xl mx-auto">
-              <div className="p-4 rounded-lg bg-gray-50 shadow-md">
-                <h4 className="font-bold text-lg text-primary-blue">CTO</h4>
-                <p className="text-gray-700 text-sm">Technical architect behind FreelanceFlow's innovative platform</p>
-              </div>
-              <div className="p-4 rounded-lg bg-gray-50 shadow-md">
-                <h4 className="font-bold text-lg text-primary-blue">CMO</h4>
-                <p className="text-gray-700 text-sm">Guiding market entry and growth.</p>
-              </div>
-            </div>
+<section id="team" className="py-16 sm:py-20 bg-white shadow-inner">
+  <div className="max-w-4xl mx-auto text-center px-4 transition duration-300 ease-in-out">
+    <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-8">Meet Our Visionary Team</h2>
+    <div className="flex flex-col md:flex-row justify-center items-start md:space-x-8 space-y-12 md:space-y-0">
 
-            <div className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-2">
-              <a href="https://github.com/TarusNicky8" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:text-blue-800 transition duration-300">GitHub</a>
-              <a href="https://www.linkedin.com/in/freelanceflow-usdc-29a495371/" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:text-blue-800 transition duration-300">LinkedIn</a>
-              <a href="https://x.com/freelanceflo" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:text-blue-800 transition duration-300">X (Twitter)</a>
-            </div>
-          </div>
+
+      <div className="flex flex-col items-center flex-1">
+        <img
+          src={process.env.PUBLIC_URL + "/images/DSC_2376-1.jpg"}
+          alt="Nicodemus Kiptoo Profile"
+          className="w-32 h-32 sm:w-40 sm:h-40 rounded-full object-cover shadow-md mb-4 border-4 border-secondary-purple"
+        />
+        <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple">Nicodemus</h3>
+        <p className="text-base sm:text-lg text-gray-700 mt-2 max-w-xs text-center">
+          Founder. Nicodemus leads the effective use of innovative solutions that streamline work and transactions for the African gig economy.
+        </p>
+
+        <div className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-2">
+          <a href="https://www.linkedin.com/in/nicodemus-kiptoo-4276b9364/" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:text-blue-800 transition duration-300">LinkedIn</a>
+          <a href="https://x.com/nicodemuskipto0" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:text-blue-800 transition duration-300">X</a>
         </div>
-      </section>
+      </div>
+
+
+      <div className="flex flex-col items-center flex-1">
+        <img
+          src={process.env.PUBLIC_URL + "/images/Ashley1.jpg"}
+          alt="Hacker Profile"
+          className="w-32 h-32 sm:w-40 sm:h-40 rounded-full object-cover shadow-md mb-4 border-4 border-secondary-purple"
+        />
+        <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple">Ashley</h3>
+        <p className="text-base sm:text-lg text-gray-700 mt-2 max-w-xs text-center">
+          Growth hacker. Ashley focuses on strategies that help freelancers have access to more secure gigs and diverse talent.
+        </p>
+        
+        <div className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-2">
+          <a href="https://www.linkedin.com/in/ashley-jepchirchir-9222982a9/" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:text-blue-800 transition duration-300">LinkedIn</a>
+          <a href="https://x.com/A_jepchirchir" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:text-blue-800 transition duration-300">X</a>
+        </div>
+      </div> 
+
+
+      <div className="flex flex-col items-center flex-1">
+        <img
+          src={process.env.PUBLIC_URL + "/images/Joan.jpg"}
+          alt="CMO Profile"
+          className="w-32 h-32 sm:w-40 sm:h-40 rounded-full object-cover shadow-md mb-4 border-4 border-secondary-purple"
+        />
+        <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple">Joan</h3>
+        <p className="text-base sm:text-lg text-gray-700 mt-2 max-w-xs text-center">
+          Business developer. Joan focuses on guiding market entry and growth strategies to connect FreelanceFlow with a global audience.
+        </p>
+
+        <div className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-2">
+          <a href="https://www.linkedin.com/in/eng-joan-jerop-810106133/" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:text-blue-800 transition duration-300">LinkedIn</a>
+          <a href="https://x.com/jeropcrypto" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:text-blue-800 transition duration-300">X</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
 
       
       <section id="roadmap" className="py-16 sm:py-20 bg-gray-100">
@@ -370,7 +399,6 @@ function App() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-left"> 
             <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl hover:scale-105 transition duration-300 ease-in-out transform">
               <div className="flex items-center mb-4">
-                {/*<span className="text-secondary-purple font-bold mr-3 text-xl sm:text-2xl">✔</span>*/}
                 <h3 className="text-lg sm:text-xl font-bold text-primary-blue">Phase 1: Initial Launch & Foundation</h3>
                 <span className="ml-auto bg-green-200 text-green-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">Completed</span>
               </div>
@@ -382,7 +410,6 @@ function App() {
             
             <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl hover:scale-105 transition duration-300 ease-in-out transform">
               <div className="flex items-center mb-4">
-                {/*<span className="text-blue-600 font-bold mr-3 text-xl sm:text-2xl">⏳</span>*/}
                 <h3 className="text-lg sm:text-xl font-bold text-primary-blue">Phase 2: Minimum Viable Product Beta</h3>
                 <span className="ml-auto bg-blue-200 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">In Progress</span>
               </div>
@@ -394,7 +421,6 @@ function App() {
 
             <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl hover:scale-105 transition duration-300 ease-in-out transform">
               <div className="flex items-center mb-4">
-                {/*<span className="text-green-600 font-bold mr-3 text-xl sm:text-2xl">🚀</span>*/}
                 <h3 className="text-lg sm:text-xl font-bold text-primary-blue">Phase 3: Growth & Ecosystem Expansion</h3>
                 <span className="ml-auto bg-purple-200 text-purple-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">Upcoming</span>
               </div>
@@ -406,7 +432,6 @@ function App() {
 
             <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl hover:scale-105 transition duration-300 ease-in-out transform">
               <div className="flex items-center mb-4">
-                {/*<span className="text-gray-500 font-bold mr-3 text-xl sm:text-2xl">💡</span>*/}
                 <h3 className="text-lg sm:text-xl font-bold text-primary-blue">Future Enhancements: Scaling & Accessibility</h3>
                 <span className="ml-auto bg-gray-200 text-gray-700 text-xs font-semibold px-2.5 py-0.5 rounded-full">Future</span>
               </div>
