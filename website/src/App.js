@@ -335,12 +335,11 @@ function App() {
     <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-8">Meet Our Visionary Team</h2>
     <div className="flex flex-col md:flex-row justify-center items-start md:space-x-8 space-y-12 md:space-y-0">
 
-
       <div className="flex flex-col items-center flex-1">
         <img
           src={process.env.PUBLIC_URL + "/images/Nick copy.webp"}
           alt="Nicodemus Kiptoo Profile"
-          className="w-32 h-32 sm:w-40 sm:h-40 rounded-full object-cover shadow-md mb-4 border-4 border-secondary-purple"
+          className="w-32 h-32 sm:w-40 sm:h-40 rounded-full object-cover object-top shadow-md mb-4 border-4 border-secondary-purple"
         />
         <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple">Nicodemus</h3>
         <p className="text-base sm:text-lg text-gray-700 mt-2 max-w-xs text-center">
@@ -353,30 +352,28 @@ function App() {
         </div>
       </div>
 
-
       <div className="flex flex-col items-center flex-1">
         <img
           src={process.env.PUBLIC_URL + "/images/Ashley.webp"}
           alt="Hacker Profile"
-          className="w-32 h-32 sm:w-40 sm:h-40 rounded-full object-cover shadow-md mb-4 border-4 border-secondary-purple"
+          className="w-32 h-32 sm:w-40 sm:h-40 rounded-full object-cover object-top shadow-md mb-4 border-4 border-secondary-purple"
         />
         <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple">Ashley</h3>
         <p className="text-base sm:text-lg text-gray-700 mt-2 max-w-xs text-center">
           Growth hacker. Ashley focuses on strategies that help freelancers have access to more secure gigs and diverse talent across the continent.
         </p>
-        
+
         <div className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-2">
           <a href="https://www.linkedin.com/in/ashley-jepchirchir-9222982a9/" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:text-blue-800 transition duration-300">LinkedIn</a>
           <a href="https://x.com/A_jepchirchir" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:text-blue-800 transition duration-300">X</a>
         </div>
-      </div> 
-
+      </div>
 
       <div className="flex flex-col items-center flex-1">
         <img
           src={process.env.PUBLIC_URL + "/images/Joan.jpg"}
           alt="CMO Profile"
-          className="w-32 h-32 sm:w-40 sm:h-40 rounded-full object-cover shadow-md mb-4 border-4 border-secondary-purple"
+          className="w-32 h-32 sm:w-40 sm:h-40 rounded-full object-cover object-top shadow-md mb-4 border-4 border-secondary-purple"
         />
         <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple">Joan</h3>
         <p className="text-base sm:text-lg text-gray-700 mt-2 max-w-xs text-center">
