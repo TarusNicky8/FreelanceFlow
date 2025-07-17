@@ -875,7 +875,7 @@ function App() {
               <img src={logo} alt="FreelanceFlow Logo" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 border-white" />
               <span className="text-lg sm:text-2xl font-bold whitespace-nowrap">FreelanceFlow</span>
             </Link>
-            <nav className="hidden md:flex space-x-6 text-lg"> 
+            <nav className="hidden md:flex flex-wrap items-center gap-x-6 text-lg"> 
               {/* Internal Links using Link component */}
               <Link to="/" className="hover:text-blue-200 transition duration-300 ease-in-out">Home</Link>
               <Link to="/dashboard" className="hover:text-blue-200 transition duration-300 ease-in-out">Dashboard</Link>
@@ -903,7 +903,7 @@ function App() {
           </div>
           {isMobileMenuOpen && (
             <nav className="md:hidden bg-primary-blue pb-2 pt-1">
-              <ul className="flex flex-col items-center space-y-2 text-lg">
+              <ul className="flex flex-col items-center space-y-3 text-lg py-2"> {/* Increased space-y and added py */}
                 <li><Link to="/" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Home</Link></li>
                 <li><Link to="/dashboard" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Dashboard</Link></li>
                 <li><Link to="/profile" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Profile</Link></li>
@@ -1131,7 +1131,7 @@ function App() {
                 </div>
               </section>
               
-              <section id="contact" className="py-12 sm:py-16 bg-primary-blue text-white text-center">
+              <section id="contact" className="py-12 sm:py-16 bg-primary-blue text-white text-center pb-20"> {/* Added pb-20 for extra bottom padding */}
                 <div className="max-w-4xl mx-auto px-4 transition duration-300 ease-in-out">
                   <h2 className="text-3xl sm:text-4xl font-bold mb-4">Connect with FreelanceFlow</h2>
                   <p className="text-lg sm:text-xl mb-8">Have questions, feedback, or want to partner? Reach out to us!</p>
