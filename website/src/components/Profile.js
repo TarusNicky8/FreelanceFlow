@@ -2,25 +2,18 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
-// Define your backend API base URL
-// IMPORTANT: For production, use an environment variable (e.g., process.env.REACT_APP_API_BASE_URL)
-// For local development, 'http://localhost:5000' is fine.
 const API_BASE_URL = 'http://localhost:5000'; 
 
 const Profile = ({ account }) => {
-  // State for the freelancer's profile data
   const [profile, setProfile] = useState({ skills: [], portfolio: [], rating: 0 });
-  // State for input fields
   const [skillsInput, setSkillsInput] = useState('');
   const [portfolioInput, setPortfolioInput] = useState('');
-  // State for loading and status messages
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
-  const [isError, setIsError] = useState(false); // To differentiate success/error messages
+  const [isError, setIsError] = useState(false); 
 
   const navigate = useNavigate();
 
-  // useEffect hook to fetch the profile data when the component mounts or account changes
   useEffect(() => {
     const fetchProfile = async () => {
       if (!account) {
@@ -34,8 +27,8 @@ const Profile = ({ account }) => {
       try {
         const response = await axios.get(`${API_BASE_URL}/api/users/${account}`);
         setProfile(response.data);
-        setSkillsInput(response.data.skills?.join(', ') || ''); // Populate input with current skills
-        setPortfolioInput(response.data.portfolio?.join(', ') || ''); // Populate input with current portfolio
+        setSkillsInput(response.data.skills?.join(', ') || '');
+        setPortfolioInput(response.data.portfolio?.join(', ') || '');
         setStatusMessage('Profile loaded successfully.');
       } catch (error) {
         console.error('Error fetching profile:', error);
@@ -46,11 +39,10 @@ const Profile = ({ account }) => {
       }
     };
     fetchProfile();
-  }, [account]); // Dependency array: re-run when 'account' changes
+  }, [account]); 
 
-  // Handler for saving the profile
   const handleSave = async (e) => {
-    e.preventDefault(); // Prevent default form submission behavior
+    e.preventDefault();
 
     if (!account) {
       setStatusMessage('Wallet not connected. Cannot save profile.');
@@ -62,7 +54,6 @@ const Profile = ({ account }) => {
     setStatusMessage('Saving profile...');
     setIsError(false);
     try {
-      // Split comma-separated strings into arrays and trim whitespace
       const updatedSkills = skillsInput.split(',').map(s => s.trim()).filter(s => s !== '');
       const updatedPortfolio = portfolioInput.split(',').map(p => p.trim()).filter(p => p !== '');
 
@@ -71,12 +62,10 @@ const Profile = ({ account }) => {
         portfolio: updatedPortfolio,
       });
 
-      // Update local profile state to reflect changes immediately
       setProfile(prev => ({ ...prev, skills: updatedSkills, portfolio: updatedPortfolio }));
       setStatusMessage('Profile updated successfully!');
-      setIsError(false); // Clear any previous error state
+      setIsError(false);
 
-      // Navigate to dashboard after a short delay for user to see success message
       setTimeout(() => {
         navigate('/dashboard');
       }, 1500); 
@@ -94,12 +83,10 @@ const Profile = ({ account }) => {
     <div className="max-w-5xl mx-auto p-4 bg-white shadow-lg rounded-lg my-8">
       <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">Freelancer Profile</h2>
       
-      {/* Display wallet account */}
       <p className="text-lg text-gray-700 mb-4">
-        **Wallet:** <span className="font-mono text-secondary-purple">{account || 'Not connected'}</span>
+        Wallet: <span className="font-mono text-secondary-purple">{account || 'Not connected'}</span>
       </p>
 
-      {/* Status Message Display */}
       {statusMessage && (
         <div className={`p-3 mb-4 rounded-md ${isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
           {statusMessage}
@@ -117,7 +104,6 @@ const Profile = ({ account }) => {
         </div>
       )}
 
-      {/* Profile Edit Form */}
       <form onSubmit={handleSave} className="space-y-6">
         <div>
           <label htmlFor="skills" className="block text-lg font-medium text-text-dark mb-1">Skills (comma-separated)</label>
@@ -159,18 +145,17 @@ const Profile = ({ account }) => {
         </button>
       </form>
 
-      {/* Current Profile Display */}
       <div className="mt-8 p-6 bg-gray-50 rounded-lg shadow-inner">
         <h3 className="text-xl font-semibold text-primary-blue mb-3 border-b pb-2">Current Profile Details</h3>
         <p className="text-base text-gray-700 mb-2">
-          **Skills:** {profile.skills && profile.skills.length > 0 ? profile.skills.join(', ') : 'No skills added yet.'}
+          Skills: {profile.skills && profile.skills.length > 0 ? profile.skills.join(', ') : 'No skills added yet.'}
         </p>
         <p className="text-base text-gray-700">
-          **Portfolio:** {profile.portfolio && profile.portfolio.length > 0 ? (
+          Portfolio: {profile.portfolio && profile.portfolio.length > 0 ? (
             profile.portfolio.map((p, index) => (
               <React.Fragment key={index}>
                 <a 
-                  href={p.startsWith('http') ? p : `https://${p}`} // Ensure links are valid
+                  href={p.startsWith('http') ? p : `https://${p}`} 
                   target="_blank" 
                   rel="noopener noreferrer" 
                   className="text-primary-blue hover:underline break-words"

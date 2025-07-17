@@ -3,9 +3,8 @@ import { BrowserRouter, Routes, Route, Link, useNavigate, useParams } from 'reac
 import axios from 'axios';
 import { createWalletClient, custom, parseUnits, encodeFunctionData, createPublicClient, http } from 'viem';
 import { getDataSuffix, submitReferral } from '@divvi/referral-sdk';
-import logo from './App icon.svg'; // Correctly import the logo
+import logo from './App icon.svg'; 
 
-// --- Configuration Constants ---
 const liskSepolia = {
   id: 4202,
   name: 'Lisk Sepolia Testnet', 
@@ -51,7 +50,7 @@ const escrowAbi = [
   }
 ];
 
-const escrowAbiForRelease = [ // Specific ABI for release function
+const escrowAbiForRelease = [ 
   {
     "inputs": [
       { "internalType": "address", "name": "freelancer", "type": "address" },
@@ -68,13 +67,10 @@ const usdcContractAddress = '0xFD2A349A744616C6077978A3D463C82Ac00A37c1';
 const escrowContractAddress = '0x83C9919341aa0705b6b0d79420EfAAE27B53ADCf';
 const defaultFreelancerAddress = '0x0000000000000000000000000000000000000001'; 
 
-// Backend API Base URL
-// For local development, this will be 'http://localhost:5000'.
 // For deployment (e.g., to freelanceflow.net), you MUST set REACT_APP_API_BASE_URL
 // environment variable to your live backend URL (e.g., https://your-live-backend.com).
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'; 
 
-// --- Icon Components (Moved here for single file constraint) ---
 const UsdcIcon = () => (
   <img src={process.env.PUBLIC_URL + '/icons/usdc.png'} alt="USDC Icon" className="h-14 w-14 text-blue-600 mb-4 mx-auto" />
 );
@@ -85,7 +81,6 @@ const LiskIcon = () => (
   <img src={process.env.PUBLIC_URL + '/icons/lisk.webp'} alt="Lisk Icon" className="h-14 w-14 text-lisk-blue mb-4 mx-auto" />
 );
 
-// --- Divvi Integration Component (Moved here for single file constraint) ---
 const DivviIntegration = ({ account, walletClient, publicClient, status, setStatus, amountToDeposit, setAmountToDeposit, connectWallet, handleDepositUSDC }) => {
   return (
     <section className="max-w-3xl mx-auto p-6 bg-white shadow-lg rounded-lg my-8 text-center">
@@ -125,7 +120,6 @@ const DivviIntegration = ({ account, walletClient, publicClient, status, setStat
 };
 
 
-// --- Profile Component (Moved here for single file constraint) ---
 const Profile = ({ account }) => {
   const [profile, setProfile] = useState({ skills: [], portfolio: [], rating: 0 });
   const [skillsInput, setSkillsInput] = useState('');
@@ -292,7 +286,6 @@ const Profile = ({ account }) => {
   );
 };
 
-// --- Dashboard Component (Moved here for single file constraint) ---
 const Dashboard = ({ account }) => {
   const [totalEscrowDeposits, setTotalEscrowDeposits] = useState(0);
   const [userJobs, setUserJobs] = useState([]);
@@ -338,7 +331,7 @@ const Dashboard = ({ account }) => {
       <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">Your Dashboard</h2>
       
       <p className="text-lg text-gray-700 mb-4">
-        **Connected Wallet:** <span className="font-mono text-secondary-purple">{account || 'Not connected'}</span>
+        Connected Wallet: <span className="font-mono text-secondary-purple">{account || 'Not connected'}</span>
       </p>
 
       {errorMessage && (
@@ -366,9 +359,9 @@ const Dashboard = ({ account }) => {
           {userProfile ? (
             <div className="mt-4 p-4 bg-purple-50 rounded-lg shadow-sm">
               <h3 className="text-xl font-semibold text-secondary-purple mb-2">Your Profile at a Glance</h3>
-              <p className="text-base text-gray-700">**Role:** {userProfile.role || 'N/A'}</p>
-              <p className="text-base text-gray-700">**Skills:** {userProfile.skills?.join(', ') || 'No skills added yet.'}</p>
-              <p className="text-base text-gray-700">**Rating:** {userProfile.rating !== undefined ? `${userProfile.rating}/5` : 'N/A'}</p>
+              <p className="text-base text-gray-700">Role: {userProfile.role || 'N/A'}</p>
+              <p className="text-base text-gray-700">Skills: {userProfile.skills?.join(', ') || 'No skills added yet.'}</p>
+              <p className="text-base text-gray-700">Rating: {userProfile.rating !== undefined ? `${userProfile.rating}/5` : 'N/A'}</p>
               <Link
                 className="mt-4 px-6 py-2 bg-primary-blue text-white rounded-md hover:bg-blue-700 transition duration-300 inline-block"
                 to="/profile"
@@ -424,7 +417,6 @@ const Dashboard = ({ account }) => {
   );
 };
 
-// --- JobDetails Component (Moved here for single file constraint) ---
 const JobDetails = ({ account, publicClient, walletClient }) => {
   const { id } = useParams();
   const [job, setJob] = useState(null);
@@ -582,11 +574,11 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
       )}
 
       <div className="space-y-3 text-gray-700 mb-6">
-        <p className="text-lg">**Description:** {job.description}</p>
-        <p className="text-lg">**Amount:** <span className="font-semibold text-accent-green">{job.amount} USDC</span></p>
-        <p className="text-lg">**Client:** <span className="font-mono text-secondary-purple">{job.client || 'N/A'}</span></p>
-        <p className="text-lg">**Freelancer:** <span className="font-mono text-secondary-purple">{job.freelancer || 'Not assigned'}</span></p>
-        <p className="text-lg">**Current Status:** <span className={`font-semibold ${job.status === 'open' ? 'text-blue-600' : job.status === 'in-progress' ? 'text-yellow-600' : job.status === 'completed' ? 'text-green-600' : 'text-gray-600'}`}>{job.status}</span></p>
+        <p className="text-lg">Description: {job.description}</p>
+        <p className="text-lg">Amount: <span className="font-semibold text-accent-green">{job.amount} USDC</span></p>
+        <p className="text-lg">Client: <span className="font-mono text-secondary-purple">{job.client || 'N/A'}</span></p>
+        <p className="text-lg">Freelancer: <span className="font-mono text-secondary-purple">{job.freelancer || 'Not assigned'}</span></p>
+        <p className="text-lg">Current Status: <span className={`font-semibold ${job.status === 'open' ? 'text-blue-600' : job.status === 'in-progress' ? 'text-yellow-600' : job.status === 'completed' ? 'text-green-600' : 'text-gray-600'}`}>{job.status}</span></p>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4">
@@ -621,7 +613,6 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
   );
 };
 
-// --- PostJob Component ---
 const PostJob = ({ account }) => {
   const navigate = useNavigate();
   const [jobTitle, setJobTitle] = useState('');
@@ -649,13 +640,12 @@ const PostJob = ({ account }) => {
     setIsError(false);
 
     try {
-      // Example: Call backend to create job and potentially handle escrow deposit logic
       await axios.post(`${API_BASE_URL}/api/jobs`, {
         title: jobTitle,
         description: jobDescription,
         amount: parseFloat(jobAmount),
-        client: account, // The connected wallet is the client
-        status: 'open' // Initial status
+        client: account, 
+        status: 'open' 
       });
 
       setStatusMessage('Job posted successfully!');
@@ -682,7 +672,7 @@ const PostJob = ({ account }) => {
       <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">Post a New Job</h2>
       
       <p className="text-lg text-gray-700 mb-4">
-        **Connected Wallet:** <span className="font-mono text-secondary-purple">{account || 'Not connected'}</span>
+        Connected Wallet: <span className="font-mono text-secondary-purple">{account || 'Not connected'}</span>
       </p>
 
       {statusMessage && (
@@ -751,17 +741,15 @@ const PostJob = ({ account }) => {
 };
 
 
-// --- Main App Component ---
 function App() {
   const [walletClient, setWalletClient] = useState(null);
   const [publicClient, setPublicClient] = useState(null); 
   const [account, setAccount] = useState(null);
-  const [status, setStatus] = useState(''); // For general wallet/deposit status on Divvi demo
+  const [status, setStatus] = useState(''); 
   const [amountToDeposit, setAmountToDeposit] = useState('100'); 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isInfoMenuOpen, setIsInfoMenuOpen] = useState(false); // New state for the "More Info" dropdown
+  const [isInfoMenuOpen, setIsInfoMenuOpen] = useState(false); 
 
-  // Function to connect wallet (passed to DivviIntegration)
   const connectWallet = async () => {
     setStatus('Connecting wallet...');
     try {
@@ -789,7 +777,6 @@ function App() {
     }
   };
 
-  // Function to handle USDC deposit (passed to DivviIntegration)
   const handleDepositUSDC = async () => {
     if (!account || !walletClient || !publicClient) {
       setStatus('Please connect your wallet first.');
@@ -863,30 +850,26 @@ function App() {
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
-    if (isInfoMenuOpen) setIsInfoMenuOpen(false); // Close info menu if mobile menu opens
+    if (isInfoMenuOpen) setIsInfoMenuOpen(false); 
   };
 
   return (
-    <BrowserRouter> {/* Wrap the entire application in BrowserRouter */}
+    <BrowserRouter> 
       <div className="bg-gradient-to-br from-gray-50 to-gray-200 min-h-screen font-sans text-gray-800">
         
         <header className="bg-primary-blue text-white p-4 shadow-lg sticky top-0 z-50 transition duration-300 ease-in-out">
           <div className="max-w-6xl mx-auto flex items-center justify-between">
-            {/* Using the imported logo directly */}
             <Link to="/" className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
               <img src={logo} alt="FreelanceFlow Logo" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 border-white" />
               <span className="text-lg sm:text-2xl font-bold whitespace-nowrap">FreelanceFlow</span>
             </Link>
             <nav className="hidden md:flex flex-1 justify-between items-center ml-8">
-              {/* Group 1: Core App Navigation Links */}
               <div className="flex items-center gap-x-6 text-lg"> 
                 <Link to="/" className="hover:text-blue-200 transition duration-300 ease-in-out">Home</Link>
                 <Link to="/dashboard" className="hover:text-blue-200 transition duration-300 ease-in-out">Dashboard</Link>
                 <Link to="/profile" className="hover:text-blue-200 transition duration-300 ease-in-out">Profile</Link>
                 <Link to="/post-job" className="hover:text-blue-200 transition duration-300 ease-in-out">Post Job</Link>
               </div>
-              
-              {/* Group 2: Informational/Project Links (in a dropdown) */}
               <div className="relative">
                 <button
                   onClick={() => setIsInfoMenuOpen(!isInfoMenuOpen)}
@@ -942,11 +925,9 @@ function App() {
           )}
         </header>
 
-        {/* Define Routes */}
         <Routes>
           <Route path="/" element={
             <>
-              {/* Original Landing Page Sections */}
               <section className="relative bg-gradient-to-r from-primary-blue to-secondary-purple text-white py-24 text-center overflow-hidden animate-gradient">
                 <div className="absolute inset-0 z-0 overflow-hidden">
                   <div className="absolute top-0 left-1/4 h-full w-px bg-white/20 animate-line-flow"></div> 
@@ -970,7 +951,6 @@ function App() {
                   >
                     Join Our Community
                   </a>
-                  {/* Divvi Integration Demo removed from the main landing page display */}
                 </div>
               </section>
 
@@ -1213,7 +1193,6 @@ function App() {
               handleDepositUSDC={handleDepositUSDC} 
             />
           } />
-          {/* PostJob component is now fully functional */}
           <Route path="/post-job" element={<PostJob account={account} />} />
         </Routes>
       </div>
