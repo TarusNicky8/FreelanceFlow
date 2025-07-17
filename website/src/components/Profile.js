@@ -93,7 +93,6 @@ const Profile = ({ account }) => {
         </div>
       )}
 
-      {/* Loading Indicator */}
       {isLoading && (
         <div className="flex items-center justify-center mb-4 text-primary-blue">
           <svg className="animate-spin h-5 w-5 mr-3 text-primary-blue" viewBox="0 0 24 24">
