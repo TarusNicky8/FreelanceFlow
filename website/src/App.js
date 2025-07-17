@@ -875,23 +875,27 @@ function App() {
               <img src={logo} alt="FreelanceFlow Logo" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 border-white" />
               <span className="text-lg sm:text-2xl font-bold whitespace-nowrap">FreelanceFlow</span>
             </Link>
-            <nav className="hidden md:flex flex-wrap items-center gap-x-6 text-lg"> 
-              {/* Internal Links using Link component */}
-              <Link to="/" className="hover:text-blue-200 transition duration-300 ease-in-out">Home</Link>
-              <Link to="/dashboard" className="hover:text-blue-200 transition duration-300 ease-in-out">Dashboard</Link>
-              <Link to="/profile" className="hover:text-blue-200 transition duration-300 ease-in-out">Profile</Link>
-              <Link to="/divvi-integration" className="hover:text-blue-200 transition duration-300 ease-in-out">Divvi Demo</Link>
-              <Link to="/post-job" className="hover:text-blue-200 transition duration-300 ease-in-out">Post Job</Link>
+            <nav className="hidden md:flex flex-1 justify-between items-center ml-8"> {/* Added flex-1 and justify-between */}
+              {/* Group 1: App Navigation Links */}
+              <div className="flex items-center gap-x-6 text-lg"> 
+                <Link to="/" className="hover:text-blue-200 transition duration-300 ease-in-out">Home</Link>
+                <Link to="/dashboard" className="hover:text-blue-200 transition duration-300 ease-in-out">Dashboard</Link>
+                <Link to="/profile" className="hover:text-blue-200 transition duration-300 ease-in-out">Profile</Link>
+                <Link to="/divvi-integration" className="hover:text-blue-200 transition duration-300 ease-in-out">Divvi Demo</Link>
+                <Link to="/post-job" className="hover:text-blue-200 transition duration-300 ease-in-out">Post Job</Link>
+              </div>
               
-              {/* External Links (remain <a> tags) */}
-              <a href="#about" className="hover:text-blue-200 transition duration-300 ease-in-out">About</a>
-              <a href="#vision" className="hover:text-blue-200 transition duration-300 ease-in-out">Vision</a> 
-              <a href="#mission" className="hover:text-blue-200 transition duration-300 ease-in-out">Mission</a> 
-              <a href="#features" className="hover:text-blue-200 transition duration-300 ease-in-out">Features</a>
-              <a href="#team" className="hover:text-blue-200 transition duration-300 ease-in-out">Team</a>
-              <a href="#roadmap" className="hover:text-blue-200 transition duration-300 ease-in-out">Roadmap</a>
-              <a href="/WHITEPAPER.pdf" target="_blank" rel="noopener noreferrer" className="hover:text-blue-200 transition duration-300 ease-in-out">Whitepaper</a> 
-              <a href="#contact" className="hover:text-blue-200 transition duration-300 ease-in-out">Contact</a>
+              {/* Group 2: Landing Page Section Links (External) */}
+              <div className="flex items-center gap-x-6 text-lg">
+                <a href="#about" className="hover:text-blue-200 transition duration-300 ease-in-out">About</a>
+                <a href="#vision" className="hover:text-blue-200 transition duration-300 ease-in-out">Vision</a> 
+                <a href="#mission" className="hover:text-blue-200 transition duration-300 ease-in-out">Mission</a> 
+                <a href="#features" className="hover:text-blue-200 transition duration-300 ease-in-out">Features</a>
+                <a href="#team" className="hover:text-blue-200 transition duration-300 ease-in-out">Team</a>
+                <a href="#roadmap" className="hover:text-blue-200 transition duration-300 ease-in-out">Roadmap</a>
+                <a href="/WHITEPAPER.pdf" target="_blank" rel="noopener noreferrer" className="hover:text-blue-200 transition duration-300 ease-in-out">Whitepaper</a> 
+                <a href="#contact" className="hover:text-blue-200 transition duration-300 ease-in-out">Contact</a>
+              </div>
             </nav>
             <button 
               onClick={toggleMobileMenu}
