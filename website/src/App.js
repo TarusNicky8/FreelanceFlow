@@ -759,6 +759,7 @@ function App() {
   const [status, setStatus] = useState(''); // For general wallet/deposit status on Divvi demo
   const [amountToDeposit, setAmountToDeposit] = useState('100'); 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isInfoMenuOpen, setIsInfoMenuOpen] = useState(false); // New state for the "More Info" dropdown
 
   // Function to connect wallet (passed to DivviIntegration)
   const connectWallet = async () => {
@@ -862,6 +863,7 @@ function App() {
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
+    if (isInfoMenuOpen) setIsInfoMenuOpen(false); // Close info menu if mobile menu opens
   };
 
   return (
@@ -875,26 +877,39 @@ function App() {
               <img src={logo} alt="FreelanceFlow Logo" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 border-white" />
               <span className="text-lg sm:text-2xl font-bold whitespace-nowrap">FreelanceFlow</span>
             </Link>
-            <nav className="hidden md:flex flex-1 justify-between items-center ml-8"> {/* Added flex-1 and justify-between */}
-              {/* Group 1: App Navigation Links */}
+            <nav className="hidden md:flex flex-1 justify-between items-center ml-8">
+              {/* Group 1: Core App Navigation Links */}
               <div className="flex items-center gap-x-6 text-lg"> 
                 <Link to="/" className="hover:text-blue-200 transition duration-300 ease-in-out">Home</Link>
                 <Link to="/dashboard" className="hover:text-blue-200 transition duration-300 ease-in-out">Dashboard</Link>
                 <Link to="/profile" className="hover:text-blue-200 transition duration-300 ease-in-out">Profile</Link>
-                <Link to="/divvi-integration" className="hover:text-blue-200 transition duration-300 ease-in-out">Divvi Demo</Link>
                 <Link to="/post-job" className="hover:text-blue-200 transition duration-300 ease-in-out">Post Job</Link>
               </div>
               
-              {/* Group 2: Landing Page Section Links (External) */}
-              <div className="flex items-center gap-x-6 text-lg">
-                <a href="#about" className="hover:text-blue-200 transition duration-300 ease-in-out">About</a>
-                <a href="#vision" className="hover:text-blue-200 transition duration-300 ease-in-out">Vision</a> 
-                <a href="#mission" className="hover:text-blue-200 transition duration-300 ease-in-out">Mission</a> 
-                <a href="#features" className="hover:text-blue-200 transition duration-300 ease-in-out">Features</a>
-                <a href="#team" className="hover:text-blue-200 transition duration-300 ease-in-out">Team</a>
-                <a href="#roadmap" className="hover:text-blue-200 transition duration-300 ease-in-out">Roadmap</a>
-                <a href="/WHITEPAPER.pdf" target="_blank" rel="noopener noreferrer" className="hover:text-blue-200 transition duration-300 ease-in-out">Whitepaper</a> 
-                <a href="#contact" className="hover:text-blue-200 transition duration-300 ease-in-out">Contact</a>
+              {/* Group 2: Informational/Project Links (in a dropdown) */}
+              <div className="relative">
+                <button
+                  onClick={() => setIsInfoMenuOpen(!isInfoMenuOpen)}
+                  className="px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700 transition duration-300 ease-in-out flex items-center"
+                >
+                  More Info
+                  <svg className={`ml-2 h-4 w-4 transform transition-transform ${isInfoMenuOpen ? 'rotate-180' : 'rotate-0'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {isInfoMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
+                    <Link to="/divvi-integration" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Divvi Demo</Link>
+                    <a href="#about" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">About</a>
+                    <a href="#vision" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Vision</a>
+                    <a href="#mission" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Mission</a>
+                    <a href="#features" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Features</a>
+                    <a href="#team" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Team</a>
+                    <a href="#roadmap" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Roadmap</a>
+                    <a href="/WHITEPAPER.pdf" target="_blank" rel="noopener noreferrer" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Whitepaper</a>
+                    <a href="#contact" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Contact</a>
+                  </div>
+                )}
               </div>
             </nav>
             <button 
@@ -906,13 +921,14 @@ function App() {
             </button>
           </div>
           {isMobileMenuOpen && (
-            <nav className="md:hidden bg-primary-blue pb-2 pt-1">
-              <ul className="flex flex-col items-center space-y-3 text-lg py-2"> {/* Increased space-y and added py */}
+            <nav className="md:hidden bg-primary-blue pb-2 pt-1 overflow-y-auto max-h-screen">
+              <ul className="flex flex-col items-center space-y-3 text-lg py-2">
                 <li><Link to="/" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Home</Link></li>
                 <li><Link to="/dashboard" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Dashboard</Link></li>
                 <li><Link to="/profile" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Profile</Link></li>
-                <li><Link to="/divvi-integration" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Divvi Demo</Link></li>
                 <li><Link to="/post-job" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Post Job</Link></li>
+                <li className="text-gray-300 text-sm mt-4 mb-2">--- Information & Demos ---</li>
+                <li><Link to="/divvi-integration" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Divvi Demo</Link></li>
                 <li><a href="#about" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">About</a></li>
                 <li><a href="#vision" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Vision</a></li> 
                 <li><a href="#mission" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Mission</a></li> 
@@ -1135,7 +1151,7 @@ function App() {
                 </div>
               </section>
               
-              <section id="contact" className="py-12 sm:py-16 bg-primary-blue text-white text-center pb-20"> {/* Added pb-20 for extra bottom padding */}
+              <section id="contact" className="py-12 sm:py-16 bg-primary-blue text-white text-center pb-20">
                 <div className="max-w-4xl mx-auto px-4 transition duration-300 ease-in-out">
                   <h2 className="text-3xl sm:text-4xl font-bold mb-4">Connect with FreelanceFlow</h2>
                   <p className="text-lg sm:text-xl mb-8">Have questions, feedback, or want to partner? Reach out to us!</p>
