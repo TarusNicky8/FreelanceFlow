@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Link, useNavigate, useParams } from 'reac
 import axios from 'axios';
 import { createWalletClient, custom, parseUnits, encodeFunctionData, createPublicClient, http } from 'viem';
 import { getDataSuffix, submitReferral } from '@divvi/referral-sdk';
+import logo from './App icon.svg'; // Correctly import the logo
 
 // --- Configuration Constants ---
 const liskSepolia = {
@@ -620,7 +621,7 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
   );
 };
 
-// --- PostJob Component (Placeholder - will be implemented later) ---
+// --- PostJob Component ---
 const PostJob = ({ account }) => {
   const navigate = useNavigate();
   const [jobTitle, setJobTitle] = useState('');
@@ -648,11 +649,6 @@ const PostJob = ({ account }) => {
     setIsError(false);
 
     try {
-      // First, deposit funds into escrow
-      // This part would typically involve a blockchain transaction for the client to deposit funds
-      // For now, we'll simulate it or assume it's handled by the backend logic after job creation.
-      // In a real dApp, you'd call a smart contract deposit function here.
-
       // Example: Call backend to create job and potentially handle escrow deposit logic
       await axios.post(`${API_BASE_URL}/api/jobs`, {
         title: jobTitle,
@@ -776,14 +772,14 @@ function App() {
         chain: liskSepolia,
         transport: custom(window.ethereum),
       });
-      const publicClientInstance = createPublicClient({ // Renamed to avoid conflict with global export
+      const publicClientInstance = createPublicClient({ 
         chain: liskSepolia,
         transport: http(liskSepolia.rpcUrls.default.http[0]),
       });
       
       const addresses = await client.getAddresses();
       setWalletClient(client);
-      setPublicClient(publicClientInstance); // Use the new instance
+      setPublicClient(publicClientInstance); 
       setAccount(addresses[0]);
       setStatus(`Wallet connected: ${addresses[0]}`);
     } catch (error) {
@@ -874,8 +870,9 @@ function App() {
         
         <header className="bg-primary-blue text-white p-4 shadow-lg sticky top-0 z-50 transition duration-300 ease-in-out">
           <div className="max-w-6xl mx-auto flex items-center justify-between">
+            {/* Using the imported logo directly */}
             <Link to="/" className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
-              <img src={process.env.PUBLIC_URL + '/App icon.svg'} alt="FreelanceFlow Logo" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 border-white" />
+              <img src={logo} alt="FreelanceFlow Logo" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 border-white" />
               <span className="text-lg sm:text-2xl font-bold whitespace-nowrap">FreelanceFlow</span>
             </Link>
             <nav className="hidden md:flex space-x-6 text-lg"> 
@@ -953,18 +950,7 @@ function App() {
                   >
                     Join Our Community
                   </a>
-                  {/* Divvi Integration Demo now directly on the home page */}
-                  <DivviIntegration 
-                    account={account} 
-                    walletClient={walletClient} 
-                    publicClient={publicClient} 
-                    status={status} 
-                    setStatus={setStatus} 
-                    amountToDeposit={amountToDeposit} 
-                    setAmountToDeposit={setAmountToDeposit} 
-                    connectWallet={connectWallet} 
-                    handleDepositUSDC={handleDepositUSDC} 
-                  />
+                  {/* Divvi Integration Demo removed from the main landing page display */}
                 </div>
               </section>
 
@@ -1207,16 +1193,8 @@ function App() {
               handleDepositUSDC={handleDepositUSDC} 
             />
           } />
-          {/* Placeholder for PostJob component */}
-          <Route path="/post-job" element={
-            <div className="max-w-xl mx-auto p-8 bg-white shadow-lg rounded-lg my-8 text-center">
-              <h2 className="text-3xl font-bold text-primary-blue mb-4">Post a New Job</h2>
-              <p className="text-lg text-gray-700 mb-6">This feature is coming soon! You'll be able to post new job opportunities here.</p>
-              <Link to="/dashboard" className="px-6 py-3 bg-primary-blue text-white font-semibold rounded-md hover:bg-blue-700 transition duration-300">
-                Back to Dashboard
-              </Link>
-            </div>
-          } />
+          {/* PostJob component is now fully functional */}
+          <Route path="/post-job" element={<PostJob account={account} />} />
         </Routes>
       </div>
     </BrowserRouter>
