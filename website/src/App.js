@@ -67,8 +67,6 @@ const usdcContractAddress = '0xFD2A349A744616C6077978A3D463C82Ac00A37c1';
 const escrowContractAddress = '0x83C9919341aa0705b6b0d79420EfAAE27B53ADCf';
 const defaultFreelancerAddress = '0x0000000000000000000000000000000000000001'; 
 
-// For deployment (e.g., to freelanceflow.net), you MUST set REACT_APP_API_BASE_URL
-// environment variable to your live backend URL (e.g., https://your-live-backend.com).
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'; 
 
 const UsdcIcon = () => (
@@ -118,7 +116,6 @@ const DivviIntegration = ({ account, walletClient, publicClient, status, setStat
     </section>
   );
 };
-
 
 const Profile = ({ account }) => {
   const [profile, setProfile] = useState({ skills: [], portfolio: [], rating: 0 });
@@ -199,7 +196,7 @@ const Profile = ({ account }) => {
       <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">Freelancer Profile</h2>
       
       <p className="text-lg text-gray-700 mb-4">
-        **Wallet:** <span className="font-mono text-secondary-purple">{account || 'Not connected'}</span>
+        Wallet: <span className="font-mono text-secondary-purple">{account || 'Not connected'}</span>
       </p>
 
       {statusMessage && (
@@ -262,10 +259,10 @@ const Profile = ({ account }) => {
       <div className="mt-8 p-6 bg-gray-50 rounded-lg shadow-inner">
         <h3 className="text-xl font-semibold text-primary-blue mb-3 border-b pb-2">Current Profile Details</h3>
         <p className="text-base text-gray-700 mb-2">
-          **Skills:** {profile.skills && profile.skills.length > 0 ? profile.skills.join(', ') : 'No skills added yet.'}
+          Skills: {profile.skills && profile.skills.length > 0 ? profile.skills.join(', ') : 'No skills added yet.'}
         </p>
         <p className="text-base text-gray-700">
-          **Portfolio:** {profile.portfolio && profile.portfolio.length > 0 ? (
+          Portfolio: {profile.portfolio && profile.portfolio.length > 0 ? (
             profile.portfolio.map((p, index) => (
               <React.Fragment key={index}>
                 <a 
@@ -288,7 +285,8 @@ const Profile = ({ account }) => {
 
 const Dashboard = ({ account }) => {
   const [totalEscrowDeposits, setTotalEscrowDeposits] = useState(0);
-  const [userJobs, setUserJobs] = useState([]);
+  const [clientJobs, setClientJobs] = useState([]); // Jobs where user is client
+  const [freelancerJobs, setFreelancerJobs] = useState([]); // Jobs where user is freelancer
   const [userProfile, setUserProfile] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
@@ -311,7 +309,12 @@ const Dashboard = ({ account }) => {
         setTotalEscrowDeposits(depositResponse.data.totalDeposits || 0);
 
         const jobsResponse = await axios.get(`${API_BASE_URL}/api/jobs/forUser/${account}`);
-        setUserJobs(jobsResponse.data || []);
+        // Filter jobs based on role
+        const clientJobsFiltered = jobsResponse.data.filter(job => job.client.toLowerCase() === account.toLowerCase());
+        const freelancerJobsFiltered = jobsResponse.data.filter(job => job.freelancer && job.freelancer.toLowerCase() === account.toLowerCase());
+        
+        setClientJobs(clientJobsFiltered);
+        setFreelancerJobs(freelancerJobsFiltered);
 
         const profileResponse = await axios.get(`${API_BASE_URL}/api/users/${account}`);
         setUserProfile(profileResponse.data);
@@ -381,10 +384,41 @@ const Dashboard = ({ account }) => {
             </div>
           )}
 
-          <h3 className="text-xl font-semibold mt-8 text-primary-blue border-b pb-2">Your Jobs</h3>
-          {userJobs.length > 0 ? (
+          <h3 className="text-xl font-semibold mt-8 text-primary-blue border-b pb-2">Jobs You Posted (Client)</h3>
+          {clientJobs.length > 0 ? (
             <ul className="mt-4 space-y-4">
-              {userJobs.map((job) => (
+              {clientJobs.map((job) => (
+                <li key={job._id} className="bg-gray-50 p-4 rounded-lg shadow-md flex justify-between items-center">
+                  <div>
+                    <p className="text-lg font-semibold text-gray-800">{job.title} - <span className="text-accent-green">{job.amount} USDC</span></p>
+                    <p className="text-sm text-gray-600">Freelancer: {job.freelancer || 'Unassigned'} | Status: {job.status || 'Pending'}</p>
+                  </div>
+                  <Link
+                    className="px-4 py-2 bg-secondary-purple text-white rounded-md hover:bg-purple-700 transition duration-300"
+                    to={`/job/${job._id}`}
+                  >
+                    View Details
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="mt-4 p-4 bg-yellow-50 rounded-lg shadow-sm text-yellow-800">
+              <p className="text-base">You haven't posted any jobs yet. Time to find some talent!</p>
+            </div>
+          )}
+
+          <Link
+            className="mt-8 w-full px-6 py-3 bg-primary-blue text-white font-semibold rounded-md hover:bg-blue-700 transition duration-300 text-center block"
+            to="/post-job"
+          >
+            Post a New Job
+          </Link>
+
+          <h3 className="text-xl font-semibold mt-8 text-primary-blue border-b pb-2">Jobs You Are Working On (Freelancer)</h3>
+          {freelancerJobs.length > 0 ? (
+            <ul className="mt-4 space-y-4">
+              {freelancerJobs.map((job) => (
                 <li key={job._id} className="bg-gray-50 p-4 rounded-lg shadow-md flex justify-between items-center">
                   <div>
                     <p className="text-lg font-semibold text-gray-800">{job.title} - <span className="text-accent-green">{job.amount} USDC</span></p>
@@ -401,16 +435,9 @@ const Dashboard = ({ account }) => {
             </ul>
           ) : (
             <div className="mt-4 p-4 bg-yellow-50 rounded-lg shadow-sm text-yellow-800">
-              <p className="text-base">You don't have any active jobs yet. Time to find some or post one!</p>
+              <p className="text-base">You haven't accepted any jobs yet. Browse available jobs!</p>
             </div>
           )}
-
-          <Link
-            className="mt-8 w-full px-6 py-3 bg-primary-blue text-white font-semibold rounded-md hover:bg-blue-700 transition duration-300 text-center block"
-            to="/post-job"
-          >
-            Post a New Job
-          </Link>
         </>
       )}
     </div>
@@ -740,6 +767,445 @@ const PostJob = ({ account }) => {
   );
 };
 
+// --- NEW: BrowseJobs Component ---
+const BrowseJobs = () => {
+  const [jobs, setJobs] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchJobs = async () => {
+      setIsLoading(true);
+      setErrorMessage('');
+      try {
+        // This will eventually fetch from your backend API
+        // For now, let's use mock data
+        const mockJobs = [
+          { _id: 'job1', title: 'Build a Decentralized Chat App', description: 'Develop a secure, real-time chat application using Web3 technologies.', amount: 1200, client: '0xClientA', status: 'open' },
+          { _id: 'job2', title: 'Smart Contract Audit for DeFi Protocol', description: 'Perform a comprehensive security audit of a new DeFi lending protocol.', amount: 2500, client: '0xClientB', status: 'open' },
+          { _id: 'job3', title: 'UI/UX Design for NFT Marketplace', description: 'Create intuitive and engaging user interfaces for a new NFT marketplace.', amount: 800, client: '0xClientC', status: 'open' },
+          { _id: 'job4', title: 'Content Writer for Blockchain Blog', description: 'Write engaging articles and blog posts on blockchain and crypto topics.', amount: 300, client: '0xClientD', status: 'open' },
+        ];
+        setJobs(mockJobs);
+      } catch (error) {
+        console.error('Error fetching jobs:', error);
+        setErrorMessage(`Error loading jobs: ${error.message || 'Network error'}`);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchJobs();
+  }, []);
+
+  return (
+    <div className="max-w-6xl mx-auto p-4 bg-white shadow-lg rounded-lg my-8">
+      <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">Browse Available Jobs</h2>
+      
+      {errorMessage && (
+        <div className="p-3 mb-4 rounded-md bg-red-100 text-red-700">
+          {errorMessage}
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-8 text-primary-blue">
+          <svg className="animate-spin h-6 w-6 mr-3 text-primary-blue" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Loading jobs...
+        </div>
+      ) : (
+        <>
+          {jobs.length > 0 ? (
+            <ul className="mt-4 space-y-4">
+              {jobs.map((job) => (
+                <li key={job._id} className="bg-gray-50 p-4 rounded-lg shadow-md flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                  <div className="mb-2 sm:mb-0">
+                    <p className="text-lg font-semibold text-gray-800">{job.title} - <span className="text-accent-green">{job.amount} USDC</span></p>
+                    <p className="text-sm text-gray-600 truncate max-w-sm">{job.description}</p>
+                    <p className="text-xs text-gray-500">Client: {job.client} | Status: {job.status}</p>
+                  </div>
+                  <Link
+                    className="px-4 py-2 bg-primary-blue text-white rounded-md hover:bg-blue-700 transition duration-300 flex-shrink-0"
+                    to={`/job/${job._id}`}
+                  >
+                    View Details
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="mt-4 p-4 bg-yellow-50 rounded-lg shadow-sm text-yellow-800 text-center">
+              <p className="text-base">No open jobs found at the moment. Check back later!</p>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+};
+
+// --- NEW: CrossChainIntegration Component ---
+const CrossChainIntegration = ({ account, walletClient, publicClient }) => {
+  const [sourceChain, setSourceChain] = useState('Lisk Sepolia');
+  const [destinationChain, setDestinationChain] = useState('Optimism/Base (Mock)');
+  const [transferAmount, setTransferAmount] = useState('');
+  const [statusMessage, setStatusMessage] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isError, setIsError] = useState(false);
+
+  const handleCrossChainTransfer = async () => {
+    if (!account || !walletClient || !publicClient) {
+      setStatusMessage('Please connect your wallet first.');
+      setIsError(true);
+      return;
+    }
+    if (isNaN(parseFloat(transferAmount)) || parseFloat(transferAmount) <= 0) {
+      setStatusMessage('Please enter a valid amount to transfer.');
+      setIsError(true);
+      return;
+    }
+
+    setIsProcessing(true);
+    setStatusMessage(`Initiating cross-chain transfer of ${transferAmount} USDC from ${sourceChain} to ${destinationChain}...`);
+    setIsError(false);
+
+    try {
+      // --- Mocking LayerZero Integration ---
+      // In a real LayerZero integration, you would:
+      // 1. Get the OApp (Omnichain Application) contract instance for your specific bridge.
+      // 2. Encode the function data for the cross-chain transfer (e.g., 'send' function on your OApp).
+      //    This would involve specifying the destination chain ID, recipient address, amount, and LayerZero options.
+      // 3. Send the transaction via walletClient.sendTransaction.
+      // 4. Wait for transaction receipt.
+      // 5. Potentially use LayerZero Scan API to track message status across chains.
+
+      // For this demo, we'll simulate the process.
+      await new Promise(resolve => setTimeout(resolve, 3000)); // Simulate network delay
+
+      setStatusMessage(`Simulated cross-chain transfer successful! ${transferAmount} USDC sent from ${sourceChain} to ${destinationChain}. (This is a mock transaction.)`);
+      setIsError(false);
+      setTransferAmount('');
+
+    } catch (error) {
+      console.error('Error during simulated cross-chain transfer:', error);
+      setStatusMessage(`Simulated transfer failed: ${error.message || 'Please try again.'}`);
+      setIsError(true);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  return (
+    <div className="max-w-3xl mx-auto p-6 bg-white shadow-lg rounded-lg my-8">
+      <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">Cross-Chain Payments (LayerZero Integration)</h2>
+      <p className="text-lg text-gray-700 mb-6">
+        Seamlessly transfer USDC between Lisk Sepolia and other Optimism-based networks (e.g., Optimism Mainnet, Base) using LayerZero.
+      </p>
+
+      <p className="text-lg text-gray-700 mb-4">
+        Connected Wallet: <span className="font-mono text-secondary-purple">{account || 'Not connected'}</span>
+      </p>
+
+      {statusMessage && (
+        <div className={`p-3 mb-4 rounded-md ${isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+          {statusMessage}
+        </div>
+      )}
+
+      <div className="space-y-6">
+        <div>
+          <label htmlFor="sourceChain" className="block text-lg font-medium text-gray-800 mb-1">Source Chain</label>
+          <select
+            id="sourceChain"
+            value={sourceChain}
+            onChange={(e) => setSourceChain(e.target.value)}
+            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
+            disabled={isProcessing}
+          >
+            <option value="Lisk Sepolia">Lisk Sepolia Testnet</option>
+            {/* Add more options as actual LayerZero integrations are built */}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="destinationChain" className="block text-lg font-medium text-gray-800 mb-1">Destination Chain</label>
+          <select
+            id="destinationChain"
+            value={destinationChain}
+            onChange={(e) => setDestinationChain(e.target.value)}
+            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
+            disabled={isProcessing}
+          >
+            <option value="Optimism/Base (Mock)">Optimism/Base (Mock)</option>
+            {/* Add more options as actual LayerZero integrations are built */}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="transferAmount" className="block text-lg font-medium text-gray-800 mb-1">Amount to Transfer (USDC)</label>
+          <input
+            type="number"
+            id="transferAmount"
+            value={transferAmount}
+            onChange={(e) => setTransferAmount(e.target.value)}
+            placeholder="e.g., 50"
+            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
+            disabled={isProcessing}
+          />
+        </div>
+        <button
+          onClick={handleCrossChainTransfer}
+          className="w-full px-6 py-3 bg-secondary-purple text-white font-semibold rounded-md hover:bg-purple-700 transition duration-300 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={isProcessing || !account}
+        >
+          {isProcessing ? 'Transferring...' : 'Initiate Cross-Chain Transfer'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// --- NEW: DisputeResolution Component ---
+const DisputeResolution = ({ account }) => {
+  const [jobId, setJobId] = useState('');
+  const [disputeReason, setDisputeReason] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
+  const [isError, setIsError] = useState(false);
+
+  const handleSubmitDispute = async (e) => {
+    e.preventDefault();
+    if (!account) {
+      setStatusMessage('Please connect your wallet to submit a dispute.');
+      setIsError(true);
+      return;
+    }
+    if (!jobId || !disputeReason) {
+      setStatusMessage('Please fill in both Job ID and Dispute Reason.');
+      setIsError(true);
+      return;
+    }
+
+    setIsLoading(true);
+    setStatusMessage('Submitting dispute...');
+    setIsError(false);
+
+    try {
+      // --- Mocking Dispute Submission ---
+      // In a real scenario, this would interact with your backend's dispute module
+      // which might then update a smart contract state or log the dispute.
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate network delay
+
+      console.log(`Dispute submitted for Job ID: ${jobId}, Reason: ${disputeReason}, by: ${account}`);
+      setStatusMessage('Dispute submitted successfully! Our team will review it.');
+      setIsError(false);
+      setJobId('');
+      setDisputeReason('');
+
+    } catch (error) {
+      console.error('Error submitting dispute:', error);
+      setStatusMessage(`Error submitting dispute: ${error.message || 'Please try again.'}`);
+      setIsError(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-3xl mx-auto p-6 bg-white shadow-lg rounded-lg my-8">
+      <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">Dispute Resolution</h2>
+      <p className="text-lg text-gray-700 mb-6">
+        If there's an issue with a job, you can formally initiate a dispute here.
+      </p>
+
+      <p className="text-lg text-gray-700 mb-4">
+        Connected Wallet: <span className="font-mono text-secondary-purple">{account || 'Not connected'}</span>
+      </p>
+
+      {statusMessage && (
+        <div className={`p-3 mb-4 rounded-md ${isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+          {statusMessage}
+        </div>
+      )}
+
+      {isLoading && (
+        <div className="flex items-center justify-center mb-4 text-primary-blue">
+          <svg className="animate-spin h-5 w-5 mr-3 text-primary-blue" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Submitting...
+        </div>
+      )}
+
+      <form onSubmit={handleSubmitDispute} className="space-y-6">
+        <div>
+          <label htmlFor="jobId" className="block text-lg font-medium text-gray-800 mb-1">Job ID</label>
+          <input
+            type="text"
+            id="jobId"
+            value={jobId}
+            onChange={(e) => setJobId(e.target.value)}
+            placeholder="e.g., job123xyz"
+            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
+            disabled={isLoading}
+          />
+        </div>
+        <div>
+          <label htmlFor="disputeReason" className="block text-lg font-medium text-gray-800 mb-1">Dispute Reason</label>
+          <textarea
+            id="disputeReason"
+            value={disputeReason}
+            onChange={(e) => setDisputeReason(e.target.value)}
+            placeholder="Please describe the issue in detail..."
+            rows="5"
+            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
+            disabled={isLoading}
+          ></textarea>
+        </div>
+        <button
+          type="submit"
+          className="w-full px-6 py-3 bg-secondary-purple text-white font-semibold rounded-md hover:bg-purple-700 transition duration-300 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={isLoading || !account}
+        >
+          {isLoading ? 'Submitting...' : 'Submit Dispute'}
+        </button>
+      </form>
+    </div>
+  );
+};
+
+// --- NEW: Withdrawal Component (Mock Fiat On/Off-Ramp) ---
+const Withdrawal = ({ account }) => {
+  const [amount, setAmount] = useState('');
+  const [fiatCurrency, setFiatCurrency] = useState('KES'); // Default to Kenyan Shilling
+  const [bankDetails, setBankDetails] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
+  const [isError, setIsError] = useState(false);
+
+  const handleWithdrawal = async (e) => {
+    e.preventDefault();
+    if (!account) {
+      setStatusMessage('Please connect your wallet to initiate a withdrawal.');
+      setIsError(true);
+      return;
+    }
+    if (isNaN(parseFloat(amount)) || parseFloat(amount) <= 0 || !bankDetails) {
+      setStatusMessage('Please enter a valid amount and bank details.');
+      setIsError(true);
+      return;
+    }
+
+    setIsLoading(true);
+    setStatusMessage(`Initiating withdrawal of ${amount} USDC to ${fiatCurrency} via bank transfer...`);
+    setIsError(false);
+
+    try {
+      // --- Mocking Fiat On/Off-Ramp Integration ---
+      // In a real scenario, this would involve:
+      // 1. Interacting with a crypto-to-fiat on/off-ramp provider's API (e.g., Circle, Transak, Banxa).
+      // 2. This would likely involve KYC/AML checks, and then converting USDC to fiat.
+      // 3. The provider would then initiate a local bank transfer.
+      // This is a complex integration and is mocked for frontend demonstration.
+      await new Promise(resolve => setTimeout(resolve, 3000)); // Simulate network delay
+
+      console.log(`Withdrawal simulated: ${amount} USDC to ${fiatCurrency} for account ${account} with details ${bankDetails}`);
+      setStatusMessage(`Withdrawal of ${amount} USDC to ${fiatCurrency} simulated successfully! Funds should arrive in 3-5 business days.`);
+      setIsError(false);
+      setAmount('');
+      setBankDetails('');
+
+    } catch (error) {
+      console.error('Error during simulated withdrawal:', error);
+      setStatusMessage(`Simulated withdrawal failed: ${error.message || 'Please try again.'}`);
+      setIsError(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-3xl mx-auto p-6 bg-white shadow-lg rounded-lg my-8">
+      <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">Withdraw Funds (Fiat On/Off-Ramp)</h2>
+      <p className="text-lg text-gray-700 mb-6">
+        Convert your USDC earnings to local fiat currency and withdraw directly to your bank account.
+      </p>
+
+      <p className="text-lg text-gray-700 mb-4">
+        Connected Wallet: <span className="font-mono text-secondary-purple">{account || 'Not connected'}</span>
+      </p>
+
+      {statusMessage && (
+        <div className={`p-3 mb-4 rounded-md ${isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+          {statusMessage}
+        </div>
+      )}
+
+      {isLoading && (
+        <div className="flex items-center justify-center mb-4 text-primary-blue">
+          <svg className="animate-spin h-5 w-5 mr-3 text-primary-blue" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Processing Withdrawal...
+        </div>
+      )}
+
+      <form onSubmit={handleWithdrawal} className="space-y-6">
+        <div>
+          <label htmlFor="amount" className="block text-lg font-medium text-gray-800 mb-1">Amount to Withdraw (USDC)</label>
+          <input
+            type="number"
+            id="amount"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="e.g., 100"
+            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
+            disabled={isLoading}
+          />
+        </div>
+        <div>
+          <label htmlFor="fiatCurrency" className="block text-lg font-medium text-gray-800 mb-1">Fiat Currency</label>
+          <select
+            id="fiatCurrency"
+            value={fiatCurrency}
+            onChange={(e) => setFiatCurrency(e.target.value)}
+            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
+            disabled={isLoading}
+          >
+            <option value="KES">Kenyan Shilling (KES)</option>
+            <option value="NGN">Nigerian Naira (NGN)</option>
+            <option value="ZAR">South African Rand (ZAR)</option>
+            <option value="USD">US Dollar (USD)</option>
+            {/* Add more currencies as needed */}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="bankDetails" className="block text-lg font-medium text-gray-800 mb-1">Bank Account Details (Mock)</label>
+          <textarea
+            id="bankDetails"
+            value={bankDetails}
+            onChange={(e) => setBankDetails(e.target.value)}
+            placeholder="Bank Name, Account Number, SWIFT/BIC, etc."
+            rows="3"
+            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
+            disabled={isLoading}
+          ></textarea>
+        </div>
+        <button
+          type="submit"
+          className="w-full px-6 py-3 bg-accent-green text-white font-semibold rounded-md hover:bg-green-600 transition duration-300 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={isLoading || !account}
+        >
+          {isLoading ? 'Processing...' : 'Initiate Withdrawal'}
+        </button>
+      </form>
+    </div>
+  );
+};
+
 
 function App() {
   const [walletClient, setWalletClient] = useState(null);
@@ -869,6 +1335,7 @@ function App() {
                 <Link to="/dashboard" className="hover:text-blue-200 transition duration-300 ease-in-out">Dashboard</Link>
                 <Link to="/profile" className="hover:text-blue-200 transition duration-300 ease-in-out">Profile</Link>
                 <Link to="/post-job" className="hover:text-blue-200 transition duration-300 ease-in-out">Post Job</Link>
+                <Link to="/browse-jobs" className="hover:text-blue-200 transition duration-300 ease-in-out">Browse Jobs</Link> 
               </div>
               <div className="relative">
                 <button
@@ -883,6 +1350,9 @@ function App() {
                 {isInfoMenuOpen && (
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
                     <Link to="/divvi-integration" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Divvi Demo</Link>
+                    <Link to="/cross-chain-transfer" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Cross-Chain Transfer</Link> 
+                    <Link to="/dispute-resolution" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Dispute Resolution</Link> {/* Added Dispute Resolution */}
+                    <Link to="/withdraw" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Withdraw Funds</Link> {/* Added Withdrawal */}
                     <a href="#about" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">About</a>
                     <a href="#vision" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Vision</a>
                     <a href="#mission" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Mission</a>
@@ -910,8 +1380,12 @@ function App() {
                 <li><Link to="/dashboard" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Dashboard</Link></li>
                 <li><Link to="/profile" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Profile</Link></li>
                 <li><Link to="/post-job" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Post Job</Link></li>
+                <li><Link to="/browse-jobs" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Browse Jobs</Link></li> 
                 <li className="text-gray-300 text-sm mt-4 mb-2">--- Information & Demos ---</li>
                 <li><Link to="/divvi-integration" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Divvi Demo</Link></li>
+                <li><Link to="/cross-chain-transfer" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Cross-Chain Transfer</Link></li> 
+                <li><Link to="/dispute-resolution" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Dispute Resolution</Link></li> {/* Added Dispute Resolution */}
+                <li><Link to="/withdraw" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Withdraw Funds</Link></li> {/* Added Withdrawal */}
                 <li><a href="#about" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">About</a></li>
                 <li><a href="#vision" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Vision</a></li> 
                 <li><a href="#mission" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Mission</a></li> 
@@ -1194,6 +1668,10 @@ function App() {
             />
           } />
           <Route path="/post-job" element={<PostJob account={account} />} />
+          <Route path="/browse-jobs" element={<BrowseJobs />} /> 
+          <Route path="/cross-chain-transfer" element={<CrossChainIntegration account={account} publicClient={publicClient} walletClient={walletClient} />} />
+          <Route path="/dispute-resolution" element={<DisputeResolution account={account} />} /> {/* New Route */}
+          <Route path="/withdraw" element={<Withdrawal account={account} />} /> {/* New Route */}
         </Routes>
       </div>
     </BrowserRouter>
