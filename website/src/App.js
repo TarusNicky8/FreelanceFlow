@@ -19,7 +19,7 @@ const liskSepolia = {
     public: { http: ['https://testnet-rpc.lisk.com'] },
   },
   blockExplorers: {
-    default: { name: 'Lisk Sepolia Blockscout', url: 'https://sepolia-blockscout.lisk.com/' },
+    default: { name: 'Lisk Blockscout', url: 'https://sepolia-blockscout.lisk.com/' },
   },
   testnet: true,
 };
@@ -98,20 +98,16 @@ const DivviIntegration = ({ account, walletClient, publicClient, status, setStat
         />
       </div>
       <p className={`mb-4 text-center text-lg ${status.includes('Error') ? 'text-red-600' : 'text-green-600'}`}>{status}</p>
-      {!account ? (
-        <button
-          onClick={connectWallet}
-          className="px-8 py-4 bg-accent-green text-white font-semibold rounded-full shadow-lg hover:bg-green-600 transition duration-300 transform hover:scale-105"
-        >
-          Connect Wallet
-        </button>
-      ) : (
+      {/* The connect wallet button is now in the header, so we remove it from here */}
+      {account ? (
         <button
           onClick={handleDepositUSDC} 
           className="px-8 py-4 bg-secondary-purple text-white font-semibold rounded-full shadow-lg hover:bg-purple-700 transition duration-300 transform hover:scale-105"
         >
           Deposit USDC to Escrow (with Divvi Tracking)
         </button>
+      ) : (
+        <p className="text-lg text-gray-600">Connect your wallet in the header to deposit USDC.</p>
       )}
     </section>
   );
@@ -225,7 +221,7 @@ const Profile = ({ account }) => {
             onChange={(e) => setSkillsInput(e.target.value)}
             placeholder="e.g., React, Node.js, Solidity, UI/UX Design"
             className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
-            disabled={isLoading}
+            disabled={isLoading || !account} // Disable if loading or not connected
           />
         </div>
         <div>
@@ -237,7 +233,7 @@ const Profile = ({ account }) => {
             onChange={(e) => setPortfolioInput(e.target.value)}
             placeholder="e.g., github.com/your-project, yourportfolio.com/design"
             className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
-            disabled={isLoading}
+            disabled={isLoading || !account} // Disable if loading or not connected
           />
         </div>
         <div>
@@ -250,7 +246,7 @@ const Profile = ({ account }) => {
         <button
           type="submit"
           className="w-full px-6 py-3 bg-secondary-purple text-white font-semibold rounded-md hover:bg-purple-700 transition duration-300 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={isLoading}
+          disabled={isLoading || !account} // Disable if loading or not connected
         >
           {isLoading ? 'Saving...' : 'Save Profile'}
         </button>
@@ -613,7 +609,7 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
           <button
             className="px-6 py-3 bg-secondary-purple text-white font-semibold rounded-md hover:bg-purple-700 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={handleAccept}
-            disabled={isProcessingTx}
+            disabled={isProcessingTx || !account} // Disable if loading or not connected
           >
             {isProcessingTx ? 'Accepting...' : 'Accept Job'}
           </button>
@@ -623,7 +619,7 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
           <button
             className="px-6 py-3 bg-accent-green text-white font-semibold rounded-md hover:bg-green-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={handleComplete}
-            disabled={isProcessingTx}
+            disabled={isProcessingTx || !account} // Disable if loading or not connected
           >
             {isProcessingTx ? 'Releasing Funds...' : 'Release Funds'}
           </button>
@@ -728,7 +724,7 @@ const PostJob = ({ account }) => {
             onChange={(e) => setJobTitle(e.target.value)}
             placeholder="e.g., Build a React Component"
             className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
-            disabled={isLoading}
+            disabled={isLoading || !account} // Disable if loading or not connected
           />
         </div>
         <div>
@@ -740,7 +736,7 @@ const PostJob = ({ account }) => {
             placeholder="Detailed description of the task..."
             rows="5"
             className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
-            disabled={isLoading}
+            disabled={isLoading || !account} // Disable if loading or not connected
           ></textarea>
         </div>
         <div>
@@ -752,13 +748,13 @@ const PostJob = ({ account }) => {
             onChange={(e) => setJobAmount(e.target.value)}
             placeholder="e.g., 500"
             className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
-            disabled={isLoading}
+            disabled={isLoading || !account} // Disable if loading or not connected
           />
         </div>
         <button
           type="submit"
           className="w-full px-6 py-3 bg-secondary-purple text-white font-semibold rounded-md hover:bg-purple-700 transition duration-300 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={isLoading}
+          disabled={isLoading || !account} // Disable if loading or not connected
         >
           {isLoading ? 'Posting...' : 'Post Job'}
         </button>
@@ -779,15 +775,9 @@ const BrowseJobs = () => {
       setIsLoading(true);
       setErrorMessage('');
       try {
-        // This will eventually fetch from your backend API
-        // For now, let's use mock data
-        const mockJobs = [
-          { _id: 'job1', title: 'Build a Decentralized Chat App', description: 'Develop a secure, real-time chat application using Web3 technologies.', amount: 1200, client: '0xClientA', status: 'open' },
-          { _id: 'job2', title: 'Smart Contract Audit for DeFi Protocol', description: 'Perform a comprehensive security audit of a new DeFi lending protocol.', amount: 2500, client: '0xClientB', status: 'open' },
-          { _id: 'job3', title: 'UI/UX Design for NFT Marketplace', description: 'Create intuitive and engaging user interfaces for a new NFT marketplace.', amount: 800, client: '0xClientC', status: 'open' },
-          { _id: 'job4', title: 'Content Writer for Blockchain Blog', description: 'Write engaging articles and blog posts on blockchain and crypto topics.', amount: 300, client: '0xClientD', status: 'open' },
-        ];
-        setJobs(mockJobs);
+        // Fetch jobs from your backend API
+        const response = await axios.get(`${API_BASE_URL}/api/jobs?status=open`);
+        setJobs(response.data);
       } catch (error) {
         console.error('Error fetching jobs:', error);
         setErrorMessage(`Error loading jobs: ${error.message || 'Network error'}`);
@@ -923,7 +913,7 @@ const CrossChainIntegration = ({ account, walletClient, publicClient }) => {
             value={sourceChain}
             onChange={(e) => setSourceChain(e.target.value)}
             className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
-            disabled={isProcessing}
+            disabled={isProcessing || !account} // Disable if loading or not connected
           >
             <option value="Lisk Sepolia">Lisk Sepolia Testnet</option>
             {/* Add more options as actual LayerZero integrations are built */}
@@ -936,7 +926,7 @@ const CrossChainIntegration = ({ account, walletClient, publicClient }) => {
             value={destinationChain}
             onChange={(e) => setDestinationChain(e.target.value)}
             className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
-            disabled={isProcessing}
+            disabled={isProcessing || !account} // Disable if loading or not connected
           >
             <option value="Optimism/Base (Mock)">Optimism/Base (Mock)</option>
             {/* Add more options as actual LayerZero integrations are built */}
@@ -951,7 +941,7 @@ const CrossChainIntegration = ({ account, walletClient, publicClient }) => {
             onChange={(e) => setTransferAmount(e.target.value)}
             placeholder="e.g., 50"
             className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
-            disabled={isProcessing}
+            disabled={isProcessing || !account} // Disable if loading or not connected
           />
         </div>
         <button
@@ -1049,7 +1039,7 @@ const DisputeResolution = ({ account }) => {
             onChange={(e) => setJobId(e.target.value)}
             placeholder="e.g., job123xyz"
             className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
-            disabled={isLoading}
+            disabled={isLoading || !account} // Disable if loading or not connected
           />
         </div>
         <div>
@@ -1061,7 +1051,7 @@ const DisputeResolution = ({ account }) => {
             placeholder="Please describe the issue in detail..."
             rows="5"
             className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
-            disabled={isLoading}
+            disabled={isLoading || !account} // Disable if loading or not connected
           ></textarea>
         </div>
         <button
@@ -1163,7 +1153,7 @@ const Withdrawal = ({ account }) => {
             onChange={(e) => setAmount(e.target.value)}
             placeholder="e.g., 100"
             className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
-            disabled={isLoading}
+            disabled={isLoading || !account} // Disable if loading or not connected
           />
         </div>
         <div>
@@ -1173,7 +1163,7 @@ const Withdrawal = ({ account }) => {
             value={fiatCurrency}
             onChange={(e) => setFiatCurrency(e.target.value)}
             className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
-            disabled={isLoading}
+            disabled={isLoading || !account} // Disable if loading or not connected
           >
             <option value="KES">Kenyan Shilling (KES)</option>
             <option value="NGN">Nigerian Naira (NGN)</option>
@@ -1191,7 +1181,7 @@ const Withdrawal = ({ account }) => {
             placeholder="Bank Name, Account Number, SWIFT/BIC, etc."
             rows="3"
             className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
-            disabled={isLoading}
+            disabled={isLoading || !account} // Disable if loading or not connected
           ></textarea>
         </div>
         <button
@@ -1216,13 +1206,26 @@ function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isInfoMenuOpen, setIsInfoMenuOpen] = useState(false); 
 
+  // Function to truncate address for display
+  const truncateAddress = (address) => {
+    if (!address) return '';
+    return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
+  };
+
   const connectWallet = async () => {
+    // Log window.ethereum to the console for debugging
+    console.log('window.ethereum:', window.ethereum);
+
     setStatus('Connecting wallet...');
     try {
       if (typeof window.ethereum === 'undefined') {
-        setStatus('MetaMask or similar wallet not detected!');
+        setStatus('MetaMask or similar wallet not detected! Please install a Web3 wallet.');
         return;
       }
+
+      // Request accounts directly from MetaMask
+      const addresses = await window.ethereum.request({ method: 'eth_requestAccounts' });
+
       const client = createWalletClient({
         chain: liskSepolia,
         transport: custom(window.ethereum),
@@ -1232,16 +1235,48 @@ function App() {
         transport: http(liskSepolia.rpcUrls.default.http[0]),
       });
       
-      const addresses = await client.getAddresses();
       setWalletClient(client);
       setPublicClient(publicClientInstance); 
       setAccount(addresses[0]);
-      setStatus(`Wallet connected: ${addresses[0]}`);
+      setStatus(`Wallet connected: ${truncateAddress(addresses[0])}`);
     } catch (error) {
       console.error("Error connecting wallet:", error);
-      setStatus(`Error connecting wallet: ${error.message}`);
+      // Check if the error is due to user rejecting the connection
+      if (error.code === 4001) { // EIP-1193 user rejected request error code
+        setStatus('Wallet connection rejected by user.');
+      } else {
+        setStatus(`Error connecting wallet: ${error.message}`);
+      }
     }
   };
+
+  // Listen for account changes (e.g., user changes account in MetaMask)
+  useEffect(() => {
+    if (window.ethereum) {
+      window.ethereum.on('accountsChanged', (accounts) => {
+        if (accounts.length > 0) {
+          setAccount(accounts[0]);
+          setStatus(`Wallet changed to: ${truncateAddress(accounts[0])}`);
+        } else {
+          setAccount(null);
+          setWalletClient(null);
+          setPublicClient(null);
+          setStatus('Wallet disconnected.');
+        }
+      });
+      // Optional: Reconnect on initial load if an account is already connected
+      // This is a basic check; a more robust solution might involve `walletClient.getAddresses()`
+      // if (window.ethereum.selectedAddress) {
+      //   connectWallet();
+      // }
+    }
+    // Cleanup listener on component unmount
+    return () => {
+      if (window.ethereum) {
+        window.ethereum.removeListener('accountsChanged', () => {});
+      }
+    };
+  }, []); // Empty dependency array means this runs once on mount
 
   const handleDepositUSDC = async () => {
     if (!account || !walletClient || !publicClient) {
@@ -1337,32 +1372,41 @@ function App() {
                 <Link to="/post-job" className="hover:text-blue-200 transition duration-300 ease-in-out">Post Job</Link>
                 <Link to="/browse-jobs" className="hover:text-blue-200 transition duration-300 ease-in-out">Browse Jobs</Link> 
               </div>
-              <div className="relative">
+              <div className="flex items-center gap-x-4"> {/* Container for More Info and Wallet Connect */}
+                <div className="relative">
+                  <button
+                    onClick={() => setIsInfoMenuOpen(!isInfoMenuOpen)}
+                    className="px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700 transition duration-300 ease-in-out flex items-center"
+                  >
+                    More Info
+                    <svg className={`ml-2 h-4 w-4 transform transition-transform ${isInfoMenuOpen ? 'rotate-180' : 'rotate-0'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  {isInfoMenuOpen && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
+                      <Link to="/divvi-integration" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Divvi Demo</Link>
+                      <Link to="/cross-chain-transfer" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Cross-Chain Transfer</Link> 
+                      <Link to="/dispute-resolution" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Dispute Resolution</Link>
+                      <Link to="/withdraw" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Withdraw Funds</Link>
+                      <a href="#about" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">About</a>
+                      <a href="#vision" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Vision</a>
+                      <a href="#mission" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Mission</a>
+                      <a href="#features" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Features</a>
+                      <a href="#team" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Team</a>
+                      <a href="#roadmap" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Roadmap</a>
+                      <a href="/WHITEPAPER.pdf" target="_blank" rel="noopener noreferrer" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Whitepaper</a>
+                      <a href="#contact" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Contact</a>
+                    </div>
+                  )}
+                </div>
+                {/* Wallet Connect Button in Header */}
                 <button
-                  onClick={() => setIsInfoMenuOpen(!isInfoMenuOpen)}
-                  className="px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700 transition duration-300 ease-in-out flex items-center"
+                  onClick={connectWallet}
+                  className="px-4 py-2 bg-accent-green text-white font-semibold rounded-md shadow-lg hover:bg-green-600 transition duration-300 transform hover:scale-105 ml-4"
                 >
-                  More Info
-                  <svg className={`ml-2 h-4 w-4 transform transition-transform ${isInfoMenuOpen ? 'rotate-180' : 'rotate-0'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                  </svg>
+                  {account ? truncateAddress(account) : 'Connect Wallet'}
                 </button>
-                {isInfoMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
-                    <Link to="/divvi-integration" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Divvi Demo</Link>
-                    <Link to="/cross-chain-transfer" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Cross-Chain Transfer</Link> 
-                    <Link to="/dispute-resolution" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Dispute Resolution</Link> {/* Added Dispute Resolution */}
-                    <Link to="/withdraw" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Withdraw Funds</Link> {/* Added Withdrawal */}
-                    <a href="#about" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">About</a>
-                    <a href="#vision" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Vision</a>
-                    <a href="#mission" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Mission</a>
-                    <a href="#features" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Features</a>
-                    <a href="#team" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Team</a>
-                    <a href="#roadmap" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Roadmap</a>
-                    <a href="/WHITEPAPER.pdf" target="_blank" rel="noopener noreferrer" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Whitepaper</a>
-                    <a href="#contact" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Contact</a>
-                  </div>
-                )}
               </div>
             </nav>
             <button 
@@ -1384,8 +1428,8 @@ function App() {
                 <li className="text-gray-300 text-sm mt-4 mb-2">--- Information & Demos ---</li>
                 <li><Link to="/divvi-integration" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Divvi Demo</Link></li>
                 <li><Link to="/cross-chain-transfer" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Cross-Chain Transfer</Link></li> 
-                <li><Link to="/dispute-resolution" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Dispute Resolution</Link></li> {/* Added Dispute Resolution */}
-                <li><Link to="/withdraw" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Withdraw Funds</Link></li> {/* Added Withdrawal */}
+                <li><Link to="/dispute-resolution" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Dispute Resolution</Link></li>
+                <li><Link to="/withdraw" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Withdraw Funds</Link></li>
                 <li><a href="#about" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">About</a></li>
                 <li><a href="#vision" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Vision</a></li> 
                 <li><a href="#mission" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Mission</a></li> 
@@ -1394,6 +1438,15 @@ function App() {
                 <li><a href="#roadmap" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Roadmap</a></li>
                 <li><a href="/WHITEPAPER.pdf" target="_blank" rel="noopener noreferrer" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Whitepaper</a></li> 
                 <li><a href="#contact" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Contact</a></li>
+                {/* Wallet Connect Button for Mobile Menu */}
+                <li>
+                  <button
+                    onClick={connectWallet}
+                    className="w-full px-6 py-3 bg-accent-green text-white font-semibold rounded-md shadow-lg hover:bg-green-600 transition duration-300 transform hover:scale-105 mt-4"
+                  >
+                    {account ? truncateAddress(account) : 'Connect Wallet'}
+                  </button>
+                </li>
               </ul>
             </nav>
           )}
@@ -1670,8 +1723,8 @@ function App() {
           <Route path="/post-job" element={<PostJob account={account} />} />
           <Route path="/browse-jobs" element={<BrowseJobs />} /> 
           <Route path="/cross-chain-transfer" element={<CrossChainIntegration account={account} publicClient={publicClient} walletClient={walletClient} />} />
-          <Route path="/dispute-resolution" element={<DisputeResolution account={account} />} /> {/* New Route */}
-          <Route path="/withdraw" element={<Withdrawal account={account} />} /> {/* New Route */}
+          <Route path="/dispute-resolution" element={<DisputeResolution account={account} />} />
+          <Route path="/withdraw" element={<Withdrawal account={account} />} />
         </Routes>
       </div>
     </BrowserRouter>
