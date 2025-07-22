@@ -1,6 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const cors = require('cors'); // Keep cors for potential fallback or other uses, though we'll handle manually
+const cors = require('cors'); // Re-import the cors package
 const { createPublicClient, http, formatUnits } = require('viem'); // Import formatUnits
 require('dotenv').config(); // Load environment variables from .env file
 
@@ -10,30 +10,26 @@ const app = express();
 // Define allowed origins for CORS
 const allowedOrigins = [
   'https://freelanceflow.net',
-  'https://www.freelanceflow.net'
+  'https://www.freelanceflow.net',
+  'http://localhost:3000', // For local frontend development
+  'http://localhost:5000'  // If your frontend runs on 5000 locally
 ];
 
-// Custom CORS middleware to ensure headers are always present, especially for OPTIONS preflight
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  } else {
-    // Fallback for unexpected origins or local development if needed
-    // In production, you might want to restrict this more or send no header
-    // For now, we'll set it to the primary domain if the origin is not explicitly allowed
-    res.setHeader('Access-Control-Allow-Origin', 'https://www.freelanceflow.net'); 
-  }
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Access-Control-Allow-Credentials', 'true'); // Allow credentials if needed
-
-  // Handle preflight OPTIONS requests
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200); // Respond with 200 OK for preflight
-  }
-  next();
-});
+// Configure CORS using the 'cors' package with a dynamic origin check
+app.use(cors({
+  origin: function (origin, callback) {
+    // allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}.`;
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Explicitly allow all necessary HTTP methods
+  allowedHeaders: ['Content-Type', 'Authorization'], // Explicitly allow headers your frontend might send
+  credentials: true // Important if you plan to send cookies or authorization headers (e.g., for user sessions)
+}));
 
 app.use(express.json()); // Parse JSON request bodies
 
