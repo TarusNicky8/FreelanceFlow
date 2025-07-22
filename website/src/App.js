@@ -15,8 +15,8 @@ const liskSepolia = {
     symbol: 'ETH',
   },
   rpcUrls: {
-    default: { http: ['https://testnet-rpc.lisk.com'] },
-    public: { http: ['https://testnet-rpc.lisk.com'] },
+    default: { http: ['https://rpc.sepolia-api.lisk.com'] }, // Corrected Lisk Sepolia RPC URL
+    public: { http: ['https://rpc.sepolia-api.lisk.com'] }, // Corrected Lisk Sepolia RPC URL
   },
   blockExplorers: {
     default: { name: 'Lisk Blockscout', url: 'https://sepolia-blockscout.lisk.com/' },
@@ -287,7 +287,9 @@ const Dashboard = ({ account }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Removed: const navigate = useNavigate(); // This line was unused and caused the ESLint warning
+  // IMPORTANT: The 'navigate' variable is intentionally removed from here as it's not used in Dashboard.
+  // This was the source of your ESLint 'no-unused-vars' error.
+  // const navigate = useNavigate(); 
 
   useEffect(() => {
     const fetchData = async () => {
