@@ -305,9 +305,10 @@ const Dashboard = ({ account }) => {
         setTotalEscrowDeposits(depositResponse.data.totalDeposits || 0);
 
         const jobsResponse = await axios.get(`${API_BASE_URL}/api/jobs/forUser/${account}`);
-        // Filter jobs based on role
-        const clientJobsFiltered = jobsResponse.data.filter(job => job.client.toLowerCase() === account.toLowerCase());
-        const freelancerJobsFiltered = jobsResponse.data.filter(job => job.freelancer && job.freelancer.toLowerCase() === account.toLowerCase());
+        // Ensure jobsResponse.data is an array before filtering
+        const allUserJobs = Array.isArray(jobsResponse.data) ? jobsResponse.data : [];
+        const clientJobsFiltered = allUserJobs.filter(job => job.client.toLowerCase() === account.toLowerCase());
+        const freelancerJobsFiltered = allUserJobs.filter(job => job.freelancer && job.freelancer.toLowerCase() === account.toLowerCase());
         
         setClientJobs(clientJobsFiltered);
         setFreelancerJobs(freelancerJobsFiltered);
@@ -1550,8 +1551,8 @@ function App() {
                       </p>
 
                       <div className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-2">
-                        <a href="https://www.linkedin.com/in/nicodemus-kiptoo-4276b9364/" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:text-blue-800 transition duration-300">LinkedIn</a>
-                        <a href="https://x.com/nicodemuskipto0" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:text-blue-800 transition duration-300">X</a>
+                        <a href="https://www.linkedin.com/in/nicodemus-kiptoo-4276b9364/" target="_blank" rel="noopener noreferrer" className="hover:text-primary-blue transition duration-300">LinkedIn</a>
+                        <a href="https://x.com/nicodemuskipto0" target="_blank" rel="noopener noreferrer" className="hover:text-primary-blue transition duration-300">X</a>
                       </div>
                     </div>
 
@@ -1567,8 +1568,8 @@ function App() {
                       </p>
 
                       <div className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-2">
-                        <a href="https://www.linkedin.com/in/ashley-jepchirchir-9222982a9/" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:text-blue-800 transition duration-300">LinkedIn</a>
-                        <a href="https://x.com/A_jepchirchir" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:text-blue-800 transition duration-300">X</a>
+                        <a href="https://www.linkedin.com/in/ashley-jepchirchir-9222982a9/" target="_blank" rel="noopener noreferrer" className="hover:text-primary-blue transition duration-300">LinkedIn</a>
+                        <a href="https://x.com/A_jepchirchir" target="_blank" rel="noopener noreferrer" className="hover:text-primary-blue transition duration-300">X</a>
                       </div>
                     </div>
 
@@ -1584,8 +1585,8 @@ function App() {
                       </p>
 
                       <div className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-2">
-                        <a href="https://www.linkedin.com/in/eng-joan-jerop-810106133/" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:text-blue-800 transition duration-300">LinkedIn</a>
-                        <a href="https://x.com/jeropcrypto" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:text-blue-800 transition duration-300">X</a>
+                        <a href="https://www.linkedin.com/in/eng-joan-jerop-810106133/" target="_blank" rel="noopener noreferrer" className="hover:text-primary-blue transition duration-300">LinkedIn</a>
+                        <a href="https://x.com/jeropcrypto" target="_blank" rel="noopener noreferrer" className="hover:text-primary-blue transition duration-300">X</a>
                       </div>
                     </div>
                   </div>
