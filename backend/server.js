@@ -1,6 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const cors = require('cors'); // Re-import the cors package
+const cors = require('cors'); // Re-enabled: Import the cors package
 const { createPublicClient, http, formatUnits } = require('viem');
 require('dotenv').config();
 
@@ -19,14 +19,13 @@ const allowedOrigins = [
   'https://freelanceflow.net',
   'https://www.freelanceflow.net',
   'http://localhost:3000', // For local frontend development
-  'http://localhost:5000'  // If your frontend runs on 5000 locally
+  'http://localhost:5000'  // If your backend serves itself or for testing
 ];
 
 // Configure CORS using the 'cors' package with a dynamic origin check
 app.use(cors({
   origin: function (origin, callback) {
     // If no origin is provided (e.g., direct API calls, curl, or same-origin in some cases), allow it.
-    // In a production environment, you might want to restrict this more.
     if (!origin) {
       console.log("CORS: No origin provided, allowing request.");
       return callback(null, true);
@@ -50,13 +49,14 @@ app.use(cors({
 
 app.use(express.json());
 
-// --- Blockchain Configuration (unchanged) ---
+// --- Blockchain Configuration ---
 const liskNetwork = {
   id: process.env.NODE_ENV === 'production' ? 1135 : 4202,
   name: process.env.NODE_ENV === 'production' ? 'Lisk Mainnet' : 'Lisk Sepolia Testnet',
   rpcUrls: {
     default: {
-      http: [process.env.NODE_ENV === 'production' ? 'https://rpc.lisk.com' : 'https://testnet-rpc.lisk.com'],
+      // UPDATED RPC URLs based on your input
+      http: [process.env.NODE_ENV === 'production' ? 'https://rpc.api.lisk.com' : 'https://rpc.sepolia-api.lisk.com'],
     },
   },
   blockExplorers: {
@@ -84,11 +84,8 @@ console.log(`Using ESCROW_CONTRACT_ADDRESS: ${ESCROW_CONTRACT_ADDRESS}`);
 console.log(`Using USDC_CONTRACT_ADDRESS: ${USDC_CONTRACT_ADDRESS}`);
 
 
-// --- MongoDB Connection (unchanged) ---
-mongoose.connect(process.env.MONGO_URI, { 
-  useNewUrlParser: true, 
-  useUnifiedTopology: true,
-})
+// --- MongoDB Connection ---
+mongoose.connect(process.env.MONGO_URI) // Removed deprecated options
 .then(() => console.log('MongoDB connected successfully'))
 .catch(err => console.error('MongoDB connection error:', err));
 
@@ -270,12 +267,14 @@ app.get('/api/deposits/total/:account', async (req, res) => {
       },
     ];
 
+    console.log(`Attempting to read contract for address: ${addressToCheck} on Lisk RPC: ${liskNetwork.rpcUrls.default.http[0]}`);
     const depositBigInt = await publicClient.readContract({
       address: ESCROW_CONTRACT_ADDRESS,
       abi: escrowAbiForDeposits,
       functionName: 'deposits',
       args: [addressToCheck],
     });
+    console.log(`Successfully read contract. Raw deposit: ${depositBigInt}`);
 
     const totalDeposits = formatUnits(depositBigInt, units);
     res.json({ totalDeposits: totalDeposits });
@@ -314,3 +313,9 @@ app.post('/api/withdrawals', async (req, res) => {
 
 // --- Vercel Export ---
 module.exports = app;
+
+// Local Development Server (only runs if not in production environment)
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+}
