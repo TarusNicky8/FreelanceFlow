@@ -1,19 +1,40 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const cors = require('cors');
+const cors = require('cors'); // Keep cors for potential fallback or other uses, though we'll handle manually
 const { createPublicClient, http, formatUnits } = require('viem'); // Import formatUnits
 require('dotenv').config(); // Load environment variables from .env file
 
 const app = express();
 
 // --- Middleware ---
-// CORS should be applied very early to ensure it's processed for all requests
-app.use(cors({
-  origin: ['https://freelanceflow.net', 'https://www.freelanceflow.net'], // Explicitly allow both www and non-www versions
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Explicitly allow common HTTP methods
-  allowedHeaders: ['Content-Type', 'Authorization'], // Explicitly allow headers your frontend might send
-  credentials: true // Important if you plan to send cookies or authorization headers (e.g., for user sessions)
-}));
+// Define allowed origins for CORS
+const allowedOrigins = [
+  'https://freelanceflow.net',
+  'https://www.freelanceflow.net'
+];
+
+// Custom CORS middleware to ensure headers are always present, especially for OPTIONS preflight
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  } else {
+    // Fallback for unexpected origins or local development if needed
+    // In production, you might want to restrict this more or send no header
+    // For now, we'll set it to the primary domain if the origin is not explicitly allowed
+    res.setHeader('Access-Control-Allow-Origin', 'https://www.freelanceflow.net'); 
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', 'true'); // Allow credentials if needed
+
+  // Handle preflight OPTIONS requests
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200); // Respond with 200 OK for preflight
+  }
+  next();
+});
+
 app.use(express.json()); // Parse JSON request bodies
 
 // --- Blockchain Configuration ---
@@ -46,6 +67,13 @@ const publicClient = createPublicClient({
   chain: liskNetwork,
   transport: http(liskNetwork.rpcUrls.default.http[0]),
 });
+
+// Log environment and RPC URL for debugging on Vercel
+console.log(`Backend running in NODE_ENV: ${process.env.NODE_ENV}`);
+console.log(`Using Lisk RPC URL: ${liskNetwork.rpcUrls.default.http[0]}`);
+console.log(`Using ESCROW_CONTRACT_ADDRESS: ${ESCROW_CONTRACT_ADDRESS}`);
+console.log(`Using USDC_CONTRACT_ADDRESS: ${USDC_CONTRACT_ADDRESS}`);
+
 
 // --- MongoDB Connection ---
 // For Vercel serverless functions, it's crucial to handle database connections
