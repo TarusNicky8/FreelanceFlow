@@ -1,6 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const cors = require('cors'); // <<< THIS LINE IS NOW UNCOMMENTED
+const cors = require('cors'); // <<< THIS MUST BE UNCOMMENTED
 const { createPublicClient, http, formatUnits } = require('viem');
 require('dotenv').config();
 
