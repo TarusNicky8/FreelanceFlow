@@ -121,7 +121,7 @@ const Profile = ({ account }) => {
   const [statusMessage, setStatusMessage] = useState('');
   const [isError, setIsError] = useState(false);
 
-  const navigate = useNavigate(); // Line 290
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -1456,7 +1456,7 @@ function App() {
         <Routes>
           <Route path="/" element={
             <>
-              <section className="relative bg-gradient-to-r from-primary-blue to-secondary-purple text-white py-24 text-center overflow-hidden animate-gradient">
+              <section className="relative bg-gradient-to-br from-primary-blue to-secondary-purple text-white py-24 text-center overflow-hidden animate-gradient">
                 <div className="absolute inset-0 z-0 overflow-hidden">
                   <div className="absolute top-0 left-1/4 h-full w-px bg-white/20 animate-line-flow"></div> 
                   <div className="absolute top-0 left-3/4 h-full w-px bg-white/20 animate-line-flow-delay-2"></div> 
