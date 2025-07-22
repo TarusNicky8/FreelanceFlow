@@ -121,7 +121,7 @@ const Profile = ({ account }) => {
   const [statusMessage, setStatusMessage] = useState('');
   const [isError, setIsError] = useState(false);
 
-  const navigate = useNavigate();
+  const navigate = useNavigate(); // Line 290
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -175,7 +175,7 @@ const Profile = ({ account }) => {
       setIsError(false);
       
       setTimeout(() => {
-        navigate('/dashboard');
+        navigate('/dashboard'); // navigate is used here
       }, 1500); 
 
     } catch (error) {
@@ -287,7 +287,7 @@ const Dashboard = ({ account }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const navigate = useNavigate();
+  // Removed: const navigate = useNavigate(); // This line was unused and caused the ESLint warning
 
   useEffect(() => {
     const fetchData = async () => {
