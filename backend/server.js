@@ -1,6 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const cors = require('cors'); // Re-enabled: Import the cors package
+const cors = require('cors'); // <<< THIS LINE IS NOW UNCOMMENTED
 const { createPublicClient, http, formatUnits } = require('viem');
 require('dotenv').config();
 
@@ -213,7 +213,8 @@ app.get('/api/jobs/:id', async (req, res) => {
       return res.status(404).json({ error: 'Job not found' });
     }
     res.json(job);
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Error fetching job by ID:', error);
     res.status(400).json({ error: 'Invalid Job ID or server error' });
   }
@@ -230,8 +231,7 @@ app.put('/api/jobs/:id', async (req, res) => {
       return res.status(404).json({ error: 'Job not found' });
     }
     res.json(job);
-  }
-  catch (error) {
+  } catch (error) {
     console.error('Error updating job:', error);
     res.status(400).json({ error: error.message });
   }
