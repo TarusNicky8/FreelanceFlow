@@ -1,6 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const cors = require('cors'); // Re-enabled: Import the cors package
+// const cors = require('cors'); // Removed: CORS will be handled by vercel.json
 const { createPublicClient, http, formatUnits } = require('viem');
 require('dotenv').config();
 
@@ -14,38 +14,36 @@ app.use((req, res, next) => {
 });
 
 // --- Middleware ---
-// Define allowed origins for CORS
-const allowedOrigins = [
-  'https://freelanceflow.net',
-  'https://www.freelanceflow.net',
-  'http://localhost:3000', // For local frontend development
-  'http://localhost:5000'  // If your backend serves itself or for testing
-];
+// CORS middleware removed as it will be handled by vercel.json for production deployments.
+// For local development, ensure your browser is configured to allow CORS from localhost:3000 to localhost:5000,
+// or temporarily re-add a simple cors() middleware if needed for local testing only.
+// const allowedOrigins = [
+//   'https://freelanceflow.net',
+//   'https://www.freelanceflow.net',
+//   'http://localhost:3000',
+//   'http://localhost:5000'
+// ];
 
-// Configure CORS using the 'cors' package with a dynamic origin check
-app.use(cors({
-  origin: function (origin, callback) {
-    // If no origin is provided (e.g., direct API calls, curl, or same-origin in some cases), allow it.
-    if (!origin) {
-      console.log("CORS: No origin provided, allowing request.");
-      return callback(null, true);
-    }
+// app.use(cors({
+//   origin: function (origin, callback) {
+//     if (!origin) {
+//       console.log("CORS: No origin provided, allowing request.");
+//       return callback(null, true);
+//     }
     
-    // Check if the origin is in our allowed list
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      console.log(`CORS: Origin ${origin} is allowed.`);
-      return callback(null, true);
-    } else {
-      // If the origin is not allowed, log it and reject the request
-      console.error(`CORS: Origin ${origin} not allowed by CORS policy.`);
-      const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}.`;
-      return callback(new Error(msg), false);
-    }
-  },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'], // Explicitly allow all necessary HTTP methods
-  allowedHeaders: ['Content-Type', 'Authorization'], // Explicitly allow headers your frontend might send
-  credentials: true // Important if you plan to send cookies or authorization headers (e.g., for user sessions)
-}));
+//     if (allowedOrigins.indexOf(origin) !== -1) {
+//       console.log(`CORS: Origin ${origin} is allowed.`);
+//       return callback(null, true);
+//     } else {
+//       console.error(`CORS: Origin ${origin} not allowed by CORS policy.`);
+//       const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}.`;
+//       return callback(new Error(msg), false);
+//     }
+//   },
+//   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+//   allowedHeaders: ['Content-Type', 'Authorization'],
+//   credentials: true
+// }));
 
 app.use(express.json());
 
