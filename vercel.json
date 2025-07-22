@@ -1,0 +1,26 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "backend-server-js/index.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "website/package.json",
+      "use": "@vercel/static-build",
+      "config": { "distDir": "build" }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "backend-server-js/index.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "website/build/$1"
+    }
+  ],
+  "installCommand": "npm install --prefix backend-server-js && npm install --prefix website",
+  "buildCommand": "npm run build --prefix website"
+}
