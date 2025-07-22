@@ -1,6 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const cors = require('cors');
+// const cors = require('cors'); // Removed: Vercel will handle CORS via vercel.json
 const { createPublicClient, http, formatUnits } = require('viem');
 require('dotenv').config();
 
@@ -13,26 +13,27 @@ app.use((req, res, next) => {
 });
 
 // --- Middleware ---
-const allowedOrigins = [
-  'https://freelanceflow.net',
-  'https://www.freelanceflow.net',
-  'http://localhost:3000',
-  'http://localhost:5000'
-];
+// CORS is now handled by vercel.json, so this block is removed/commented out.
+// const allowedOrigins = [
+//   'https://freelanceflow.net',
+//   'https://www.freelanceflow.net',
+//   'http://localhost:3000',
+//   'http://localhost:5000'
+// ];
 
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}.`;
-      return callback(new Error(msg), false);
-    }
-    return callback(null, true);
-  },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
-}));
+// app.use(cors({
+//   origin: function (origin, callback) {
+//     if (!origin) return callback(null, true);
+//     if (allowedOrigins.indexOf(origin) === -1) {
+//       const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}.`;
+//       return callback(new Error(msg), false);
+//     }
+//     return callback(null, true);
+//   },
+//   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+//   allowedHeaders: ['Content-Type', 'Authorization'],
+//   credentials: true
+// }));
 
 app.use(express.json());
 
