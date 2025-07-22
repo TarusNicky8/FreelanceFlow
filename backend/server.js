@@ -6,12 +6,13 @@ require('dotenv').config(); // Load environment variables from .env file
 
 const app = express();
 
-// Middleware
-// Explicitly allow both www and non-www versions of your domain for CORS
+// --- Middleware ---
+// CORS should be applied very early to ensure it's processed for all requests
 app.use(cors({
-  origin: ['https://freelanceflow.net', 'https://www.freelanceflow.net'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Explicitly allow methods
-  allowedHeaders: ['Content-Type', 'Authorization'], // Explicitly allow headers
+  origin: ['https://freelanceflow.net', 'https://www.freelanceflow.net'], // Explicitly allow both www and non-www versions
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Explicitly allow common HTTP methods
+  allowedHeaders: ['Content-Type', 'Authorization'], // Explicitly allow headers your frontend might send
+  credentials: true // Important if you plan to send cookies or authorization headers (e.g., for user sessions)
 }));
 app.use(express.json()); // Parse JSON request bodies
 
@@ -22,7 +23,7 @@ const liskNetwork = {
   name: process.env.NODE_ENV === 'production' ? 'Lisk Mainnet' : 'Lisk Sepolia Testnet',
   rpcUrls: {
     default: {
-      http: [process.env.NODE_ENV === 'production' ? 'https://rpc.api.lisk.com' : 'https://rpc.sepolia-api.lisk.com'],
+      http: [process.env.NODE_ENV === 'production' ? 'https://rpc.lisk.com' : 'https://testnet-rpc.lisk.com'],
     },
   },
   blockExplorers: {
@@ -47,6 +48,10 @@ const publicClient = createPublicClient({
 });
 
 // --- MongoDB Connection ---
+// For Vercel serverless functions, it's crucial to handle database connections
+// in a way that is efficient for a serverless environment (e.g., idempotent connection).
+// Keeping it top-level like this is generally fine for Express apps on Vercel,
+// but be aware of potential cold start impacts.
 mongoose.connect(process.env.MONGO_URI, { 
   useNewUrlParser: true, 
   useUnifiedTopology: true,
@@ -258,8 +263,10 @@ app.get('/api/deposits/total/:account', async (req, res) => {
     res.json({ totalDeposits: totalDeposits });
   } catch (error) {
     console.error('Error fetching total deposits:', error);
-    // Provide a more informative error message to the frontend
-    res.status(500).json({ error: `Failed to fetch total deposits: ${error.message}. Ensure wallet is connected and contract address is correct.` });
+    // Provide a more informative error message to the frontend, including the RPC URL
+    res.status(500).json({ 
+      error: `Failed to fetch total deposits from Lisk Sepolia RPC (${liskNetwork.rpcUrls.default.http[0]}): ${error.message}. Please check your backend's network connectivity and RPC status.` 
+    });
   }
 });
 
@@ -295,7 +302,12 @@ app.post('/api/withdrawals', async (req, res) => {
 });
 
 
-// --- Server Start ---
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// --- Vercel Export ---
+// Instead of app.listen, export the app for Vercel's serverless function environment
+module.exports = app;
 
+// If you still want to run locally with app.listen, you can do this:
+// if (process.env.NODE_ENV !== 'production') {
+//   const PORT = process.env.PORT || 5000;
+//   app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// }
