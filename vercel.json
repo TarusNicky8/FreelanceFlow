@@ -17,12 +17,8 @@
       "dest": "backend-server-js/index.js"
     },
     {
-      "src": "/",
-      "dest": "website/build/index.html"
-    },
-    {
       "src": "/(.*)",
-      "dest": "website/build/$1"
+      "dest": "website/build/index.html"
     }
   ],
   "installCommand": "npm install --prefix backend-server-js && npm install --prefix website",
