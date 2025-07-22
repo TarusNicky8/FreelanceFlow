@@ -7,7 +7,12 @@ require('dotenv').config(); // Load environment variables from .env file
 const app = express();
 
 // Middleware
-app.use(cors()); // Enable CORS for all origins (adjust in production for security)
+// Explicitly allow both www and non-www versions of your domain for CORS
+app.use(cors({
+  origin: ['https://freelanceflow.net', 'https://www.freelanceflow.net'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Explicitly allow methods
+  allowedHeaders: ['Content-Type', 'Authorization'], // Explicitly allow headers
+}));
 app.use(express.json()); // Parse JSON request bodies
 
 // --- Blockchain Configuration ---
