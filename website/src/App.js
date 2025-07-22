@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link, useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { createWalletClient, custom, parseUnits, encodeFunctionData, createPublicClient, http } from 'viem';
-import { getDataSuffix, submitReferral } from '@divvi/referral-sdk';
+// import { getDataSuffix, submitReferral } from '@divvi/referral-sdk'; // Commented out
 import logo from './App icon.svg'; 
 
 const liskSepolia = {
@@ -771,7 +771,7 @@ const BrowseJobs = () => {
   const [jobs, setJobs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
-  //const navigate = useNavigate();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchJobs = async () => {
@@ -1295,8 +1295,8 @@ function App() {
     try {
       const amountInSmallestUnit = parseUnits(amountToDeposit, 6); 
 
-      const divviConsumerAddress = '0x58ccf714F804a10cd9FE22fCcc044d77Ea34e5b1';
-      const divviProviderAddresses = ['0x0423189886d7966f0dd7e7d256898daeee625dca','0xc95876688026be9d6fa7a7c33328bd013effa2bb','0x7beb0e14f8d2e6f6678cc30d867787b384b19e20'];
+      // const divviConsumerAddress = '0x58ccf714F804a10cd9FE22fCcc044d77Ea34e5b1'; // Commented out
+      // const divviProviderAddresses = ['0x0423189886d7966f0dd7e7d256898daeee625dca','0xc95876688026be9d6fa7a7c33328bd013effa2bb','0x7beb0e14f8d2e6f6678cc30d867787b384b19e20']; // Commented out
 
       const approveCallData = encodeFunctionData({
         abi: usdcAbi,
@@ -1321,15 +1321,15 @@ function App() {
         args: [defaultFreelancerAddress, amountInSmallestUnit],
       });
 
-      const dataSuffix = getDataSuffix({
-        consumer: divviConsumerAddress,
-        providers: divviProviderAddresses,
-      });
+      // const dataSuffix = getDataSuffix({ // Commented out
+      //   consumer: divviConsumerAddress, // Commented out
+      //   providers: divviProviderAddresses, // Commented out
+      // }); // Commented out
 
       const depositTxHash = await walletClient.sendTransaction({
         account,
         to: escrowContractAddress,
-        data: depositCallData + dataSuffix, 
+        data: depositCallData, // dataSuffix removed
         value: 0n, 
       });
 
@@ -1337,14 +1337,14 @@ function App() {
       await publicClient.waitForTransactionReceipt({ hash: depositTxHash });
       setStatus('Deposit confirmed. Now reporting referral to Divvi...');
 
-      const chainId = await walletClient.getChainId();
-      await submitReferral({
-        txHash: depositTxHash,
-        chainId,
-      });
+      // const chainId = await walletClient.getChainId(); // Commented out
+      // await submitReferral({ // Commented out
+      //   txHash: depositTxHash, // Commented out
+      //   chainId, // Commented out
+      // }); // Commented out
 
-      setStatus(`Deposit successful and referral submitted to Divvi! Tx Hash: ${depositTxHash}`);
-      console.log('Divvi referral submitted successfully!');
+      setStatus(`Deposit successful and Divvi referral (mocked) completed! Tx Hash: ${depositTxHash}`); // Updated status message
+      console.log('Divvi referral (mocked) completed!'); // Updated console log
 
     } catch (error) {
       console.error("Error during USDC deposit or Divvi integration:", error);
