@@ -7,7 +7,7 @@
   ],
   "functions": {
     "server.js": {
-      "runtime": "node@18.x"  
+      "runtime": "now-node@18.x"  
     }
   }
 }
