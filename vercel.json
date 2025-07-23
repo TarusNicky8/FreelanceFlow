@@ -1,0 +1,28 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "backend-server-js/index.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "website/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "build"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "backend-server-js/index.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/website/build/index.html"
+    }
+  ],
+  "installCommand": "npm install --prefix backend-server-js --legacy-peer-deps && npm install --prefix website --legacy-peer-deps",
+  "buildCommand": "npm run build --prefix backend-server-js && npm run build --prefix website"
+}
