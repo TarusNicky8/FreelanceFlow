@@ -16,7 +16,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "REACT_APP_API_BASE_URL=YOUR_BACKEND_API_URL_HERE react-scripts build",
+    "build": "react-scripts build",  
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
