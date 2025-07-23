@@ -1,66 +1,58 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const cors = require('cors'); // <<< THIS MUST BE UNCOMMENTED
+const cors = require('cors');
 const { createPublicClient, http, formatUnits } = require('viem');
 require('dotenv').config();
 
 const app = express();
 
-// --- IMPORTANT: Log incoming requests for debugging ---
+// --- Log incoming requests for debugging ---
 app.use((req, res, next) => {
   console.log(`Incoming Request: ${req.method} ${req.url}`);
-  console.log(`Request Origin Header: ${req.headers.origin}`); // Log the origin header
+  console.log(`Request Origin Header: ${req.headers.origin}`);
   next();
 });
 
-// --- Middleware ---
-// Define allowed origins for CORS
+// --- CORS Configuration ---
 const allowedOrigins = [
   'https://freelanceflow.net',
   'https://www.freelanceflow.net',
-  'http://localhost:3000', // For local frontend development
-  'http://localhost:5000'  // If your backend serves itself or for testing
+  'http://localhost:3000',
+  'http://localhost:5000'
 ];
 
-// Configure CORS using the 'cors' package with a dynamic origin check
 app.use(cors({
   origin: function (origin, callback) {
-    // If no origin is provided (e.g., direct API calls, curl, or same-origin in some cases), allow it.
-    if (!origin) {
-      console.log("CORS: No origin provided, allowing request.");
-      return callback(null, true);
-    }
-    
-    // Check if the origin is in our allowed list
-    if (allowedOrigins.indexOf(origin) !== -1) {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
       console.log(`CORS: Origin ${origin} is allowed.`);
       return callback(null, true);
-    } else {
-      // If the origin is not allowed, log it and reject the request
-      console.error(`CORS: Origin ${origin} not allowed by CORS policy.`);
-      const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}.`;
-      return callback(new Error(msg), false);
     }
+    const msg = `CORS: Origin ${origin} not allowed.`;
+    console.error(msg);
+    return callback(new Error(msg), false);
   },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'], // Explicitly allow all necessary HTTP methods
-  allowedHeaders: ['Content-Type', 'Authorization'], // Explicitly allow headers your frontend might send
-  credentials: true // Important if you plan to send cookies or authorization headers (e.g., for user sessions)
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
 }));
 
 app.use(express.json());
 
-// --- Blockchain Configuration ---
+// --- Blockchain Config ---
 const liskNetwork = {
   id: process.env.NODE_ENV === 'production' ? 1135 : 4202,
   name: process.env.NODE_ENV === 'production' ? 'Lisk Mainnet' : 'Lisk Sepolia Testnet',
   rpcUrls: {
     default: {
-      // UPDATED RPC URLs based on your input
       http: [process.env.NODE_ENV === 'production' ? 'https://rpc.api.lisk.com' : 'https://rpc.sepolia-api.lisk.com'],
     },
   },
   blockExplorers: {
-    default: { name: 'Lisk Blockscout', url: process.env.NODE_ENV === 'production' ? 'https://blockscout.lisk.com/' : 'https://sepolia-blockscout.lisk.com/' },
+    default: {
+      name: 'Lisk Blockscout',
+      url: process.env.NODE_ENV === 'production' ? 'https://blockscout.lisk.com/' : 'https://sepolia-blockscout.lisk.com/',
+    },
   },
   testnet: process.env.NODE_ENV !== 'production',
 };
@@ -78,18 +70,17 @@ const publicClient = createPublicClient({
   transport: http(liskNetwork.rpcUrls.default.http[0]),
 });
 
-console.log(`Backend running in NODE_ENV: ${process.env.NODE_ENV}`);
-console.log(`Using Lisk RPC URL: ${liskNetwork.rpcUrls.default.http[0]}`);
-console.log(`Using ESCROW_CONTRACT_ADDRESS: ${ESCROW_CONTRACT_ADDRESS}`);
-console.log(`Using USDC_CONTRACT_ADDRESS: ${USDC_CONTRACT_ADDRESS}`);
-
+console.log(`NODE_ENV: ${process.env.NODE_ENV}`);
+console.log(`Using Lisk RPC: ${liskNetwork.rpcUrls.default.http[0]}`);
+console.log(`ESCROW_CONTRACT_ADDRESS: ${ESCROW_CONTRACT_ADDRESS}`);
+console.log(`USDC_CONTRACT_ADDRESS: ${USDC_CONTRACT_ADDRESS}`);
 
 // --- MongoDB Connection ---
-mongoose.connect(process.env.MONGO_URI) // Removed deprecated options
-.then(() => console.log('MongoDB connected successfully'))
-.catch(err => console.error('MongoDB connection error:', err));
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log('MongoDB connected successfully'))
+  .catch(err => console.error('MongoDB connection error:', err));
 
-// --- Mongoose Schemas (unchanged) ---
+// --- Mongoose Schemas ---
 const userSchema = new mongoose.Schema({
   address: { type: String, required: true, unique: true, lowercase: true },
   role: { type: String, enum: ['freelancer', 'client', 'both'], default: 'freelancer' },
@@ -138,7 +129,6 @@ const withdrawalSchema = new mongoose.Schema({
   txId: { type: String, default: null },
 });
 
-
 const User = mongoose.model('User', userSchema);
 const Job = mongoose.model('Job', jobSchema);
 const Dispute = mongoose.model('Dispute', disputeSchema);
@@ -146,7 +136,7 @@ const Withdrawal = mongoose.model('Withdrawal', withdrawalSchema);
 
 // --- API Routes ---
 
-// User Routes
+// Users
 app.post('/api/users', async (req, res) => {
   try {
     const user = new User(req.body);
@@ -182,7 +172,7 @@ app.put('/api/users/:address', async (req, res) => {
   }
 });
 
-// Job Routes
+// Jobs
 app.post('/api/jobs', async (req, res) => {
   try {
     const jobData = { ...req.body, client: req.body.client.toLowerCase() };
@@ -201,7 +191,7 @@ app.get('/api/jobs', async (req, res) => {
     const jobs = await Job.find(statusFilter);
     res.json(jobs);
   } catch (error) {
-    console.error('Error fetching all jobs:', error);
+    console.error('Error fetching jobs:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -209,12 +199,9 @@ app.get('/api/jobs', async (req, res) => {
 app.get('/api/jobs/:id', async (req, res) => {
   try {
     const job = await Job.findById(req.params.id);
-    if (!job) {
-      return res.status(404).json({ error: 'Job not found' });
-    }
+    if (!job) return res.status(404).json({ error: 'Job not found' });
     res.json(job);
-  }
-  catch (error) {
+  } catch (error) {
     console.error('Error fetching job by ID:', error);
     res.status(400).json({ error: 'Invalid Job ID or server error' });
   }
@@ -227,9 +214,7 @@ app.put('/api/jobs/:id', async (req, res) => {
       updateData.freelancer = updateData.freelancer.toLowerCase();
     }
     const job = await Job.findByIdAndUpdate(req.params.id, updateData, { new: true, runValidators: true });
-    if (!job) {
-      return res.status(404).json({ error: 'Job not found' });
-    }
+    if (!job) return res.status(404).json({ error: 'Job not found' });
     res.json(job);
   } catch (error) {
     console.error('Error updating job:', error);
@@ -255,9 +240,7 @@ app.get('/api/jobs/forUser/:account', async (req, res) => {
 
 app.get('/api/deposits/total/:account', async (req, res) => {
   try {
-    const units = 6; 
     const addressToCheck = req.params.account;
-
     const escrowAbiForDeposits = [
       {
         inputs: [{ internalType: 'address', name: '', type: 'address' }],
@@ -268,25 +251,22 @@ app.get('/api/deposits/total/:account', async (req, res) => {
       },
     ];
 
-    console.log(`Attempting to read contract for address: ${addressToCheck} on Lisk RPC: ${liskNetwork.rpcUrls.default.http[0]}`);
     const depositBigInt = await publicClient.readContract({
       address: ESCROW_CONTRACT_ADDRESS,
       abi: escrowAbiForDeposits,
       functionName: 'deposits',
       args: [addressToCheck],
     });
-    console.log(`Successfully read contract. Raw deposit: ${depositBigInt}`);
 
-    const totalDeposits = formatUnits(depositBigInt, units);
-    res.json({ totalDeposits: totalDeposits });
+    const totalDeposits = formatUnits(depositBigInt, 6);
+    res.json({ totalDeposits });
   } catch (error) {
-    console.error('Error fetching total deposits:', error);
-    res.status(500).json({ 
-      error: `Failed to fetch total deposits from Lisk Sepolia RPC (${liskNetwork.rpcUrls.default.http[0]}): ${error.message}. Please check your backend's network connectivity and RPC status.` 
-    });
+    console.error('Error fetching deposits:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
+// Disputes
 app.post('/api/disputes', async (req, res) => {
   try {
     const disputeData = { ...req.body, reporterAddress: req.body.reporterAddress.toLowerCase() };
@@ -295,11 +275,12 @@ app.post('/api/disputes', async (req, res) => {
     await Job.findByIdAndUpdate(dispute.jobId, { status: 'disputed' });
     res.status(201).json(dispute);
   } catch (error) {
-    console.error('Error submitting dispute:', error);
+    console.error('Error creating dispute:', error);
     res.status(400).json({ error: error.message });
   }
 });
 
+// Withdrawals
 app.post('/api/withdrawals', async (req, res) => {
   try {
     const withdrawalData = { ...req.body, requestorAddress: req.body.requestorAddress.toLowerCase() };
@@ -313,10 +294,6 @@ app.post('/api/withdrawals', async (req, res) => {
 });
 
 // --- Vercel Export ---
-module.exports = app;
-
-// Local Development Server (only runs if not in production environment)
-if (process.env.NODE_ENV !== 'production') {
-  const PORT = process.env.PORT || 5000;
-  app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
-}
+module.exports = (req, res) => {
+  return app(req, res);
+};
