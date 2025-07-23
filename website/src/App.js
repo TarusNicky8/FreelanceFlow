@@ -67,7 +67,7 @@ const usdcContractAddress = '0xFD2A349A744616C6077978A3D463C82Ac00A37c1';
 const escrowContractAddress = '0x83C9919341aa0705b6b0d79420EfAAE27B53ADCf';
 const defaultFreelancerAddress = '0x0000000000000000000000000000000000000001'; 
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'; 
+const API_BASE_URL = 'https://freelanceflow-backend-api.vercel.app'; 
 
 const UsdcIcon = () => (
   <img src={process.env.PUBLIC_URL + '/icons/usdc.png'} alt="USDC Icon" className="h-14 w-14 text-blue-600 mb-4 mx-auto" />
