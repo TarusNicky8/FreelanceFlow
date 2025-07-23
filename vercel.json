@@ -9,7 +9,7 @@
       "src": "website/package.json",
       "use": "@vercel/static-build",
       "config": {
-        "distDir": "build"
+        "distDir": "website/build"
       }
     }
   ],
@@ -19,8 +19,11 @@
       "dest": "backend-server-js/index.js"
     },
     {
-      "src": "/(.*)",
-      "dest": "/website/build/index.html"
+      "handle": "filesystem"
+    },
+    {
+      "src": "/.*",
+      "dest": "/index.html"
     }
   ],
   "installCommand": "npm install --prefix backend-server-js --legacy-peer-deps && npm install --prefix website --legacy-peer-deps",
