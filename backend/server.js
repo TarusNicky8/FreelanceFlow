@@ -57,12 +57,12 @@ const liskNetwork = {
   testnet: process.env.NODE_ENV !== 'production',
 };
 
-const USDC_CONTRACT_ADDRESS = process.env.NODE_ENV === 'production' 
-  ? process.env.USDC_MAINNET_CONTRACT_ADDRESS 
+const USDC_CONTRACT_ADDRESS = process.env.NODE_ENV === 'production'
+  ? process.env.USDC_MAINNET_CONTRACT_ADDRESS
   : process.env.USDC_SEPOLIA_CONTRACT_ADDRESS;
 
-const ESCROW_CONTRACT_ADDRESS = process.env.NODE_ENV === 'production' 
-  ? process.env.ESCROW_MAINNET_CONTRACT_ADDRESS 
+const ESCROW_CONTRACT_ADDRESS = process.env.NODE_ENV === 'production'
+  ? process.env.ESCROW_MAINNET_CONTRACT_ADDRESS
   : process.env.ESCROW_SEPOLIA_CONTRACT_ADDRESS;
 
 const publicClient = createPublicClient({
@@ -76,9 +76,18 @@ console.log(`ESCROW_CONTRACT_ADDRESS: ${ESCROW_CONTRACT_ADDRESS}`);
 console.log(`USDC_CONTRACT_ADDRESS: ${USDC_CONTRACT_ADDRESS}`);
 
 // --- MongoDB Connection ---
-mongoose.connect(process.env.MONGO_URI)
+// Adding optional parameters for better connection handling
+mongoose.connect(process.env.MONGO_URI, {
+  useNewUrlParser: true, // Deprecated in Mongoose 6+, but good to have for older versions or clarity
+  useUnifiedTopology: true, // Deprecated in Mongoose 6+, but good to have for older versions or clarity
+})
   .then(() => console.log('MongoDB connected successfully'))
-  .catch(err => console.error('MongoDB connection error:', err));
+  .catch(err => {
+    console.error('MongoDB initial connection error:', err);
+    // In a persistent server, you might want to exit if initial connection fails
+    // For a web server, this often means the app won't start correctly.
+    process.exit(1);
+  });
 
 // --- Mongoose Schemas ---
 const userSchema = new mongoose.Schema({
@@ -293,7 +302,7 @@ app.post('/api/withdrawals', async (req, res) => {
   }
 });
 
-// --- Vercel Export ---
-module.exports = (req, res) => {
-  return app(req, res);
-};
+// --- EXPORT THE APP DIRECTLY ---
+// This is the critical change for the "persistent server" approach.
+// We are no longer exporting a Vercel serverless function handler.
+module.exports = app;
