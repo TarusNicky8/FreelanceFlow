@@ -2172,6 +2172,10 @@ function App() {
   const [notificationType, setNotificationType] = useState('info'); // 'info', 'success', 'error'
   const notificationTimeoutRef = useRef(null);
 
+  // ADDED: State for mobile menu and info menu
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isInfoMenuOpen, setIsInfoMenuOpen] = useState(false);
+
 
   // Function to set a notification
   const setNotification = (message, type = 'info', duration = 5000) => {
