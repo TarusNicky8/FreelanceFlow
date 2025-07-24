@@ -4,7 +4,7 @@ import axios from 'axios';
 import { createWalletClient, custom, parseUnits, encodeFunctionData, createPublicClient, http, formatUnits } from 'viem';
 import { isAddress } from 'viem'; // Import isAddress for validation
 import { getAddress } from 'viem'; // Import getAddress for checksumming
-import { useAccount, useNetwork } from 'wagmi'; // If you're using wagmi for wallet connection, this would be helpful. Assuming not for now.
+// Removed: import { useAccount, useNetwork } from 'wagmi'; // If you're using wagmi for wallet connection, this would be helpful. Assuming not for now.
 
 // import { getDataSuffix, submitReferral } from '@divvi/referral-sdk'; // Uncomment if Divvi is fully integrated
 import logo from './App icon.svg';
@@ -155,7 +155,7 @@ const DivviIntegration = ({ account, walletClient, publicClient, status, setStat
 
     setStatus('Initiating general USDC deposit with Divvi tracking...');
     try {
-      const amountInSmallestUnit = parseUnits(amountToDeposit, 6); // USDC has 6 decimals
+      const amountInSmallestUnit = parseUnits(amountToDeposit.toString(), 6); // USDC has 6 decimals
 
       // --- Divvi SDK Integration (uncomment and install @divvi/referral-sdk to enable) ---
       // const divviConsumerAddress = '0x58ccf714F804a10cd9FE22fCcc044d77Ea34e5b1';
