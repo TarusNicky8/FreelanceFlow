@@ -2,10 +2,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Link, useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { createWalletClient, custom, parseUnits, encodeFunctionData, createPublicClient, http, formatUnits } from 'viem';
-import { isAddress } from 'viem'; // Import isAddress for validation
-import { getAddress } from 'viem'; // Import getAddress for checksumming
+import { isAddress, getAddress } from 'viem'; // Import isAddress and getAddress for validation and checksumming
 
 import logo from './App icon.svg';
+
+// Function to truncate address for display - MOVED TO GLOBAL SCOPE
+const truncateAddress = (address) => {
+  if (!address) return '';
+  return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
+};
 
 const liskSepolia = {
   id: 4202,
@@ -611,7 +616,7 @@ const Dashboard = ({ account }) => {
                 <li key={job._id} className="bg-gray-50 p-4 rounded-lg shadow-md flex justify-between items-center">
                   <div>
                     <p className="text-lg font-semibold text-gray-800">{job.title} - <span className="text-accent-green">{job.amount} USDC</span></p>
-                    <p className="text-sm text-gray-600">Freelancer: {job.freelancer ? job.freelancer.substring(0, 6) + '...' + job.freelancer.substring(job.freelancer.length - 4) : 'Unassigned'} | Status: {job.status} | Escrow: {job.escrowStatus}</p>
+                    <p className="text-sm text-gray-600">Freelancer: {job.freelancer ? truncateAddress(job.freelancer) : 'Unassigned'} | Status: {job.status} | Escrow: {job.escrowStatus}</p>
                   </div>
                   <Link
                     className="px-4 py-2 bg-secondary-purple text-white rounded-md hover:bg-purple-700 transition duration-300"
@@ -642,7 +647,7 @@ const Dashboard = ({ account }) => {
                 <li key={job._id} className="bg-gray-50 p-4 rounded-lg shadow-md flex justify-between items-center">
                   <div>
                     <p className="text-lg font-semibold text-gray-800">{job.title} - <span className="text-accent-green">{job.amount} USDC</span></p>
-                    <p className="text-sm text-gray-600">Client: {job.client ? job.client.substring(0, 6) + '...' + job.client.substring(job.client.length - 4) : 'N/A'} | Status: {job.status} | Escrow: {job.escrowStatus}</p>
+                    <p className="text-sm text-gray-600">Client: {job.client ? truncateAddress(job.client) : 'N/A'} | Status: {job.status} | Escrow: {job.escrowStatus}</p>
                   </div>
                   <Link
                     className="px-4 py-2 bg-secondary-purple text-white rounded-md hover:bg-purple-700 transition duration-300"
@@ -744,14 +749,14 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
       return;
     }
 
-    // --- Chain Mismatch Check for Job Funding ---
+    // --- Chain Mismatch Check ---
     try {
       const currentChainId = await walletClient.getChainId();
       if (currentChainId !== liskSepolia.id) {
         setStatusMessage(`Wallet is on the wrong network. Please switch to ${liskSepolia.name} (Chain ID: ${liskSepolia.id}). Attempting to switch...`);
         try {
           await walletClient.switchChain({ id: liskSepolia.id });
-          setStatusMessage(`Successfully prompted to switch to ${liskSepolia.name}. Please confirm in your wallet and try funding the job again.`);
+          setStatusMessage(`Successfully prompted to switch to ${liskSepolia.name}. Please confirm in your wallet and try the deposit again.`);
           return; // Exit and let user retry after chain switch
         } catch (switchError) {
           console.error("Error switching chain:", switchError);
@@ -1505,6 +1510,7 @@ const PostJob = ({ account }) => {
   const [jobTitle, setJobTitle] = useState('');
   const [jobDescription, setJobDescription] = useState('');
   const [jobAmount, setJobAmount] = useState('');
+  const [requiredSkillsInput, setRequiredSkillsInput] = useState(''); // New state for required skills
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [isError, setIsError] = useState(false);
@@ -1527,13 +1533,16 @@ const PostJob = ({ account }) => {
     setIsError(false);
 
     try {
+      const skillsArray = requiredSkillsInput.split(',').map(s => s.trim()).filter(s => s !== '');
+
       const response = await axios.post(`${API_BASE_URL}/api/jobs`, {
         title: jobTitle,
         description: jobDescription,
         amount: parseFloat(jobAmount),
         client: account,
         status: 'open', // Initial status
-        escrowStatus: 'pending-deposit' // Initial escrow status
+        escrowStatus: 'pending-deposit', // Initial escrow status
+        requiredSkills: skillsArray, // Include required skills
       });
 
       setStatusMessage('Job posted successfully! Redirecting to job details to fund escrow.');
@@ -1541,6 +1550,7 @@ const PostJob = ({ account }) => {
       setJobTitle('');
       setJobDescription('');
       setJobAmount('');
+      setRequiredSkillsInput(''); // Clear skills input
 
       setTimeout(() => {
         navigate(`/job/${response.data._id}`); // Navigate to the newly posted job's details page
@@ -1612,6 +1622,18 @@ const PostJob = ({ account }) => {
             value={jobAmount}
             onChange={(e) => setJobAmount(e.target.value)}
             placeholder="e.g., 500"
+            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
+            disabled={isLoading || !account}
+          />
+        </div>
+        <div>
+          <label htmlFor="requiredSkills" className="block text-lg font-medium text-gray-800 mb-1">Required Skills (comma-separated, optional)</label>
+          <input
+            type="text"
+            id="requiredSkills"
+            value={requiredSkillsInput}
+            onChange={(e) => setRequiredSkillsInput(e.target.value)}
+            placeholder="e.g., JavaScript, Solidity, UI/UX"
             className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
             disabled={isLoading || !account}
           />
@@ -2110,12 +2132,6 @@ function App() {
   const [amountToDeposit, setAmountToDeposit] = useState('100');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isInfoMenuOpen, setIsInfoMenuOpen] = useState(false);
-
-  // Function to truncate address for display
-  const truncateAddress = (address) => {
-    if (!address) return '';
-    return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
-  };
 
   const initializeWeb3Clients = async (connectedAddress) => {
     try {
