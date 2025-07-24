@@ -143,6 +143,13 @@ const LiskIcon = () => (
 
 // --- DivviIntegration Component (Now uses depositGeneral) ---
 const DivviIntegration = ({ account, walletClient, publicClient, status, setStatus, amountToDeposit, setAmountToDeposit }) => {
+  // Debugging log for wallet connection status
+  useEffect(() => {
+    console.log("DivviIntegration - account:", account);
+    console.log("DivviIntegration - walletClient:", walletClient);
+    console.log("DivviIntegration - publicClient:", publicClient);
+  }, [account, walletClient, publicClient]);
+
   const handleDepositUSDCGeneral = async () => {
     if (!account || !walletClient || !publicClient) {
       setStatus('Please connect your wallet first.');
@@ -221,9 +228,9 @@ const DivviIntegration = ({ account, walletClient, publicClient, status, setStat
 
   return (
     <section className="max-w-3xl mx-auto p-6 bg-white shadow-lg rounded-lg my-8 text-center">
-      <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">Divvi Integration Demo: General Deposit USDC</h2>
+      <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">Deposit Funds (General Escrow)</h2>
       <p className="text-lg text-gray-700 mb-6">
-        This section demonstrates the secure USDC deposit process for general funds, enhanced with Divvi tracking for transparent on-chain activity.
+        Deposit USDC into the general escrow for future use. This process is enhanced with Divvi tracking for transparent on-chain activity.
       </p>
       <div className="mb-4">
         <label htmlFor="depositAmount" className="block text-lg font-medium text-gray-800 mb-2">Amount to Deposit (USDC):</label>
@@ -237,7 +244,7 @@ const DivviIntegration = ({ account, walletClient, publicClient, status, setStat
         />
       </div>
       <p className={`mb-4 text-center text-lg ${status.includes('Error') || status.includes('failed') ? 'text-red-600' : 'text-green-600'}`}>{status}</p>
-      {account ? (
+      {account && walletClient && publicClient ? ( // Check all three for full readiness
         <button
           onClick={handleDepositUSDCGeneral}
           className="px-8 py-4 bg-secondary-purple text-white font-semibold rounded-full shadow-lg hover:bg-purple-700 transition duration-300 transform hover:scale-105"
@@ -245,7 +252,7 @@ const DivviIntegration = ({ account, walletClient, publicClient, status, setStat
           Deposit USDC to Escrow (General Funds)
         </button>
       ) : (
-        <p className="text-lg text-gray-600">Connect your wallet in the header to deposit USDC.</p>
+        <p className="text-lg text-gray-600">Please connect your wallet in the header to deposit USDC.</p>
       )}
     </section>
   );
@@ -1838,7 +1845,7 @@ function App() {
                   </button>
                   {isInfoMenuOpen && (
                     <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
-                      <Link to="/divvi-integration" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Divvi Demo</Link>
+                      <Link to="/divvi-integration" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Deposit Funds</Link> {/* Changed label */}
                       <Link to="/cross-chain-transfer" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Cross-Chain Transfer</Link>
                       <Link to="/dispute-resolution" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Dispute Resolution</Link>
                       <Link to="/withdraw" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Withdraw Funds</Link>
@@ -1879,7 +1886,7 @@ function App() {
                 <li><Link to="/post-job" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Post Job</Link></li>
                 <li><Link to="/browse-jobs" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Browse Jobs</Link></li>
                 <li className="text-gray-300 text-sm mt-4 mb-2">--- Information & Demos ---</li>
-                <li><Link to="/divvi-integration" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Divvi Demo</Link></li>
+                <li><Link to="/divvi-integration" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Deposit Funds</Link></li> {/* Changed label */}
                 <li><Link to="/cross-chain-transfer" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Cross-Chain Transfer</Link></li>
                 <li><Link to="/dispute-resolution" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Dispute Resolution</Link></li>
                 <li><Link to="/withdraw" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Withdraw Funds</Link></li>
