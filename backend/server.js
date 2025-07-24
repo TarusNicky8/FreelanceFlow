@@ -83,7 +83,6 @@ console.log(`ESCROW_CONTRACT_ADDRESS: ${ESCROW_CONTRACT_ADDRESS}`);
 console.log(`USDC_CONTRACT_ADDRESS: ${USDC_CONTRACT_ADDRESS}`);
 
 // --- MongoDB Connection ---
-// ADD THIS LINE FOR DEBUGGING:
 console.log('Attempting to connect to MongoDB with URI:', process.env.MONGO_URI ? 'URI_SET' : 'URI_NOT_SET');
 mongoose.connect(process.env.MONGO_URI, {
     useNewUrlParser: true, // Deprecated in Mongoose 6+, but harmless
@@ -256,6 +255,24 @@ app.get('/api/jobs/:id', async (req, res) => {
         res.status(400).json({ error: 'Invalid Job ID or server error' });
     }
 });
+
+// NEW: Endpoint to get jobs for a specific user (client or freelancer)
+app.get('/api/jobs/forUser/:address', async (req, res) => {
+    try {
+        const userAddress = req.params.address.toLowerCase();
+        const jobs = await Job.find({
+            $or: [
+                { client: userAddress },
+                { freelancer: userAddress }
+            ]
+        });
+        res.json(jobs);
+    } catch (error) {
+        console.error('Error fetching jobs for user:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 
 // Generic PUT for updating job details. Specific actions below.
 app.put('/api/jobs/:id', async (req, res) => {
