@@ -83,6 +83,8 @@ console.log(`ESCROW_CONTRACT_ADDRESS: ${ESCROW_CONTRACT_ADDRESS}`);
 console.log(`USDC_CONTRACT_ADDRESS: ${USDC_CONTRACT_ADDRESS}`);
 
 // --- MongoDB Connection ---
+// ADD THIS LINE FOR DEBUGGING:
+console.log('Attempting to connect to MongoDB with URI:', process.env.MONGO_URI ? 'URI_SET' : 'URI_NOT_SET');
 mongoose.connect(process.env.MONGO_URI, {
     useNewUrlParser: true, // Deprecated in Mongoose 6+, but harmless
     useUnifiedTopology: true, // Deprecated in Mongoose 6+, but harmless
