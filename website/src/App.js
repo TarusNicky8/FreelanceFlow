@@ -141,13 +141,46 @@ const LiskIcon = () => (
 
 // --- DivviIntegration Component (Now uses depositGeneral) ---
 const DivviIntegration = ({ account, walletClient, publicClient, status, setStatus, amountToDeposit, setAmountToDeposit }) => {
+  const [userUsdcBalance, setUserUsdcBalance] = useState(0);
+
+  // Fetch user's USDC balance
+  useEffect(() => {
+    const fetchUsdcBalance = async () => {
+      if (account && publicClient) {
+        try {
+          const balance = await publicClient.readContract({
+            address: usdcContractAddress,
+            abi: usdcAbi,
+            functionName: 'balanceOf',
+            args: [account],
+          });
+          setUserUsdcBalance(parseFloat(formatUnits(balance, 6)));
+        } catch (error) {
+          console.error("Error fetching user USDC balance:", error);
+          setUserUsdcBalance(0);
+          // Set status to inform user if balance fetch fails
+          setStatus(`Error fetching USDC balance: ${error.message}`);
+        }
+      } else {
+        setUserUsdcBalance(0);
+      }
+    };
+
+    fetchUsdcBalance();
+  }, [account, publicClient, usdcContractAddress]); // Re-fetch when account or publicClient changes
+
   const handleDepositUSDCGeneral = async () => {
     if (!account || !walletClient || !publicClient) {
       setStatus('Please connect your wallet first.');
       return;
     }
-    if (isNaN(parseFloat(amountToDeposit)) || parseFloat(amountToDeposit) <= 0) {
+    const depositAmountNum = parseFloat(amountToDeposit);
+    if (isNaN(depositAmountNum) || depositAmountNum <= 0) {
       setStatus('Please enter a valid amount to deposit.');
+      return;
+    }
+    if (depositAmountNum > userUsdcBalance) {
+      setStatus('Insufficient USDC balance in your wallet for this deposit.');
       return;
     }
 
@@ -158,7 +191,7 @@ const DivviIntegration = ({ account, walletClient, publicClient, status, setStat
         setStatus(`Wallet is on the wrong network. Please switch to ${liskSepolia.name} (Chain ID: ${liskSepolia.id}). Attempting to switch...`);
         try {
           await walletClient.switchChain({ id: liskSepolia.id });
-          setStatus(`Successfully switched to ${liskSepolia.name}. Please try the deposit again.`);
+          setStatus(`Successfully prompted to switch to ${liskSepolia.name}. Please confirm in your wallet and try the deposit again.`);
           return; // Exit and let user retry after chain switch
         } catch (switchError) {
           console.error("Error switching chain:", switchError);
@@ -240,9 +273,11 @@ const DivviIntegration = ({ account, walletClient, publicClient, status, setStat
     }
   };
 
+  const isDepositButtonDisabled = !account || !walletClient || !publicClient || parseFloat(amountToDeposit) <= 0 || parseFloat(amountToDeposit) > userUsdcBalance;
+
   return (
     <section className="max-w-3xl mx-auto p-6 bg-white shadow-lg rounded-lg my-8 text-center">
-      <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">Deposit Funds (General Escrow)</h2> {/* Corrected label */}
+      <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">Deposit Funds (General Escrow)</h2>
       <p className="text-lg text-gray-700 mb-6">
         Deposit USDC into the general escrow for future use. This process is enhanced with Divvi tracking for transparent on-chain activity.
       </p>
@@ -257,11 +292,17 @@ const DivviIntegration = ({ account, walletClient, publicClient, status, setStat
           className="w-full max-w-xs p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200 text-gray-800"
         />
       </div>
-      <p className={`mb-4 text-center text-lg ${status.includes('Error') || status.includes('failed') ? 'text-red-600' : 'text-green-600'}`}>{status}</p>
+      {account && (
+        <p className="text-lg text-gray-700 mb-4">
+          Your Wallet USDC Balance: <span className="font-semibold text-primary-blue">{userUsdcBalance} USDC</span>
+        </p>
+      )}
+      <p className={`mb-4 text-center text-lg ${status.includes('Error') || status.includes('failed') || status.includes('Insufficient') ? 'text-red-600' : 'text-green-600'}`}>{status}</p>
       {account && walletClient && publicClient ? ( // Check all three for full readiness
         <button
           onClick={handleDepositUSDCGeneral}
-          className="px-8 py-4 bg-secondary-purple text-white font-semibold rounded-full shadow-lg hover:bg-purple-700 transition duration-300 transform hover:scale-105"
+          className="px-8 py-4 bg-secondary-purple text-white font-semibold rounded-full shadow-lg hover:bg-purple-700 transition duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={isDepositButtonDisabled}
         >
           Deposit USDC to Escrow (General Funds)
         </button>
@@ -690,7 +731,7 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
       return;
     }
     if (clientUsdcBalance < job.amount) {
-      setStatusMessage('Insufficient USDC balance to fund this job.');
+      setStatusMessage('Insufficient USDC balance in your wallet to fund this job.'); // Enhanced message
       setIsError(true);
       return;
     }
@@ -702,7 +743,7 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
         setStatusMessage(`Wallet is on the wrong network. Please switch to ${liskSepolia.name} (Chain ID: ${liskSepolia.id}). Attempting to switch...`);
         try {
           await walletClient.switchChain({ id: liskSepolia.id });
-          setStatusMessage(`Successfully switched to ${liskSepolia.name}. Please try funding the job again.`);
+          setStatusMessage(`Successfully prompted to switch to ${liskSepolia.name}. Please confirm in your wallet and try funding the job again.`);
           return; // Exit and let user retry after chain switch
         } catch (switchError) {
           console.error("Error switching chain:", switchError);
@@ -806,7 +847,7 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
         setStatusMessage(`Wallet is on the wrong network. Please switch to ${liskSepolia.name} (Chain ID: ${liskSepolia.id}). Attempting to switch...`);
         try {
           await walletClient.switchChain({ id: liskSepolia.id });
-          setStatusMessage(`Successfully switched to ${liskSepolia.name}. Please try accepting the job again.`);
+          setStatusMessage(`Successfully prompted to switch to ${liskSepolia.name}. Please confirm in your wallet and try accepting the job again.`);
           return; // Exit and let user retry after chain switch
         } catch (switchError) {
           console.error("Error switching chain:", switchError);
@@ -866,7 +907,7 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
         setStatusMessage(`Wallet is on the wrong network. Please switch to ${liskSepolia.name} (Chain ID: ${liskSepolia.id}). Attempting to switch...`);
         try {
           await walletClient.switchChain({ id: liskSepolia.id });
-          setStatusMessage(`Successfully switched to ${liskSepolia.name}. Please try approving the freelancer again.`);
+          setStatusMessage(`Successfully prompted to switch to ${liskSepolia.name}. Please confirm in your wallet and try approving the freelancer again.`);
           return; // Exit and let user retry after chain switch
         } catch (switchError) {
           console.error("Error switching chain:", switchError);
@@ -924,7 +965,7 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
         setStatusMessage(`Wallet is on the wrong network. Please switch to ${liskSepolia.name} (Chain ID: ${liskSepolia.id}). Attempting to switch...`);
         try {
           await walletClient.switchChain({ id: liskSepolia.id });
-          setStatusMessage(`Successfully switched to ${liskSepolia.name}. Please try rejecting the freelancer again.`);
+          setStatusMessage(`Successfully prompted to switch to ${liskSepolia.name}. Please confirm in your wallet and try rejecting the freelancer again.`);
           return; // Exit and let user retry after chain switch
         } catch (switchError) {
           console.error("Error switching chain:", switchError);
@@ -982,7 +1023,7 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
         setStatusMessage(`Wallet is on the wrong network. Please switch to ${liskSepolia.name} (Chain ID: ${liskSepolia.id}). Attempting to switch...`);
         try {
           await walletClient.switchChain({ id: liskSepolia.id });
-          setStatusMessage(`Successfully switched to ${liskSepolia.name}. Please try marking as completed again.`);
+          setStatusMessage(`Successfully prompted to switch to ${liskSepolia.name}. Please confirm in your wallet and try marking as completed again.`);
           return; // Exit and let user retry after chain switch
         } catch (switchError) {
           console.error("Error switching chain:", switchError);
@@ -1046,7 +1087,7 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
         setStatusMessage(`Wallet is on the wrong network. Please switch to ${liskSepolia.name} (Chain ID: ${liskSepolia.id}). Attempting to switch...`);
         try {
           await walletClient.switchChain({ id: liskSepolia.id });
-          setStatusMessage(`Successfully switched to ${liskSepolia.name}. Please try releasing funds again.`);
+          setStatusMessage(`Successfully prompted to switch to ${liskSepolia.name}. Please confirm in your wallet and try releasing funds again.`);
           return; // Exit and let user retry after chain switch
         } catch (switchError) {
           console.error("Error switching chain:", switchError);
@@ -1128,7 +1169,7 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
         setStatusMessage(`Wallet is on the wrong network. Please switch to ${liskSepolia.name} (Chain ID: ${liskSepolia.id}). Attempting to switch...`);
         try {
           await walletClient.switchChain({ id: liskSepolia.id });
-          setStatusMessage(`Successfully switched to ${liskSepolia.name}. Please try refunding funds again.`);
+          setStatusMessage(`Successfully prompted to switch to ${liskSepolia.name}. Please confirm in your wallet and try refunding funds again.`);
           return; // Exit and let user retry after chain switch
         } catch (switchError) {
           console.error("Error switching chain:", switchError);
@@ -1231,7 +1272,7 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
       <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">{job.title}</h2>
 
       {statusMessage && (
-        <div className={`p-3 mb-4 rounded-md ${isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+        <div className={`p-3 mb-4 rounded-md ${isError || statusMessage.includes('Insufficient') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
           {statusMessage}
         </div>
       )}
@@ -1564,7 +1605,7 @@ const CrossChainIntegration = ({ account, walletClient, publicClient }) => {
         setStatusMessage(`Wallet is on the wrong network. Please switch to ${liskSepolia.name} (Chain ID: ${liskSepolia.id}). Attempting to switch...`);
         try {
           await walletClient.switchChain({ id: liskSepolia.id });
-          setStatusMessage(`Successfully switched to ${liskSepolia.name}. Please try the transfer again.`);
+          setStatusMessage(`Successfully prompted to switch to ${liskSepolia.name}. Please confirm in your wallet and try the transfer again.`);
           return; // Exit and let user retry after chain switch
         } catch (switchError) {
           console.error("Error switching chain:", switchError);
@@ -2068,7 +2109,7 @@ function App() {
                   </button>
                   {isInfoMenuOpen && (
                     <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
-                      <Link to="/deposit-funds" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Deposit Funds</Link> {/* Corrected label */}
+                      <Link to="/deposit-funds" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Deposit Funds</Link>
                       <Link to="/cross-chain-transfer" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Cross-Chain Transfer</Link>
                       <Link to="/dispute-resolution" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Dispute Resolution</Link>
                       <Link to="/withdraw" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Withdraw Funds</Link>
@@ -2109,7 +2150,7 @@ function App() {
                 <li><Link to="/post-job" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Post Job</Link></li>
                 <li><Link to="/browse-jobs" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Browse Jobs</Link></li>
                 <li className="text-gray-300 text-sm mt-4 mb-2">--- Information & Demos ---</li>
-                <li><Link to="/deposit-funds" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Deposit Funds</Link></li> {/* Corrected label */}
+                <li><Link to="/deposit-funds" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Deposit Funds</Link></li>
                 <li><Link to="/cross-chain-transfer" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Cross-Chain Transfer</Link></li>
                 <li><Link to="/dispute-resolution" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Dispute Resolution</Link></li>
                 <li><Link to="/withdraw" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Withdraw Funds</Link></li>
@@ -2125,7 +2166,7 @@ function App() {
                 <li className="w-full px-4 pt-4"> {/* Added px-4 for padding and w-full */}
                   <button
                     onClick={connectWallet}
-                    className="w-full px-6 py-3 bg-accent-green text-white font-semibold rounded-md shadow-lg hover:bg-green-600 transition duration-300 transform hover:scale-105" // Removed mt-4
+                    className="w-full px-6 py-3 bg-accent-green text-white font-semibold rounded-md shadow-lg hover:bg-green-600 transition duration-300 transform hover:scale-105"
                   >
                     {account ? truncateAddress(account) : 'Connect Wallet'}
                   </button>
