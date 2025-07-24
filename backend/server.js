@@ -103,7 +103,9 @@ const userSchema = new mongoose.Schema({
     role: { type: String, enum: ['freelancer', 'client', 'both'], default: 'freelancer' },
     skills: [String],
     portfolio: [String],
-    rating: { type: Number, default: 0, min: 0, max: 5 }, // Rating from 0-5
+    rating: { type: Number, default: 0, min: 0, max: 5 }, // Average rating from 0-5
+    totalRatingSum: { type: Number, default: 0 }, // Sum of all ratings received
+    totalRatingsCount: { type: Number, default: 0 }, // Number of ratings received
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
 });
@@ -152,6 +154,8 @@ const jobSchema = new mongoose.Schema({
       }
     ],
     requiredSkills: [{ type: String }], // Array of strings for skills required for the job
+    // New field to track if the freelancer has been rated for this job
+    rated: { type: Boolean, default: false }
 });
 // Update 'updatedAt' timestamp on save and update operations
 jobSchema.pre('save', function (next) { this.updatedAt = Date.now(); next(); });
@@ -348,33 +352,6 @@ app.put('/api/jobs/:id/deposit-confirmed', async (req, res) => {
     }
 });
 
-
-// OLD: Endpoint for freelancer to accept a job (REPLACED BY APPLY/APPROVE/ACCEPT-ASSIGNED)
-// app.put('/api/jobs/:id/accept', async (req, res) => {
-//     try {
-//         const { freelancerAddress } = req.body;
-//         const job = await Job.findById(req.params.id);
-
-//         if (!job) return res.status(404).json({ error: 'Job not found' });
-//         if (job.status !== 'open') return res.status(400).json({ error: 'Job is not open for acceptance.' });
-//         if (job.escrowStatus !== 'deposited') return res.status(400).json({ error: 'Job funds not yet deposited by client.' });
-
-//         const updatedJob = await Job.findByIdAndUpdate(
-//             req.params.id,
-//             {
-//                 $set: {
-//                     freelancer: freelancerAddress.toLowerCase(),
-//                     status: 'pending-client-approval' // Client needs to approve freelancer
-//                 }
-//             },
-//             { new: true, runValidators: true }
-//         );
-//         res.json(updatedJob);
-//     } catch (error) {
-//         console.error('Error accepting job:', error);
-//         res.status(400).json({ error: error.message });
-//     }
-// });
 
 // NEW: POST /api/jobs/:id/apply - Freelancer applies for a job
 app.post('/api/jobs/:id/apply', async (req, res) => {
@@ -705,6 +682,58 @@ app.get('/api/jobs/:id/messages', async (req, res) => {
     res.status(200).json(job.messages);
   } catch (error) {
     console.error('Error fetching messages:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// NEW: PUT /api/jobs/:id/rate-freelancer - Client rates the freelancer for a job
+app.put('/api/jobs/:id/rate-freelancer', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { clientAddress, freelancerAddress, rating } = req.body;
+
+    if (!clientAddress || !freelancerAddress || rating === undefined || rating < 1 || rating > 5 || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid request: missing client/freelancer address, or invalid rating (1-5).' });
+    }
+
+    const job = await Job.findById(id);
+    if (!job) {
+      return res.status(404).json({ message: 'Job not found.' });
+    }
+    if (job.client.toLowerCase() !== clientAddress.toLowerCase()) {
+      return res.status(403).json({ message: 'Unauthorized: Only the client can rate for this job.' });
+    }
+    if (!job.freelancer || job.freelancer.toLowerCase() !== freelancerAddress.toLowerCase()) {
+      return res.status(400).json({ message: 'Freelancer not assigned or mismatch for this job.' });
+    }
+    if (job.escrowStatus !== 'released') {
+      return res.status(400).json({ message: 'Funds must be released for this job before rating.' });
+    }
+    if (job.rated) {
+        return res.status(400).json({ message: 'Freelancer has already been rated for this job.' });
+    }
+
+    // Update the job to mark it as rated
+    job.rated = true;
+    await job.save();
+
+    // Find the freelancer's user profile
+    const freelancerUser = await User.findOne({ address: freelancerAddress.toLowerCase() });
+    if (!freelancerUser) {
+      console.warn(`Freelancer user profile not found for address: ${freelancerAddress}. Cannot update rating.`);
+      return res.status(404).json({ message: 'Freelancer profile not found to update rating.' });
+    }
+
+    // Update totalRatingSum and totalRatingsCount
+    freelancerUser.totalRatingSum += rating;
+    freelancerUser.totalRatingsCount += 1;
+    freelancerUser.rating = (freelancerUser.totalRatingSum / freelancerUser.totalRatingsCount).toFixed(1); // Calculate new average
+
+    await freelancerUser.save();
+
+    res.status(200).json({ message: 'Rating submitted successfully.', job, freelancerUser });
+  } catch (error) {
+    console.error('Error rating freelancer:', error);
     res.status(500).json({ message: error.message });
   }
 });

@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Link, useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { createWalletClient, custom, parseUnits, encodeFunctionData, createPublicClient, http, formatUnits } from 'viem';
-import { isAddress, getAddress } from 'viem'; // Import isAddress and getAddress for validation and checksumming
+import { isAddress } from 'viem'; // Import isAddress for validation
+import { getAddress } from 'viem'; // Import getAddress for checksumming
 
 import logo from './App icon.svg';
 
@@ -144,9 +145,29 @@ const LiskIcon = () => (
   <img src={process.env.PUBLIC_URL + '/icons/lisk.webp'} alt="Lisk Icon" className="h-14 w-14 text-lisk-blue mb-4 mx-auto" />
 );
 
+// --- Notification Component (Simple Toast) ---
+const Notification = ({ message, type, onClose }) => {
+  if (!message) return null;
+
+  const bgColor = type === 'error' ? 'bg-red-500' : 'bg-green-500';
+  const textColor = 'text-white';
+
+  return (
+    <div className={`fixed bottom-4 right-4 p-4 rounded-lg shadow-lg ${bgColor} ${textColor} z-50 flex items-center justify-between animate-fade-in-up-toast`}>
+      <span>{message}</span>
+      <button onClick={onClose} className="ml-4 text-lg font-bold">
+        &times;
+      </button>
+    </div>
+  );
+};
+
+
 // --- DivviIntegration Component (Now uses depositGeneral) ---
-const DivviIntegration = ({ account, walletClient, publicClient, status, setStatus, amountToDeposit, setAmountToDeposit }) => {
+const DivviIntegration = ({ account, walletClient, publicClient, setNotification }) => {
   const [userUsdcBalance, setUserUsdcBalance] = useState(0);
+  const [amountToDeposit, setAmountToDeposit] = useState('100');
+  const [isProcessingTx, setIsProcessingTx] = useState(false);
 
   // Fetch user's USDC balance
   useEffect(() => {
@@ -163,8 +184,7 @@ const DivviIntegration = ({ account, walletClient, publicClient, status, setStat
         } catch (error) {
           console.error("Error fetching user USDC balance:", error);
           setUserUsdcBalance(0);
-          // Set status to inform user if balance fetch fails
-          setStatus(`Error fetching USDC balance: ${error.message}`);
+          setNotification(`Error fetching USDC balance: ${error.message}`, 'error');
         }
       } else {
         setUserUsdcBalance(0);
@@ -172,20 +192,20 @@ const DivviIntegration = ({ account, walletClient, publicClient, status, setStat
     };
 
     fetchUsdcBalance();
-  }, [account, publicClient, usdcContractAddress]); // Re-fetch when account or publicClient changes
+  }, [account, publicClient, usdcContractAddress, setNotification]); // Re-fetch when account or publicClient changes
 
   const handleDepositUSDCGeneral = async () => {
     if (!account || !walletClient || !publicClient) {
-      setStatus('Please connect your wallet first.');
+      setNotification('Please connect your wallet first.', 'error');
       return;
     }
     const depositAmountNum = parseFloat(amountToDeposit);
     if (isNaN(depositAmountNum) || depositAmountNum <= 0) {
-      setStatus('Please enter a valid amount to deposit.');
+      setNotification('Please enter a valid amount to deposit.', 'error');
       return;
     }
     if (depositAmountNum > userUsdcBalance) {
-      setStatus('Insufficient USDC balance in your wallet for this deposit.');
+      setNotification('Insufficient USDC balance in your wallet for this deposit.', 'error');
       return;
     }
 
@@ -193,26 +213,26 @@ const DivviIntegration = ({ account, walletClient, publicClient, status, setStat
     try {
       const currentChainId = await walletClient.getChainId();
       if (currentChainId !== liskSepolia.id) {
-        setStatus(`Wallet is on the wrong network. Please switch to ${liskSepolia.name} (Chain ID: ${liskSepolia.id}). Attempting to switch...`);
+        setNotification(`Wallet is on the wrong network. Please switch to ${liskSepolia.name} (Chain ID: ${liskSepolia.id}). Attempting to switch...`, 'error');
         try {
           await walletClient.switchChain({ id: liskSepolia.id });
-          setStatus(`Successfully prompted to switch to ${liskSepolia.name}. Please confirm in your wallet and try the deposit again.`);
+          setNotification(`Successfully prompted to switch to ${liskSepolia.name}. Please confirm in your wallet and try the deposit again.`, 'info');
           return; // Exit and let user retry after chain switch
         } catch (switchError) {
           console.error("Error switching chain:", switchError);
-          setStatus(`Failed to switch to ${liskSepolia.name}. Please switch manually in your wallet. Error: ${switchError.message}`);
+          setNotification(`Failed to switch to ${liskSepolia.name}. Please switch manually in your wallet. Error: ${switchError.message}`, 'error');
           return;
         }
       }
     } catch (chainCheckError) {
       console.error("Error checking current chain ID:", chainCheckError);
-      setStatus(`Could not verify wallet chain. Please ensure your wallet is connected and on ${liskSepolia.name}. Error: ${chainCheckError.message}`);
+      setNotification(`Could not verify wallet chain. Please ensure your wallet is connected and on ${liskSepolia.name}. Error: ${chainCheckError.message}`, 'error');
       return;
     }
     // --- End Chain Mismatch Check ---
 
-
-    setStatus('Initiating general USDC deposit with Divvi tracking...');
+    setIsProcessingTx(true);
+    setNotification('Initiating general USDC deposit with Divvi tracking...', 'info');
     try {
       const amountInSmallestUnit = parseUnits(amountToDeposit.toString(), 6); // USDC has 6 decimals
 
@@ -232,16 +252,16 @@ const DivviIntegration = ({ account, walletClient, publicClient, status, setStat
         args: [escrowContractAddress, amountInSmallestUnit],
       });
 
-      setStatus('Approving USDC for Escrow contract...');
+      setNotification('Approving USDC for Escrow contract...', 'info');
       const approveTxHash = await walletClient.sendTransaction({
         account,
         to: usdcContractAddress,
         data: approveCallData,
       });
 
-      setStatus(`Approval transaction sent! Hash: ${approveTxHash}. Waiting for confirmation...`);
+      setNotification(`Approval transaction sent! Hash: ${truncateAddress(approveTxHash)}. Waiting for confirmation...`, 'info');
       await publicClient.waitForTransactionReceipt({ hash: approveTxHash });
-      setStatus('USDC Approved. Now initiating general deposit...');
+      setNotification('USDC Approved. Now initiating general deposit...', 'info');
 
       // 2. Deposit USDC into the Escrow contract's general deposits
       const depositCallData = encodeFunctionData({
@@ -257,9 +277,9 @@ const DivviIntegration = ({ account, walletClient, publicClient, status, setStat
         value: 0n,
       });
 
-      setStatus(`Deposit transaction sent! Hash: ${depositTxHash}. Waiting for confirmation...`);
+      setNotification(`Deposit transaction sent! Hash: ${truncateAddress(depositTxHash)}. Waiting for confirmation...`, 'info');
       await publicClient.waitForTransactionReceipt({ hash: depositTxHash });
-      setStatus('General deposit confirmed. Now reporting referral to Divvi...');
+      setNotification('General deposit confirmed. Now reporting referral to Divvi...', 'info');
 
       // --- Divvi SDK Integration (uncomment to enable) ---
       // const chainId = await walletClient.getChainId();
@@ -269,16 +289,18 @@ const DivviIntegration = ({ account, walletClient, publicClient, status, setStat
       // });
       // ---------------------------------------------------
 
-      setStatus(`General deposit successful and Divvi referral (mocked) completed! Tx Hash: ${depositTxHash}`);
+      setNotification(`General deposit successful and Divvi referral (mocked) completed! Tx Hash: ${truncateAddress(depositTxHash)}`, 'success');
       console.log('Divvi referral (mocked) completed!');
 
     } catch (error) {
       console.error("Error during general USDC deposit or Divvi integration:", error);
-      setStatus(`Transaction failed or Divvi submission error: ${error.message}`);
+      setNotification(`Transaction failed or Divvi submission error: ${error.message}`, 'error');
+    } finally {
+      setIsProcessingTx(false);
     }
   };
 
-  const isDepositButtonDisabled = !account || !walletClient || !publicClient || parseFloat(amountToDeposit) <= 0 || parseFloat(amountToDeposit) > userUsdcBalance;
+  const isDepositButtonDisabled = !account || !walletClient || !publicClient || parseFloat(amountToDeposit) <= 0 || parseFloat(amountToDeposit) > userUsdcBalance || isProcessingTx;
 
   return (
     <section className="max-w-3xl mx-auto p-6 bg-white shadow-lg rounded-lg my-8 text-center">
@@ -302,14 +324,13 @@ const DivviIntegration = ({ account, walletClient, publicClient, status, setStat
           Your Wallet USDC Balance: <span className="font-semibold text-primary-blue">{userUsdcBalance} USDC</span>
         </p>
       )}
-      <p className={`mb-4 text-center text-lg ${status.includes('Error') || status.includes('failed') || status.includes('Insufficient') ? 'text-red-600' : 'text-green-600'}`}>{status}</p>
       {account && walletClient && publicClient ? ( // Check all three for full readiness
         <button
           onClick={handleDepositUSDCGeneral}
           className="px-8 py-4 bg-secondary-purple text-white font-semibold rounded-full shadow-lg hover:bg-purple-700 transition duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
           disabled={isDepositButtonDisabled}
         >
-          Deposit USDC to Escrow (General Funds)
+          {isProcessingTx ? 'Processing...' : 'Deposit USDC to Escrow (General Funds)'}
         </button>
       ) : (
         <p className="text-lg text-gray-600">Please connect your wallet in the header to deposit USDC.</p>
@@ -320,7 +341,10 @@ const DivviIntegration = ({ account, walletClient, publicClient, status, setStat
 
 // --- Profile Component ---
 const Profile = ({ account }) => {
-  const [profile, setProfile] = useState({ skills: [], portfolio: [], rating: 0, role: 'freelancer' }); // Default role
+  const { address: urlAddress } = useParams(); // Get address from URL if present
+  const displayAddress = urlAddress || account; // Use URL address if available, else connected account
+
+  const [profile, setProfile] = useState({ skills: [], portfolio: [], rating: 0, role: 'freelancer', totalRatingSum: 0, totalRatingsCount: 0 }); // Default role
   const [skillsInput, setSkillsInput] = useState('');
   const [portfolioInput, setPortfolioInput] = useState('');
   const [selectedRole, setSelectedRole] = useState('freelancer'); // State for role selection
@@ -332,8 +356,8 @@ const Profile = ({ account }) => {
 
   useEffect(() => {
     const fetchProfile = async () => {
-      if (!account) {
-        setStatusMessage('Please connect your wallet to view/edit profile.');
+      if (!displayAddress) {
+        setStatusMessage('Please connect your wallet or provide an address to view profile.');
         setIsError(true);
         return;
       }
@@ -341,7 +365,7 @@ const Profile = ({ account }) => {
       setStatusMessage('Loading profile...');
       setIsError(false);
       try {
-        const response = await axios.get(`${API_BASE_URL}/api/users/${account}`);
+        const response = await axios.get(`${API_BASE_URL}/api/users/${displayAddress}`);
         const fetchedProfile = response.data;
         setProfile(fetchedProfile);
         setSkillsInput(fetchedProfile.skills?.join(', ') || '');
@@ -357,7 +381,7 @@ const Profile = ({ account }) => {
       }
     };
     fetchProfile();
-  }, [account]);
+  }, [displayAddress]); // Re-fetch when displayAddress changes
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -365,6 +389,11 @@ const Profile = ({ account }) => {
       setStatusMessage('Wallet not connected. Cannot save profile.');
       setIsError(true);
       return;
+    }
+    if (account.toLowerCase() !== displayAddress.toLowerCase()) {
+        setStatusMessage('You can only edit your own profile.', 'error');
+        setIsError(true);
+        return;
     }
 
     setIsLoading(true);
@@ -397,12 +426,14 @@ const Profile = ({ account }) => {
     }
   };
 
+  const isOwnProfile = account && displayAddress && account.toLowerCase() === displayAddress.toLowerCase();
+
   return (
     <div className="max-w-5xl mx-auto p-4 bg-white shadow-lg rounded-lg my-8">
-      <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">Freelancer Profile</h2>
+      <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">User Profile</h2>
 
       <p className="text-lg text-gray-700 mb-4">
-        Wallet: <span className="font-mono text-secondary-purple">{account || 'Not connected'}</span>
+        Wallet: <span className="font-mono text-secondary-purple">{displayAddress ? truncateAddress(displayAddress) : 'Not connected'}</span>
       </p>
 
       {statusMessage && (
@@ -421,85 +452,93 @@ const Profile = ({ account }) => {
         </div>
       )}
 
-      <form onSubmit={handleSave} className="space-y-6">
-        <div>
-          <label htmlFor="role" className="block text-lg font-medium text-gray-800 mb-1">Your Role</label>
-          <select
-            id="role"
-            value={selectedRole}
-            onChange={(e) => setSelectedRole(e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
+      {isOwnProfile ? (
+        <form onSubmit={handleSave} className="space-y-6">
+          <div>
+            <label htmlFor="role" className="block text-lg font-medium text-gray-800 mb-1">Your Role</label>
+            <select
+              id="role"
+              value={selectedRole}
+              onChange={(e) => setSelectedRole(e.target.value)}
+              className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
+              disabled={isLoading || !account}
+            >
+              <option value="freelancer">Freelancer</option>
+              <option value="client">Client</option>
+              <option value="both">Both (Freelancer & Client)</option>
+            </select>
+          </div>
+          <div>
+            <label htmlFor="skills" className="block text-lg font-medium text-gray-800 mb-1">Skills (comma-separated)</label>
+            <input
+              type="text"
+              id="skills"
+              value={skillsInput}
+              onChange={(e) => setSkillsInput(e.target.value)}
+              placeholder="e.g., React, Node.js, Solidity, UI/UX Design"
+              className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
+              disabled={isLoading || !account}
+            />
+          </div>
+          <div>
+            <label htmlFor="portfolio" className="block text-lg font-medium text-gray-800 mb-1">Portfolio Links (comma-separated)</label>
+            <input
+              type="text"
+              id="portfolio"
+              value={portfolioInput}
+              onChange={(e) => setPortfolioInput(e.target.value)}
+              placeholder="e.g., github.com/your-project, yourportfolio.com/design"
+              className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
+              disabled={isLoading || !account}
+            />
+          </div>
+          <div>
+            <label className="block text-lg font-medium text-gray-800 mb-1">Rating</label>
+            <p className="text-xl font-semibold text-accent-green">
+              {profile.rating !== undefined ? `${profile.rating}/5` : 'N/A'}
+              <span className="text-sm text-gray-500 ml-2">(based on completed jobs)</span>
+            </p>
+          </div>
+          <button
+            type="submit"
+            className="w-full px-6 py-3 bg-secondary-purple text-white font-semibold rounded-md hover:bg-purple-700 transition duration-300 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={isLoading || !account}
           >
-            <option value="freelancer">Freelancer</option>
-            <option value="client">Client</option>
-            <option value="both">Both (Freelancer & Client)</option>
-          </select>
+            {isLoading ? 'Saving...' : 'Save Profile'}
+          </button>
+        </form>
+      ) : (
+        <div className="space-y-6">
+          <div className="p-6 bg-gray-50 rounded-lg shadow-inner">
+            <h3 className="text-xl font-semibold text-primary-blue mb-3 border-b pb-2">Profile Details</h3>
+            <p className="text-base text-gray-700 mb-2">Role: {profile.role || 'N/A'}</p>
+            <p className="text-base text-gray-700 mb-2">
+              Skills: {profile.skills && profile.skills.length > 0 ? profile.skills.join(', ') : 'No skills added yet.'}
+            </p>
+            <p className="text-base text-gray-700">
+              Portfolio: {profile.portfolio && profile.portfolio.length > 0 ? (
+                profile.portfolio.map((p, index) => (
+                  <React.Fragment key={index}>
+                    <a
+                      href={p.startsWith('http') ? p : `https://${p}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary-blue hover:underline break-words"
+                    >
+                      {p}
+                    </a>
+                    {index < profile.portfolio.length - 1 && ', '}
+                  </React.Fragment>
+                ))
+              ) : 'No portfolio links added yet.'}
+            </p>
+            <p className="text-xl font-semibold text-accent-green mt-4">
+              Rating: {profile.rating !== undefined ? `${profile.rating}/5` : 'N/A'}
+              <span className="text-sm text-gray-500 ml-2">(based on {profile.totalRatingsCount || 0} ratings)</span>
+            </p>
+          </div>
         </div>
-        <div>
-          <label htmlFor="skills" className="block text-lg font-medium text-gray-800 mb-1">Skills (comma-separated)</label>
-          <input
-            type="text"
-            id="skills"
-            value={skillsInput}
-            onChange={(e) => setSkillsInput(e.target.value)}
-            placeholder="e.g., React, Node.js, Solidity, UI/UX Design"
-            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
-            disabled={isLoading || !account}
-          />
-        </div>
-        <div>
-          <label htmlFor="portfolio" className="block text-lg font-medium text-gray-800 mb-1">Portfolio Links (comma-separated)</label>
-          <input
-            type="text"
-            id="portfolio"
-            value={portfolioInput}
-            onChange={(e) => setPortfolioInput(e.target.value)}
-            placeholder="e.g., github.com/your-project, yourportfolio.com/design"
-            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
-            disabled={isLoading || !account}
-          />
-        </div>
-        <div>
-          <label className="block text-lg font-medium text-gray-800 mb-1">Rating</label>
-          <p className="text-xl font-semibold text-accent-green">
-            {profile.rating !== undefined ? `${profile.rating}/5` : 'N/A'}
-            <span className="text-sm text-gray-500 ml-2">(based on completed jobs)</span>
-          </p>
-        </div>
-        <button
-          type="submit"
-          className="w-full px-6 py-3 bg-secondary-purple text-white font-semibold rounded-md hover:bg-purple-700 transition duration-300 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={isLoading || !account}
-        >
-          {isLoading ? 'Saving...' : 'Save Profile'}
-        </button>
-      </form>
-
-      <div className="mt-8 p-6 bg-gray-50 rounded-lg shadow-inner">
-        <h3 className="text-xl font-semibold text-primary-blue mb-3 border-b pb-2">Current Profile Details</h3>
-        <p className="text-base text-gray-700 mb-2">Role: {profile.role || 'N/A'}</p>
-        <p className="text-base text-gray-700 mb-2">
-          Skills: {profile.skills && profile.skills.length > 0 ? profile.skills.join(', ') : 'No skills added yet.'}
-        </p>
-        <p className="text-base text-gray-700">
-          Portfolio: {profile.portfolio && profile.portfolio.length > 0 ? (
-            profile.portfolio.map((p, index) => (
-              <React.Fragment key={index}>
-                <a
-                  href={p.startsWith('http') ? p : `https://${p}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary-blue hover:underline break-words"
-                >
-                  {p}
-                </a>
-                {index < profile.portfolio.length - 1 && ', '}
-              </React.Fragment>
-            ))
-          ) : 'No portfolio links added yet.'}
-        </p>
-      </div>
+      )}
     </div>
   );
 };
@@ -616,7 +655,13 @@ const Dashboard = ({ account }) => {
                 <li key={job._id} className="bg-gray-50 p-4 rounded-lg shadow-md flex justify-between items-center">
                   <div>
                     <p className="text-lg font-semibold text-gray-800">{job.title} - <span className="text-accent-green">{job.amount} USDC</span></p>
-                    <p className="text-sm text-gray-600">Freelancer: {job.freelancer ? truncateAddress(job.freelancer) : 'Unassigned'} | Status: {job.status} | Escrow: {job.escrowStatus}</p>
+                    <p className="text-sm text-gray-600">
+                      Freelancer: {job.freelancer ? (
+                        <Link to={`/profile/${job.freelancer}`} className="text-primary-blue hover:underline">
+                          {truncateAddress(job.freelancer)}
+                        </Link>
+                      ) : 'Unassigned'} | Status: {job.status} | Escrow: {job.escrowStatus}
+                    </p>
                   </div>
                   <Link
                     className="px-4 py-2 bg-secondary-purple text-white rounded-md hover:bg-purple-700 transition duration-300"
@@ -647,7 +692,13 @@ const Dashboard = ({ account }) => {
                 <li key={job._id} className="bg-gray-50 p-4 rounded-lg shadow-md flex justify-between items-center">
                   <div>
                     <p className="text-lg font-semibold text-gray-800">{job.title} - <span className="text-accent-green">{job.amount} USDC</span></p>
-                    <p className="text-sm text-gray-600">Client: {job.client ? truncateAddress(job.client) : 'N/A'} | Status: {job.status} | Escrow: {job.escrowStatus}</p>
+                    <p className="text-sm text-gray-600">
+                      Client: {job.client ? (
+                        <Link to={`/profile/${job.client}`} className="text-primary-blue hover:underline">
+                          {truncateAddress(job.client)}
+                        </Link>
+                      ) : 'N/A'} | Status: {job.status} | Escrow: {job.escrowStatus}
+                    </p>
                   </div>
                   <Link
                     className="px-4 py-2 bg-secondary-purple text-white rounded-md hover:bg-purple-700 transition duration-300"
@@ -670,23 +721,22 @@ const Dashboard = ({ account }) => {
 };
 
 // --- JobDetails Component ---
-const JobDetails = ({ account, publicClient, walletClient }) => {
+const JobDetails = ({ account, publicClient, walletClient, setNotification }) => {
   const { id } = useParams();
   const [job, setJob] = useState(null);
   const [clientUsdcBalance, setClientUsdcBalance] = useState(0); // For client to check balance before funding
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessingTx, setIsProcessingTx] = useState(false);
-  const [statusMessage, setStatusMessage] = useState('');
-  const [isError, setIsError] = useState(false);
   const [newMessage, setNewMessage] = useState(''); // For in-app messaging
   const messagesEndRef = useRef(null); // For scrolling messages into view
+  const [ratingInput, setRatingInput] = useState(0); // For freelancer rating
+  const [showRatingModal, setShowRatingModal] = useState(false);
+
 
   const navigate = useNavigate();
 
   const fetchJobAndBalance = async () => {
     setIsLoading(true);
-    setStatusMessage('');
-    setIsError(false);
     try {
       const jobResponse = await axios.get(`${API_BASE_URL}/api/jobs/${id}`);
       setJob(jobResponse.data);
@@ -704,8 +754,7 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
 
     } catch (error) {
       console.error('Error fetching job or balance:', error);
-      setStatusMessage(`Error loading job details: ${error.message || 'Network error'}`);
-      setIsError(true);
+      setNotification(`Error loading job details: ${error.message || 'Network error'}`, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -713,7 +762,7 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
 
   useEffect(() => {
     fetchJobAndBalance();
-  }, [id, account, publicClient]); // Re-fetch if ID, account, or publicClient changes
+  }, [id, account, publicClient, setNotification]); // Re-fetch if ID, account, or publicClient changes
 
   // Scroll to bottom of messages when they update
   useEffect(() => {
@@ -729,23 +778,19 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
   // --- Handle Funding Escrow for a Job ---
   const handleFundEscrow = async () => {
     if (!account || !walletClient || !publicClient || !job) {
-      setStatusMessage('Wallet not connected or job data missing.');
-      setIsError(true);
+      setNotification('Wallet not connected or job data missing.', 'error');
       return;
     }
     if (!isClient) {
-      setStatusMessage('Only the client can fund this job.');
-      setIsError(true);
+      setNotification('Only the client can fund this job.', 'error');
       return;
     }
     if (job.escrowStatus !== 'pending-deposit') {
-      setStatusMessage('Job is not in a state to be funded.');
-      setIsError(true);
+      setNotification('Job is not in a state to be funded.', 'error');
       return;
     }
     if (clientUsdcBalance < job.amount) {
-      setStatusMessage('Insufficient USDC balance in your wallet to fund this job.'); // Enhanced message
-      setIsError(true);
+      setNotification('Insufficient USDC balance in your wallet to fund this job.', 'error'); // Enhanced message
       return;
     }
 
@@ -753,27 +798,26 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
     try {
       const currentChainId = await walletClient.getChainId();
       if (currentChainId !== liskSepolia.id) {
-        setStatusMessage(`Wallet is on the wrong network. Please switch to ${liskSepolia.name} (Chain ID: ${liskSepolia.id}). Attempting to switch...`);
+        setNotification(`Wallet is on the wrong network. Please switch to ${liskSepolia.name} (Chain ID: ${liskSepolia.id}). Attempting to switch...`, 'error');
         try {
           await walletClient.switchChain({ id: liskSepolia.id });
-          setStatusMessage(`Successfully prompted to switch to ${liskSepolia.name}. Please confirm in your wallet and try the deposit again.`);
+          setNotification(`Successfully prompted to switch to ${liskSepolia.name}. Please confirm in your wallet and try the deposit again.`, 'info');
           return; // Exit and let user retry after chain switch
         } catch (switchError) {
           console.error("Error switching chain:", switchError);
-          setStatusMessage(`Failed to switch to ${liskSepolia.name}. Please switch manually in your wallet. Error: ${switchError.message}`);
+          setNotification(`Failed to switch to ${liskSepolia.name}. Please switch manually in your wallet. Error: ${switchError.message}`, 'error');
           return;
         }
       }
     } catch (chainCheckError) {
       console.error("Error checking current chain ID:", chainCheckError);
-      setStatusMessage(`Could not verify wallet chain. Please ensure your wallet is connected and on ${liskSepolia.name}. Error: ${chainCheckError.message}`);
+      setNotification(`Could not verify wallet chain. Please ensure your wallet is connected and on ${liskSepolia.name}. Error: ${chainCheckError.message}`, 'error');
       return;
     }
     // --- End Chain Mismatch Check ---
 
     setIsProcessingTx(true);
-    setStatusMessage('Initiating fund deposit for job escrow...');
-    setIsError(false);
+    setNotification('Initiating fund deposit for job escrow...', 'info');
 
     try {
       const amountInSmallestUnit = parseUnits(job.amount.toString(), 6);
@@ -785,16 +829,16 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
         args: [escrowContractAddress, amountInSmallestUnit],
       });
 
-      setStatusMessage('Approving USDC for Escrow contract...');
+      setNotification('Approving USDC for Escrow contract...', 'info');
       const approveTxHash = await walletClient.sendTransaction({
         account,
         to: usdcContractAddress,
         data: approveCallData,
       });
 
-      setStatusMessage(`Approval transaction sent! Hash: ${approveTxHash}. Waiting for confirmation...`);
+      setNotification(`Approval transaction sent! Hash: ${truncateAddress(approveTxHash)}. Waiting for confirmation...`, 'info');
       await publicClient.waitForTransactionReceipt({ hash: approveTxHash });
-      setStatusMessage('USDC Approved. Now depositing funds to job escrow...');
+      setNotification('USDC Approved. Now depositing funds to job escrow...', 'info');
 
       // 2. Deposit USDC into the job-specific escrow
       const depositJobCallData = encodeFunctionData({
@@ -810,9 +854,9 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
         value: 0n,
       });
 
-      setStatusMessage(`Deposit transaction sent! Hash: ${depositTxHash}. Waiting for confirmation...`);
+      setNotification(`Deposit transaction sent! Hash: ${truncateAddress(depositTxHash)}. Waiting for confirmation...`, 'info');
       await publicClient.waitForTransactionReceipt({ hash: depositTxHash });
-      setStatusMessage('Job funds deposited successfully on-chain!');
+      setNotification('Job funds deposited successfully on-chain!', 'success');
 
       // 3. Update backend with deposit confirmation
       await axios.put(`${API_BASE_URL}/api/jobs/${id}/deposit-confirmed`, {
@@ -822,14 +866,12 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
 
       // Update local job state
       setJob(prevJob => ({ ...prevJob, escrowStatus: 'deposited' }));
-      setStatusMessage('Job funds confirmed and updated in backend!');
-      setIsError(false);
+      setNotification('Job funds confirmed and updated in backend!', 'success');
       fetchJobAndBalance(); // Re-fetch to update balance and job state
 
     } catch (error) {
       console.error("Error funding job escrow:", error);
-      setStatusMessage(`Transaction failed or error funding job: ${error.message || 'Please try again.'}`);
-      setIsError(true);
+      setNotification(`Transaction failed or error funding job: ${error.message || 'Please try again.'}`, 'error');
     } finally {
       setIsProcessingTx(false);
     }
@@ -838,29 +880,24 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
   // --- Handle Freelancer Applying for Job ---
   const handleApply = async () => {
     if (!account) {
-      setStatusMessage('Please connect your wallet to apply for jobs.');
-      setIsError(true);
+      setNotification('Please connect your wallet to apply for jobs.', 'error');
       return;
     }
     if (!job) {
-      setStatusMessage('Job data not available.');
-      setIsError(true);
+      setNotification('Job data not available.', 'error');
       return;
     }
     if (job.status !== 'open' || job.escrowStatus !== 'deposited') {
-      setStatusMessage('Job is not open or not funded for applications.');
-      setIsError(true);
+      setNotification('Job is not open or not funded for applications.', 'error');
       return;
     }
     if (hasApplied) {
-      setStatusMessage('You have already applied for this job.');
-      setIsError(true);
+      setNotification('You have already applied for this job.', 'error');
       return;
     }
 
     setIsProcessingTx(true);
-    setStatusMessage('Applying for job...');
-    setIsError(false);
+    setNotification('Applying for job...', 'info');
     try {
       await axios.post(`${API_BASE_URL}/api/jobs/${id}/apply`, { applicantAddress: account });
 
@@ -869,13 +906,11 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
         ...prevJob,
         applicants: [...(prevJob.applicants || []), { address: account, timestamp: new Date().toISOString() }]
       }));
-      setStatusMessage('Application submitted successfully! Client will review.');
-      setIsError(false);
+      setNotification('Application submitted successfully! Client will review.', 'success');
 
     } catch (error) {
       console.error('Error applying for job:', error);
-      setStatusMessage(`Error applying for job: ${error.message || 'Please try again.'}`);
-      setIsError(true);
+      setNotification(`Error applying for job: ${error.message || 'Please try again.'}`, 'error');
     } finally {
       setIsProcessingTx(false);
     }
@@ -884,19 +919,21 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
   // --- Handle Client Approving an Applicant ---
   const handleApproveApplicant = async (applicantAddress) => {
     if (!account || !job || !isClient) {
-      setStatusMessage('Wallet not connected or you are not the client.');
-      setIsError(true);
+      setNotification('Wallet not connected or you are not the client.', 'error');
       return;
     }
-    if (job.status !== 'open' && job.status !== 'pending-client-approval') { // Allow approval if still open or if another freelancer was rejected
-      setStatusMessage('Job is not in a state to approve applicants.');
-      setIsError(true);
+    if (job.status !== 'open' || job.escrowStatus !== 'deposited') { // Job must be open and funded for client to approve
+      setNotification('Job is not open for applicant approval or not funded.', 'error');
       return;
+    }
+    if (job.freelancer) {
+        setNotification('A freelancer is already assigned to this job. Reject them first if you wish to approve another.', 'error');
+        return;
     }
 
+
     setIsProcessingTx(true);
-    setStatusMessage(`Approving applicant ${truncateAddress(applicantAddress)}...`);
-    setIsError(false);
+    setNotification(`Approving applicant ${truncateAddress(applicantAddress)}...`, 'info');
     try {
       await axios.put(`${API_BASE_URL}/api/jobs/${id}/approve-applicant`, {
         clientAddress: account,
@@ -910,13 +947,11 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
         freelancer: applicantAddress,
         applicants: prevJob.applicants.filter(app => app.address.toLowerCase() !== applicantAddress.toLowerCase()) // Remove approved from applicants list
       }));
-      setStatusMessage(`Applicant ${truncateAddress(applicantAddress)} approved! Job is now pending freelancer acceptance.`);
-      setIsError(false);
+      setNotification(`Applicant ${truncateAddress(applicantAddress)} approved! Job is now pending freelancer acceptance.`, 'success');
 
     } catch (error) {
       console.error('Error approving applicant:', error);
-      setStatusMessage(`Error approving applicant: ${error.message || 'Please try again.'}`);
-      setIsError(true);
+      setNotification(`Error approving applicant: ${error.message || 'Please try again.'}`, 'error');
     } finally {
       setIsProcessingTx(false);
     }
@@ -925,19 +960,16 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
   // --- Handle Client Rejecting an Applicant ---
   const handleRejectApplicant = async (applicantAddress) => {
     if (!account || !job || !isClient) {
-      setStatusMessage('Wallet not connected or you are not the client.');
-      setIsError(true);
+      setNotification('Wallet not connected or you are not the client.', 'error');
       return;
     }
-    if (job.status !== 'open' && job.status !== 'pending-client-approval') {
-      setStatusMessage('Job is not in a state to reject applicants.');
-      setIsError(true);
+    if (job.status !== 'open' || job.escrowStatus !== 'deposited') { // Job must be open and funded for client to reject
+      setNotification('Job is not open for applicant rejection or not funded.', 'error');
       return;
     }
 
     setIsProcessingTx(true);
-    setStatusMessage(`Rejecting applicant ${truncateAddress(applicantAddress)}...`);
-    setIsError(false);
+    setNotification(`Rejecting applicant ${truncateAddress(applicantAddress)}...`, 'info');
     try {
       await axios.put(`${API_BASE_URL}/api/jobs/${id}/reject-applicant`, {
         clientAddress: account,
@@ -949,13 +981,11 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
         ...prevJob,
         applicants: prevJob.applicants.filter(app => app.address.toLowerCase() !== applicantAddress.toLowerCase())
       }));
-      setStatusMessage(`Applicant ${truncateAddress(applicantAddress)} rejected.`);
-      setIsError(false);
+      setNotification(`Applicant ${truncateAddress(applicantAddress)} rejected.`, 'info');
 
     } catch (error) {
       console.error('Error rejecting applicant:', error);
-      setStatusMessage(`Error rejecting applicant: ${error.message || 'Please try again.'}`);
-      setIsError(true);
+      setNotification(`Error rejecting applicant: ${error.message || 'Please try again.'}`, 'error');
     } finally {
       setIsProcessingTx(false);
     }
@@ -965,13 +995,11 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
   // --- Handle Freelancer Accepting Job (after client approval) ---
   const handleAcceptAssignedJob = async () => {
     if (!account || !job || !isFreelancer) {
-      setStatusMessage('Wallet not connected or you are not the assigned freelancer.');
-      setIsError(true);
+      setNotification('Wallet not connected or you are not the assigned freelancer.', 'error');
       return;
     }
     if (job.status !== 'pending-client-approval' || job.freelancer.toLowerCase() !== account.toLowerCase()) {
-      setStatusMessage('Job is not pending your acceptance or you are not the assigned freelancer.');
-      setIsError(true);
+      setNotification('Job is not pending your acceptance or you are not the assigned freelancer.', 'error');
       return;
     }
 
@@ -979,33 +1007,31 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
     try {
       const currentChainId = await walletClient.getChainId();
       if (currentChainId !== liskSepolia.id) {
-        setStatusMessage(`Wallet is on the wrong network. Please switch to ${liskSepolia.name} (Chain ID: ${liskSepolia.id}). Attempting to switch...`);
+        setNotification(`Wallet is on the wrong network. Please switch to ${liskSepolia.name} (Chain ID: ${liskSepolia.id}). Attempting to switch...`, 'error');
         try {
           await walletClient.switchChain({ id: liskSepolia.id });
-          setStatusMessage(`Successfully prompted to switch to ${liskSepolia.name}. Please confirm in your wallet and try accepting the job again.`);
+          setNotification(`Successfully prompted to switch to ${liskSepolia.name}. Please confirm in your wallet and try accepting the job again.`, 'info');
           return; // Exit and let user retry after chain switch
         } catch (switchError) {
           console.error("Error switching chain:", switchError);
-          setStatusMessage(`Failed to switch to ${liskSepolia.name}. Please switch manually in your wallet. Error: ${switchError.message}`);
+          setNotification(`Failed to switch to ${liskSepolia.name}. Please switch manually in your wallet. Error: ${switchError.message}`, 'error');
           return;
         }
       }
     } catch (chainCheckError) {
       console.error("Error checking current chain ID:", chainCheckError);
-      setStatusMessage(`Could not verify wallet chain. Please ensure your wallet is connected and on ${liskSepolia.name}. Error: ${chainCheckError.message}`);
+      setNotification(`Could not verify wallet chain. Please ensure your wallet is connected and on ${liskSepolia.name}. Error: ${chainCheckError.message}`, 'error');
       return;
     }
     // --- End Chain Mismatch Check ---
 
     setIsProcessingTx(true);
-    setStatusMessage('Accepting assigned job...');
-    setIsError(false);
+    setNotification('Accepting assigned job...', 'info');
     try {
       await axios.put(`${API_BASE_URL}/api/jobs/${id}/accept-assigned`, { freelancerAddress: account });
 
       setJob(prevJob => ({ ...prevJob, status: 'in-progress' }));
-      setStatusMessage('Job accepted! It is now in progress.');
-      setIsError(false);
+      setNotification('Job accepted! It is now in progress.', 'success');
 
       setTimeout(() => {
         navigate('/dashboard');
@@ -1013,8 +1039,7 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
 
     } catch (error) {
       console.error('Error accepting assigned job:', error);
-      setStatusMessage(`Error accepting assigned job: ${error.message || 'Please try again.'}`);
-      setIsError(true);
+      setNotification(`Error accepting assigned job: ${error.message || 'Please try again.'}`, 'error');
     } finally {
       setIsProcessingTx(false);
     }
@@ -1024,13 +1049,11 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
   // --- Handle Freelancer Marking Job as Completed ---
   const handleMarkCompleted = async () => {
     if (!account || !job || !isFreelancer) {
-      setStatusMessage('Wallet not connected or you are not the assigned freelancer.');
-      setIsError(true);
+      setNotification('Wallet not connected or you are not the assigned freelancer.', 'error');
       return;
     }
     if (job.status !== 'in-progress') {
-      setStatusMessage('Job is not in progress.');
-      setIsError(true);
+      setNotification('Job is not in progress.', 'error');
       return;
     }
 
@@ -1038,33 +1061,31 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
     try {
       const currentChainId = await walletClient.getChainId();
       if (currentChainId !== liskSepolia.id) {
-        setStatusMessage(`Wallet is on the wrong network. Please switch to ${liskSepolia.name} (Chain ID: ${liskSepolia.id}). Attempting to switch...`);
+        setNotification(`Wallet is on the wrong network. Please switch to ${liskSepolia.name} (Chain ID: ${liskSepolia.id}). Attempting to switch...`, 'error');
         try {
           await walletClient.switchChain({ id: liskSepolia.id });
-          setStatusMessage(`Successfully prompted to switch to ${liskSepolia.name}. Please confirm in your wallet and try marking as completed again.`);
+          setNotification(`Successfully prompted to switch to ${liskSepolia.name}. Please confirm in your wallet and try marking as completed again.`, 'info');
           return; // Exit and let user retry after chain switch
         } catch (switchError) {
           console.error("Error switching chain:", switchError);
-          setStatusMessage(`Failed to switch to ${liskSepolia.name}. Please switch manually in your wallet. Error: ${switchError.message}`);
+          setNotification(`Failed to switch to ${liskSepolia.name}. Please switch manually in your wallet. Error: ${switchError.message}`, 'error');
           return;
         }
       }
     } catch (chainCheckError) {
       console.error("Error checking current chain ID:", chainCheckError);
-      setStatusMessage(`Could not verify wallet chain. Please ensure your wallet is connected and on ${liskSepolia.name}. Error: ${chainCheckError.message}`);
+      setNotification(`Could not verify wallet chain. Please ensure your wallet is connected and on ${liskSepolia.name}. Error: ${chainCheckError.message}`, 'error');
       return;
     }
     // --- End Chain Mismatch Check ---
 
     setIsProcessingTx(true);
-    setStatusMessage('Marking job as completed...');
-    setIsError(false);
+    setNotification('Marking job as completed...', 'info');
     try {
       await axios.put(`${API_BASE_URL}/api/jobs/${id}/mark-completed`, { freelancerAddress: account });
 
       setJob(prevJob => ({ ...prevJob, status: 'completed' })); // Frontend status update
-      setStatusMessage('Job marked as completed! Client can now release funds.');
-      setIsError(false);
+      setNotification('Job marked as completed! Client can now release funds.', 'success');
 
       setTimeout(() => {
         navigate('/dashboard');
@@ -1072,8 +1093,7 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
 
     } catch (error) {
       console.error('Error marking job as completed:', error);
-      setStatusMessage(`Error marking job as completed: ${error.message || 'Please try again.'}`);
-      setIsError(true);
+      setNotification(`Error marking job as completed: ${error.message || 'Please try again.'}`, 'error');
     } finally {
       setIsProcessingTx(false);
     }
@@ -1083,18 +1103,15 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
   // --- Handle Client Releasing Funds (On-chain) ---
   const handleReleaseFunds = async () => {
     if (!account || !publicClient || !walletClient || !job) {
-      setStatusMessage('Wallet not connected or blockchain clients not ready.');
-      setIsError(true);
+      setNotification('Wallet not connected or blockchain clients not ready.', 'error');
       return;
     }
     if (!isClient) {
-      setStatusMessage('Only the client can release funds.');
-      setIsError(true);
+      setNotification('Only the client can release funds.', 'error');
       return;
     }
-    if (job.status !== 'completed' || job.escrowStatus !== 'active') { // Job must be marked completed by freelancer, escrow active
-      setStatusMessage('Job is not in a state for fund release (must be completed and escrow active).');
-      setIsError(true);
+    if (job.status !== 'completed' || job.escrowStatus !== 'deposited') { // Job must be marked completed by freelancer, escrow active
+      setNotification('Job is not in a state for fund release (must be completed and escrow deposited).', 'error');
       return;
     }
 
@@ -1102,27 +1119,26 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
     try {
       const currentChainId = await walletClient.getChainId();
       if (currentChainId !== liskSepolia.id) {
-        setStatusMessage(`Wallet is on the wrong network. Please switch to ${liskSepolia.name} (Chain ID: ${liskSepolia.id}). Attempting to switch...`);
+        setNotification(`Wallet is on the wrong network. Please switch to ${liskSepolia.name} (Chain ID: ${liskSepolia.id}). Attempting to switch...`, 'error');
         try {
           await walletClient.switchChain({ id: liskSepolia.id });
-          setStatusMessage(`Successfully prompted to switch to ${liskSepolia.name}. Please confirm in your wallet and try releasing funds again.`);
+          setNotification(`Successfully prompted to switch to ${liskSepolia.name}. Please confirm in your wallet and try releasing funds again.`, 'info');
           return; // Exit and let user retry after chain switch
         } catch (switchError) {
           console.error("Error switching chain:", switchError);
-          setStatusMessage(`Failed to switch to ${liskSepolia.name}. Please switch manually in your wallet. Error: ${switchError.message}`);
+          setNotification(`Failed to switch to ${liskSepolia.name}. Please switch manually in your wallet. Error: ${switchError.message}`, 'error');
           return;
         }
       }
     } catch (chainCheckError) {
       console.error("Error checking current chain ID:", chainCheckError);
-      setStatusMessage(`Could not verify wallet chain. Please ensure your wallet is connected and on ${liskSepolia.name}. Error: ${chainCheckError.message}`);
+      setNotification(`Could not verify wallet chain. Please ensure your wallet is connected and on ${liskSepolia.name}. Error: ${chainCheckError.message}`, 'error');
       return;
     }
     // --- End Chain Mismatch Check ---
 
     setIsProcessingTx(true);
-    setStatusMessage('Initiating fund release on-chain...');
-    setIsError(false);
+    setNotification('Initiating fund release on-chain...', 'info');
     try {
       const releaseCallData = encodeFunctionData({
         abi: escrowAbi,
@@ -1136,7 +1152,7 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
         data: releaseCallData,
       });
 
-      setStatusMessage(`Transaction sent! Hash: ${txHash}. Waiting for confirmation...`);
+      setNotification(`Transaction sent! Hash: ${truncateAddress(txHash)}. Waiting for confirmation...`, 'info');
       await publicClient.waitForTransactionReceipt({ hash: txHash });
 
       // Update backend after successful on-chain release
@@ -1146,8 +1162,12 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
       });
 
       setJob(prevJob => ({ ...prevJob, escrowStatus: 'released' })); // Update local escrow status
-      setStatusMessage('Funds released successfully, job marked as completed!');
-      setIsError(false);
+      setNotification('Funds released successfully, job marked as completed!', 'success');
+
+      // Show rating modal after successful release
+      if (job.freelancer) {
+          setShowRatingModal(true);
+      }
 
       setTimeout(() => {
         navigate('/dashboard');
@@ -1155,8 +1175,7 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
 
     } catch (error) {
       console.error('Error releasing funds:', error);
-      setStatusMessage(`Transaction failed or error releasing funds: ${error.message || 'Please try again.'}`);
-      setIsError(true);
+      setNotification(`Transaction failed or error releasing funds: ${error.message || 'Please try again.'}`, 'error');
     } finally {
       setIsProcessingTx(false);
     }
@@ -1165,18 +1184,15 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
   // --- Handle Client Refunding Funds (On-chain) ---
   const handleRefundFunds = async () => {
     if (!account || !publicClient || !walletClient || !job) {
-      setStatusMessage('Wallet not connected or blockchain clients not ready.');
-      setIsError(true);
+      setNotification('Wallet not connected or blockchain clients not ready.', 'error');
       return;
     }
     if (!isClient) {
-      setStatusMessage('Only the client can refund funds.');
-      setIsError(true);
+      setNotification('Only the client can refund funds.', 'error');
       return;
     }
-    if (job.escrowStatus !== 'active' && job.escrowStatus !== 'disputed') {
-      setStatusMessage('Job is not in an active or disputed state for refund.');
-      setIsError(true);
+    if (job.escrowStatus !== 'deposited' && job.escrowStatus !== 'disputed') {
+      setNotification('Job is not in a deposited or disputed state for refund.', 'error');
       return;
     }
 
@@ -1184,27 +1200,26 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
     try {
       const currentChainId = await walletClient.getChainId();
       if (currentChainId !== liskSepolia.id) {
-        setStatusMessage(`Wallet is on the wrong network. Please switch to ${liskSepolia.name} (Chain ID: ${liskSepolia.id}). Attempting to switch...`);
+        setNotification(`Wallet is on the wrong network. Please switch to ${liskSepolia.name} (Chain ID: ${liskSepolia.id}). Attempting to switch...`, 'error');
         try {
           await walletClient.switchChain({ id: liskSepolia.id });
-          setStatusMessage(`Successfully prompted to switch to ${liskSepolia.name}. Please confirm in your wallet and try refunding funds again.`);
+          setNotification(`Successfully prompted to switch to ${liskSepolia.name}. Please confirm in your wallet and try refunding funds again.`, 'info');
           return; // Exit and let user retry after chain switch
         } catch (switchError) {
           console.error("Error switching chain:", switchError);
-          setStatusMessage(`Failed to switch to ${liskSepolia.name}. Please switch manually in your wallet. Error: ${switchError.message}`);
+          setNotification(`Failed to switch to ${liskSepolia.name}. Please switch manually in your wallet. Error: ${switchError.message}`, 'error');
           return;
         }
       }
     } catch (chainCheckError) {
       console.error("Error checking current chain ID:", chainCheckError);
-      setStatusMessage(`Could not verify wallet chain. Please ensure your wallet is connected and on ${liskSepolia.name}. Error: ${chainCheckError.message}`);
+      setNotification(`Could not verify wallet chain. Please ensure your wallet is connected and on ${liskSepolia.name}. Error: ${chainCheckError.message}`, 'error');
       return;
     }
     // --- End Chain Mismatch Check ---
 
     setIsProcessingTx(true);
-    setStatusMessage('Initiating fund refund on-chain...');
-    setIsError(false);
+    setNotification('Initiating fund refund on-chain...', 'info');
     try {
       const refundCallData = encodeFunctionData({
         abi: escrowAbi,
@@ -1218,7 +1233,7 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
         data: refundCallData,
       });
 
-      setStatusMessage(`Transaction sent! Hash: ${txHash}. Waiting for confirmation...`);
+      setNotification(`Transaction sent! Hash: ${truncateAddress(txHash)}. Waiting for confirmation...`, 'info');
       await publicClient.waitForTransactionReceipt({ hash: txHash });
 
       // Update backend after successful on-chain refund
@@ -1227,8 +1242,7 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
       });
 
       setJob(prevJob => ({ ...prevJob, escrowStatus: 'refunded', status: 'cancelled' })); // Update local statuses
-      setStatusMessage('Funds refunded successfully, job marked as cancelled!');
-      setIsError(false);
+      setNotification('Funds refunded successfully, job marked as cancelled!', 'success');
 
       setTimeout(() => {
         navigate('/dashboard');
@@ -1236,8 +1250,7 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
 
     } catch (error) {
       console.error('Error refunding funds:', error);
-      setStatusMessage(`Transaction failed or error refunding funds: ${error.message || 'Please try again.'}`);
-      setIsError(true);
+      setNotification(`Transaction failed or error refunding funds: ${error.message || 'Please try again.'}`, 'error');
     } finally {
       setIsProcessingTx(false);
     }
@@ -1247,23 +1260,19 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!account) {
-      setStatusMessage('Please connect your wallet to send messages.');
-      setIsError(true);
+      setNotification('Please connect your wallet to send messages.', 'error');
       return;
     }
     if (!newMessage.trim()) {
-      setStatusMessage('Message cannot be empty.');
-      setIsError(true);
+      setNotification('Message cannot be empty.', 'error');
       return;
     }
     if (!job) {
-      setStatusMessage('Job data not available for messaging.');
-      setIsError(true);
+      setNotification('Job data not available for messaging.', 'error');
       return;
     }
 
-    setStatusMessage('Sending message...');
-    setIsError(false);
+    setNotification('Sending message...', 'info');
     try {
       const response = await axios.post(`${API_BASE_URL}/api/jobs/${id}/messages`, {
         sender: account,
@@ -1276,12 +1285,44 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
         messages: [...(prevJob.messages || []), response.data] // Assuming backend returns the saved message
       }));
       setNewMessage(''); // Clear input field
-      setStatusMessage('Message sent!');
+      setNotification('Message sent!', 'success');
 
     } catch (error) {
       console.error('Error sending message:', error);
-      setStatusMessage(`Error sending message: ${error.message || 'Please try again.'}`);
-      setIsError(true);
+      setNotification(`Error sending message: ${error.message || 'Please try again.'}`, 'error');
+    }
+  };
+
+  // --- Handle Submitting Freelancer Rating ---
+  const handleSubmitRating = async () => {
+    if (!account || !job || !isClient || !job.freelancer) {
+      setNotification('Unauthorized or job data missing for rating.', 'error');
+      return;
+    }
+    if (ratingInput < 1 || ratingInput > 5) {
+      setNotification('Please select a rating between 1 and 5.', 'error');
+      return;
+    }
+
+    setIsProcessingTx(true);
+    setNotification(`Submitting rating of ${ratingInput} for freelancer ${truncateAddress(job.freelancer)}...`, 'info');
+    try {
+      await axios.put(`${API_BASE_URL}/api/jobs/${id}/rate-freelancer`, {
+        clientAddress: account,
+        freelancerAddress: job.freelancer,
+        rating: ratingInput,
+      });
+
+      setNotification('Freelancer rated successfully!', 'success');
+      setShowRatingModal(false); // Close modal
+      setRatingInput(0); // Reset rating input
+      // Optionally re-fetch job or profile to show updated rating, though not strictly necessary for this flow
+
+    } catch (error) {
+      console.error('Error submitting rating:', error);
+      setNotification(`Error submitting rating: ${error.message || 'Please try again.'}`, 'error');
+    } finally {
+      setIsProcessingTx(false);
     }
   };
 
@@ -1303,11 +1344,6 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
       <div className="max-w-5xl mx-auto p-4 bg-white shadow-lg rounded-lg my-8 text-center">
         <h2 className="text-2xl font-bold text-red-600 mb-4">Job Not Found</h2>
         <p className="text-lg text-gray-700">The job you are looking for does not exist or an error occurred.</p>
-        {statusMessage && (
-          <div className="p-3 mt-4 rounded-md bg-red-100 text-red-700">
-            {statusMessage}
-          </div>
-        )}
         <button
           className="mt-6 px-6 py-3 bg-primary-blue text-white rounded-md hover:bg-blue-700 transition duration-300"
           onClick={() => navigate('/dashboard')}
@@ -1324,25 +1360,31 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
   const showAcceptAssignedJobButton = isFreelancer && job.status === 'pending-client-approval' && job.freelancer.toLowerCase() === account.toLowerCase();
   const showClientApplicantActions = isClient && job.status === 'open' && job.escrowStatus === 'deposited' && job.applicants && job.applicants.length > 0 && !job.freelancer; // Only show if job is open, funded, has applicants, and no freelancer assigned
   const showMarkCompletedButton = isFreelancer && job.status === 'in-progress';
-  const showReleaseFundsButton = isClient && job.status === 'completed' && job.escrowStatus === 'active'; // Client releases after freelancer marks completed
-  const showRefundFundsButton = isClient && (job.escrowStatus === 'active' || job.escrowStatus === 'disputed'); // Client can refund if active or disputed
+  const showReleaseFundsButton = isClient && job.status === 'completed' && job.escrowStatus === 'deposited'; // Client releases after freelancer marks completed
+  const showRefundFundsButton = isClient && (job.escrowStatus === 'deposited' || job.escrowStatus === 'disputed'); // Client can refund if deposited or disputed
 
 
   return (
     <div className="max-w-5xl mx-auto p-4 bg-white shadow-lg rounded-lg my-8">
       <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">{job.title}</h2>
 
-      {statusMessage && (
-        <div className={`p-3 mb-4 rounded-md ${isError || statusMessage.includes('Insufficient') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-          {statusMessage}
-        </div>
-      )}
-
       <div className="space-y-3 text-gray-700 mb-6">
         <p className="text-lg">Description: {job.description}</p>
         <p className="text-lg">Amount: <span className="font-semibold text-accent-green">{job.amount} USDC</span></p>
-        <p className="text-lg">Client: <span className="font-mono text-secondary-purple">{job.client ? truncateAddress(job.client) : 'N/A'}</span></p>
-        <p className="text-lg">Freelancer: <span className="font-mono text-secondary-purple">{job.freelancer ? truncateAddress(job.freelancer) : 'Not assigned'}</span></p>
+        <p className="text-lg">
+          Client: {job.client ? (
+            <Link to={`/profile/${job.client}`} className="font-mono text-primary-blue hover:underline">
+              {truncateAddress(job.client)}
+            </Link>
+          ) : 'N/A'}
+        </p>
+        <p className="text-lg">
+          Freelancer: {job.freelancer ? (
+            <Link to={`/profile/${job.freelancer}`} className="font-mono text-primary-blue hover:underline">
+              {truncateAddress(job.freelancer)}
+            </Link>
+          ) : 'Not assigned'}
+        </p>
         <p className="text-lg">Current Status: <span className={`font-semibold ${job.status === 'open' ? 'text-blue-600' : job.status === 'pending-client-approval' ? 'text-orange-500' : job.status === 'in-progress' ? 'text-yellow-600' : job.status === 'completed' ? 'text-green-600' : job.status === 'disputed' ? 'text-red-600' : 'text-gray-600'}`}>{job.status}</span></p>
         <p className="text-lg">Escrow Status: <span className={`font-semibold ${job.escrowStatus === 'pending-deposit' ? 'text-red-500' : job.escrowStatus === 'deposited' || job.escrowStatus === 'active' ? 'text-green-500' : 'text-gray-600'}`}>{job.escrowStatus}</span></p>
         {isClient && <p className="text-lg">Your USDC Balance: <span className="font-semibold text-primary-blue">{clientUsdcBalance} USDC</span></p>}
@@ -1424,7 +1466,11 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
             {job.applicants.map((applicant, index) => (
               <li key={index} className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-3 rounded-md shadow-sm">
                 <div className="mb-2 sm:mb-0">
-                  <p className="font-mono text-secondary-purple text-base">{truncateAddress(applicant.address)}</p>
+                  <p className="font-mono text-secondary-purple text-base">
+                    <Link to={`/profile/${applicant.address}`} className="text-primary-blue hover:underline">
+                      {truncateAddress(applicant.address)}
+                    </Link>
+                  </p>
                   <p className="text-sm text-gray-600">Applied: {new Date(applicant.timestamp).toLocaleString()}</p>
                 </div>
                 <div className="flex space-x-2">
@@ -1450,7 +1496,7 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
       )}
 
       {/* In-App Messaging Section */}
-      {(isClient || isFreelancer) && job.status !== 'open' && ( // Only show messaging if job is assigned/in progress/completed
+      {(isClient || (isFreelancer && job.freelancer)) && (job.status !== 'open' || job.freelancer) && ( // Only show messaging if job is assigned/in progress/completed
         <div className="mt-8 p-4 bg-gray-50 rounded-lg shadow-inner">
           <h3 className="text-xl font-semibold text-primary-blue mb-4">Job Messages</h3>
           <div className="h-64 overflow-y-auto border border-gray-200 rounded-md p-3 mb-4 bg-white">
@@ -1464,7 +1510,11 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
                       : 'bg-gray-200 text-gray-800 mr-auto'
                   }`}
                 >
-                  <p className="font-semibold text-sm">{truncateAddress(message.sender)}</p>
+                  <p className="font-semibold text-sm">
+                    <Link to={`/profile/${message.sender}`} className="text-blue-200 hover:underline">
+                      {truncateAddress(message.sender)}
+                    </Link>
+                  </p>
                   <p className="text-base break-words">{message.text}</p>
                   <p className="text-xs text-right opacity-80 mt-1">{new Date(message.timestamp).toLocaleString()}</p>
                 </div>
@@ -1494,6 +1544,42 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
         </div>
       )}
 
+      {/* Rating Modal */}
+      {showRatingModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50">
+          <div className="bg-white p-8 rounded-lg shadow-xl max-w-md w-full text-center">
+            <h3 className="text-2xl font-bold text-primary-blue mb-4">Rate Freelancer</h3>
+            <p className="text-lg text-gray-700 mb-6">How would you rate {truncateAddress(job.freelancer)} for this job?</p>
+            <div className="flex justify-center space-x-2 mb-6">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  onClick={() => setRatingInput(star)}
+                  className={`text-4xl ${ratingInput >= star ? 'text-yellow-500' : 'text-gray-300'} hover:text-yellow-400 transition-colors`}
+                >
+                  &#9733; {/* Unicode star character */}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={handleSubmitRating}
+              className="px-6 py-3 bg-accent-green text-white font-semibold rounded-md hover:bg-green-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isProcessingTx || ratingInput === 0}
+            >
+              {isProcessingTx ? 'Submitting...' : 'Submit Rating'}
+            </button>
+            <button
+              onClick={() => setShowRatingModal(false)}
+              className="mt-4 px-6 py-3 bg-gray-400 text-white font-semibold rounded-md hover:bg-gray-500 transition duration-300 ml-2"
+              disabled={isProcessingTx}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+
       <button
         className="mt-8 px-6 py-3 bg-gray-600 text-white font-semibold rounded-md hover:bg-gray-700 transition duration-300"
         onClick={() => navigate('/dashboard')}
@@ -1505,32 +1591,27 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
 };
 
 // --- PostJob Component ---
-const PostJob = ({ account }) => {
+const PostJob = ({ account, setNotification }) => {
   const navigate = useNavigate();
   const [jobTitle, setJobTitle] = useState('');
   const [jobDescription, setJobDescription] = useState('');
   const [jobAmount, setJobAmount] = useState('');
   const [requiredSkillsInput, setRequiredSkillsInput] = useState(''); // New state for required skills
   const [isLoading, setIsLoading] = useState(false);
-  const [statusMessage, setStatusMessage] = useState('');
-  const [isError, setIsError] = useState(false);
 
   const handlePostJob = async (e) => {
     e.preventDefault();
     if (!account) {
-      setStatusMessage('Please connect your wallet to post a job.');
-      setIsError(true);
+      setNotification('Please connect your wallet to post a job.', 'error');
       return;
     }
     if (!jobTitle || !jobDescription || !jobAmount || isNaN(parseFloat(jobAmount)) || parseFloat(jobAmount) <= 0) {
-      setStatusMessage('Please fill all fields with valid data.');
-      setIsError(true);
+      setNotification('Please fill all fields with valid data.', 'error');
       return;
     }
 
     setIsLoading(true);
-    setStatusMessage('Posting job...');
-    setIsError(false);
+    setNotification('Posting job...', 'info');
 
     try {
       const skillsArray = requiredSkillsInput.split(',').map(s => s.trim()).filter(s => s !== '');
@@ -1545,8 +1626,7 @@ const PostJob = ({ account }) => {
         requiredSkills: skillsArray, // Include required skills
       });
 
-      setStatusMessage('Job posted successfully! Redirecting to job details to fund escrow.');
-      setIsError(false);
+      setNotification('Job posted successfully! Redirecting to job details to fund escrow.', 'success');
       setJobTitle('');
       setJobDescription('');
       setJobAmount('');
@@ -1558,8 +1638,7 @@ const PostJob = ({ account }) => {
 
     } catch (error) {
       console.error('Error posting job:', error);
-      setStatusMessage(`Error posting job: ${error.message || 'Please try again.'}`);
-      setIsError(true);
+      setNotification(`Error posting job: ${error.message || 'Please try again.'}`, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -1572,12 +1651,6 @@ const PostJob = ({ account }) => {
       <p className="text-lg text-gray-700 mb-4">
         Connected Wallet: <span className="font-mono text-secondary-purple">{account || 'Not connected'}</span>
       </p>
-
-      {statusMessage && (
-        <div className={`p-3 mb-4 rounded-md ${isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-          {statusMessage}
-        </div>
-      )}
 
       {isLoading && (
         <div className="flex items-center justify-center mb-4 text-primary-blue">
@@ -1717,7 +1790,13 @@ const BrowseJobs = () => {
                   <div className="mb-2 sm:mb-0">
                     <p className="text-lg font-semibold text-gray-800">{job.title} - <span className="text-accent-green">{job.amount} USDC</span></p>
                     <p className="text-sm text-gray-600 truncate max-w-sm">{job.description}</p>
-                    <p className="text-xs text-gray-500">Client: {job.client ? truncateAddress(job.client) : 'N/A'} | Status: {job.status} | Escrow: {job.escrowStatus}</p>
+                    <p className="text-xs text-gray-500">
+                      Client: {job.client ? (
+                        <Link to={`/profile/${job.client}`} className="text-primary-blue hover:underline">
+                          {truncateAddress(job.client)}
+                        </Link>
+                      ) : 'N/A'} | Status: {job.status} | Escrow: {job.escrowStatus}
+                    </p>
                     {job.requiredSkills && job.requiredSkills.length > 0 && (
                       <p className="text-xs text-gray-500 mt-1">Required Skills: {job.requiredSkills.join(', ')}</p>
                     )}
@@ -1743,23 +1822,19 @@ const BrowseJobs = () => {
 };
 
 // --- CrossChainIntegration Component ---
-const CrossChainIntegration = ({ account, walletClient, publicClient }) => {
+const CrossChainIntegration = ({ account, walletClient, publicClient, setNotification }) => {
   const [sourceChain, setSourceChain] = useState('Lisk Sepolia');
   const [destinationChain, setDestinationChain] = useState('Optimism/Base (Mock)');
   const [transferAmount, setTransferAmount] = useState('');
-  const [statusMessage, setStatusMessage] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isError, setIsError] = useState(false);
 
   const handleCrossChainTransfer = async () => {
     if (!account || !walletClient || !publicClient) {
-      setStatusMessage('Please connect your wallet first.');
-      setIsError(true);
+      setNotification('Please connect your wallet first.', 'error');
       return;
     }
     if (isNaN(parseFloat(transferAmount)) || parseFloat(transferAmount) <= 0) {
-      setStatusMessage('Please enter a valid amount to transfer.');
-      setIsError(true);
+      setNotification('Please enter a valid amount to transfer.', 'error');
       return;
     }
 
@@ -1767,27 +1842,26 @@ const CrossChainIntegration = ({ account, walletClient, publicClient }) => {
     try {
       const currentChainId = await walletClient.getChainId();
       if (currentChainId !== liskSepolia.id) {
-        setStatusMessage(`Wallet is on the wrong network. Please switch to ${liskSepolia.name} (Chain ID: ${liskSepolia.id}). Attempting to switch...`);
+        setNotification(`Wallet is on the wrong network. Please switch to ${liskSepolia.name} (Chain ID: ${liskSepolia.id}). Attempting to switch...`, 'error');
         try {
           await walletClient.switchChain({ id: liskSepolia.id });
-          setStatusMessage(`Successfully prompted to switch to ${liskSepolia.name}. Please confirm in your wallet and try the transfer again.`);
+          setNotification(`Successfully prompted to switch to ${liskSepolia.name}. Please confirm in your wallet and try the transfer again.`, 'info');
           return; // Exit and let user retry after chain switch
         } catch (switchError) {
           console.error("Error switching chain:", switchError);
-          setStatusMessage(`Failed to switch to ${liskSepolia.name}. Please switch manually in your wallet. Error: ${switchError.message}`);
+          setNotification(`Failed to switch to ${liskSepolia.name}. Please switch manually in your wallet. Error: ${switchError.message}`, 'error');
           return;
         }
       }
     } catch (chainCheckError) {
       console.error("Error checking current chain ID:", chainCheckError);
-      setStatusMessage(`Could not verify wallet chain. Please ensure your wallet is connected and on ${liskSepolia.name}. Error: ${chainCheckError.message}`);
+      setNotification(`Could not verify wallet chain. Please ensure your wallet is connected and on ${liskSepolia.name}. Error: ${chainCheckError.message}`, 'error');
       return;
     }
     // --- End Chain Mismatch Check ---
 
     setIsProcessing(true);
-    setStatusMessage(`Initiating cross-chain transfer of ${transferAmount} USDC from ${sourceChain} to ${destinationChain}...`);
-    setIsError(false);
+    setNotification(`Initiating cross-chain transfer of ${transferAmount} USDC from ${sourceChain} to ${destinationChain}...`, 'info');
 
     try {
       // --- Mocking LayerZero Integration ---
@@ -1802,14 +1876,12 @@ const CrossChainIntegration = ({ account, walletClient, publicClient }) => {
       // For this demo, we'll simulate the process.
       await new Promise(resolve => setTimeout(resolve, 3000)); // Simulate network delay
 
-      setStatusMessage(`Simulated cross-chain transfer successful! ${transferAmount} USDC sent from ${sourceChain} to ${destinationChain}. (This is a mock transaction.)`);
-      setIsError(false);
+      setNotification(`Simulated cross-chain transfer successful! ${transferAmount} USDC sent from ${sourceChain} to ${destinationChain}. (This is a mock transaction.)`, 'success');
       setTransferAmount('');
 
     } catch (error) {
       console.error('Error during simulated cross-chain transfer:', error);
-      setStatusMessage(`Simulated transfer failed: ${error.message || 'Please try again.'}`);
-      setIsError(true);
+      setNotification(`Simulated transfer failed: ${error.message || 'Please try again.'}`, 'error');
     } finally {
       setIsProcessing(false);
     }
@@ -1825,12 +1897,6 @@ const CrossChainIntegration = ({ account, walletClient, publicClient }) => {
       <p className="text-lg text-gray-700 mb-4">
         Connected Wallet: <span className="font-mono text-secondary-purple">{account || 'Not connected'}</span>
       </p>
-
-      {statusMessage && (
-        <div className={`p-3 mb-4 rounded-md ${isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-          {statusMessage}
-        </div>
-      )}
 
       <div className="space-y-6">
         <div>
@@ -1884,29 +1950,24 @@ const CrossChainIntegration = ({ account, walletClient, publicClient }) => {
 };
 
 // --- DisputeResolution Component ---
-const DisputeResolution = ({ account }) => {
+const DisputeResolution = ({ account, setNotification }) => {
   const [jobId, setJobId] = useState('');
   const [disputeReason, setDisputeReason] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [statusMessage, setStatusMessage] = useState('');
-  const [isError, setIsError] = useState(false);
 
   const handleSubmitDispute = async (e) => {
     e.preventDefault();
     if (!account) {
-      setStatusMessage('Please connect your wallet to submit a dispute.');
-      setIsError(true);
+      setNotification('Please connect your wallet to submit a dispute.', 'error');
       return;
     }
     if (!jobId || !disputeReason) {
-      setStatusMessage('Please fill in both Job ID and Dispute Reason.');
-      setIsError(true);
+      setNotification('Please fill in both Job ID and Dispute Reason.', 'error');
       return;
     }
 
     setIsLoading(true);
-    setStatusMessage('Submitting dispute...');
-    setIsError(false);
+    setNotification('Submitting dispute...', 'info');
 
     try {
       // Call backend to submit dispute
@@ -1916,15 +1977,13 @@ const DisputeResolution = ({ account }) => {
         reason: disputeReason,
       });
 
-      setStatusMessage('Dispute submitted successfully! Our team will review it.');
-      setIsError(false);
+      setNotification('Dispute submitted successfully! Our team will review it.', 'success');
       setJobId('');
       setDisputeReason('');
 
     } catch (error) {
       console.error('Error submitting dispute:', error);
-      setStatusMessage(`Error submitting dispute: ${error.message || 'Please try again.'}`);
-      setIsError(true);
+      setNotification(`Error submitting dispute: ${error.message || 'Please try again.'}`, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -1940,12 +1999,6 @@ const DisputeResolution = ({ account }) => {
       <p className="text-lg text-gray-700 mb-4">
         Connected Wallet: <span className="font-mono text-secondary-purple">{account || 'Not connected'}</span>
       </p>
-
-      {statusMessage && (
-        <div className={`p-3 mb-4 rounded-md ${isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-          {statusMessage}
-        </div>
-      )}
 
       {isLoading && (
         <div className="flex items-center justify-center mb-4 text-primary-blue">
@@ -1995,30 +2048,25 @@ const DisputeResolution = ({ account }) => {
 };
 
 // --- Withdrawal Component (Mock Fiat On/Off-Ramp) ---
-const Withdrawal = ({ account }) => {
+const Withdrawal = ({ account, setNotification }) => {
   const [amount, setAmount] = useState('');
   const [fiatCurrency, setFiatCurrency] = useState('KES');
   const [bankDetails, setBankDetails] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [statusMessage, setStatusMessage] = useState('');
-  const [isError, setIsError] = useState(false);
 
   const handleWithdrawal = async (e) => {
     e.preventDefault();
     if (!account) {
-      setStatusMessage('Please connect your wallet to initiate a withdrawal.');
-      setIsError(true);
+      setNotification('Please connect your wallet to initiate a withdrawal.', 'error');
       return;
     }
     if (isNaN(parseFloat(amount)) || parseFloat(amount) <= 0 || !bankDetails) {
-      setStatusMessage('Please enter a valid amount and bank details.');
-      setIsError(true);
+      setNotification('Please enter a valid amount and bank details.', 'error');
       return;
     }
 
     setIsLoading(true);
-    setStatusMessage(`Initiating withdrawal of ${amount} USDC to ${fiatCurrency} via bank transfer...`);
-    setIsError(false);
+    setNotification(`Initiating withdrawal of ${amount} USDC to ${fiatCurrency} via bank transfer...`, 'info');
 
     try {
       // Call backend to submit withdrawal request
@@ -2029,15 +2077,13 @@ const Withdrawal = ({ account }) => {
         bankDetails: bankDetails, // In a real app, this would be structured data
       });
 
-      setStatusMessage(`Withdrawal request submitted! Our team will process your ${amount} USDC to ${fiatCurrency}.`);
-      setIsError(false);
+      setNotification(`Withdrawal request submitted! Our team will process your ${amount} USDC to ${fiatCurrency}.`, 'success');
       setAmount('');
       setBankDetails('');
 
     } catch (error) {
       console.error('Error during withdrawal:', error);
-      setStatusMessage(`Withdrawal failed: ${error.message || 'Please try again.'}`);
-      setIsError(true);
+      setNotification(`Withdrawal failed: ${error.message || 'Please try again.'}`, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -2053,12 +2099,6 @@ const Withdrawal = ({ account }) => {
       <p className="text-lg text-gray-700 mb-4">
         Connected Wallet: <span className="font-mono text-secondary-purple">{account || 'Not connected'}</span>
       </p>
-
-      {statusMessage && (
-        <div className={`p-3 mb-4 rounded-md ${isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-          {statusMessage}
-        </div>
-      )}
 
       {isLoading && (
         <div className="flex items-center justify-center mb-4 text-primary-blue">
@@ -2128,10 +2168,24 @@ function App() {
   const [walletClient, setWalletClient] = useState(null);
   const [publicClient, setPublicClient] = useState(null);
   const [account, setAccount] = useState(null);
-  const [status, setStatus] = useState('');
-  const [amountToDeposit, setAmountToDeposit] = useState('100');
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isInfoMenuOpen, setIsInfoMenuOpen] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState('');
+  const [notificationType, setNotificationType] = useState('info'); // 'info', 'success', 'error'
+  const notificationTimeoutRef = useRef(null);
+
+
+  // Function to set a notification
+  const setNotification = (message, type = 'info', duration = 5000) => {
+    // Clear any existing timeout
+    if (notificationTimeoutRef.current) {
+      clearTimeout(notificationTimeoutRef.current);
+    }
+    setNotificationMessage(message);
+    setNotificationType(type);
+    notificationTimeoutRef.current = setTimeout(() => {
+      setNotificationMessage('');
+    }, duration);
+  };
+
 
   const initializeWeb3Clients = async (connectedAddress) => {
     try {
@@ -2146,10 +2200,10 @@ function App() {
       setWalletClient(client);
       setPublicClient(publicClientInstance);
       setAccount(connectedAddress);
-      setStatus(`Wallet connected: ${truncateAddress(connectedAddress)}`);
+      setNotification(`Wallet connected: ${truncateAddress(connectedAddress)}`, 'success');
     } catch (error) {
       console.error("Error initializing Web3 clients:", error);
-      setStatus(`Error initializing wallet: ${error.message}`);
+      setNotification(`Error initializing wallet: ${error.message}`, 'error');
       setAccount(null);
       setWalletClient(null);
       setPublicClient(null);
@@ -2157,10 +2211,10 @@ function App() {
   };
 
   const connectWallet = async () => {
-    setStatus('Connecting wallet...');
+    setNotification('Connecting wallet...', 'info');
     try {
       if (typeof window.ethereum === 'undefined') {
-        setStatus('MetaMask or similar wallet not detected! Please install a Web3 wallet.');
+        setNotification('MetaMask or similar wallet not detected! Please install a Web3 wallet.', 'error');
         return;
       }
 
@@ -2170,9 +2224,9 @@ function App() {
     } catch (error) {
       console.error("Error connecting wallet:", error);
       if (error.code === 4001) {
-        setStatus('Wallet connection rejected by user.');
+        setNotification('Wallet connection rejected by user.', 'error');
       } else {
-        setStatus(`Error connecting wallet: ${error.message}`);
+        setNotification(`Error connecting wallet: ${error.message}`, 'error');
       }
       setAccount(null);
       setWalletClient(null);
@@ -2190,7 +2244,7 @@ function App() {
           setAccount(null);
           setWalletClient(null);
           setPublicClient(null);
-          setStatus('Wallet disconnected.');
+          setNotification('Wallet disconnected.', 'info');
         }
       };
 
@@ -2200,7 +2254,7 @@ function App() {
           if (accounts.length > 0) {
             await initializeWeb3Clients(accounts[0]);
           } else {
-            setStatus('No wallet connected initially.');
+            setNotification('No wallet connected initially.', 'info');
           }
         })
         .catch(error => console.error("Error checking initial accounts:", error));
@@ -2212,12 +2266,12 @@ function App() {
         window.ethereum.request({ method: 'eth_accounts' })
           .then(async (accounts) => {
             if (accounts.length > 0) {
-              await initializeWeb3Clients(accounts[0]);
+              initializeWeb3Clients(accounts[0]); // Don't await, let it run in background
             } else {
               setAccount(null);
               setWalletClient(null);
               setPublicClient(null);
-              setStatus('Wallet disconnected or chain changed to unknown network.');
+              setNotification('Wallet disconnected or chain changed to unknown network.', 'info');
             }
           })
           .catch(error => console.error("Error on chainChanged accounts check:", error));
@@ -2589,24 +2643,29 @@ function App() {
           } />
           <Route path="/dashboard" element={<Dashboard account={account} />} />
           <Route path="/profile" element={<Profile account={account} />} />
-          <Route path="/job/:id" element={<JobDetails account={account} publicClient={publicClient} walletClient={walletClient} />} />
+          <Route path="/profile/:address" element={<Profile account={account} />} /> {/* New route for public profiles */}
+          <Route path="/job/:id" element={<JobDetails account={account} publicClient={publicClient} walletClient={walletClient} setNotification={setNotification} />} />
           <Route path="/deposit-funds" element={
             <DivviIntegration
               account={account}
               walletClient={walletClient}
               publicClient={publicClient}
-              status={status}
-              setStatus={setStatus}
-              amountToDeposit={amountToDeposit}
-              setAmountToDeposit={setAmountToDeposit}
+              setNotification={setNotification}
             />
           } />
-          <Route path="/post-job" element={<PostJob account={account} />} />
+          <Route path="/post-job" element={<PostJob account={account} setNotification={setNotification} />} />
           <Route path="/browse-jobs" element={<BrowseJobs />} />
-          <Route path="/cross-chain-transfer" element={<CrossChainIntegration account={account} publicClient={publicClient} walletClient={walletClient} />} />
-          <Route path="/dispute-resolution" element={<DisputeResolution account={account} />} />
-          <Route path="/withdraw" element={<Withdrawal account={account} />} />
+          <Route path="/cross-chain-transfer" element={<CrossChainIntegration account={account} publicClient={publicClient} walletClient={walletClient} setNotification={setNotification} />} />
+          <Route path="/dispute-resolution" element={<DisputeResolution account={account} setNotification={setNotification} />} />
+          <Route path="/withdraw" element={<Withdrawal account={account} setNotification={setNotification} />} />
         </Routes>
+
+        {/* Global Notification Component */}
+        <Notification
+          message={notificationMessage}
+          type={notificationType}
+          onClose={() => setNotificationMessage('')}
+        />
       </div>
     </BrowserRouter>
   );
