@@ -137,6 +137,21 @@ const jobSchema = new mongoose.Schema({
     completionTxHash: { type: String, default: null }, // Transaction hash for fund release
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
+    // --- NEW FIELDS FOR JOB APPLICATION AND MESSAGING ---
+    applicants: [ // Array of objects for job applicants
+      {
+        address: { type: String, required: true, lowercase: true }, // Wallet address of the applicant
+        timestamp: { type: Date, default: Date.now },
+      }
+    ],
+    messages: [ // Array of objects for in-app messages
+      {
+        sender: { type: String, required: true, lowercase: true }, // Wallet address of the sender
+        text: { type: String, required: true },
+        timestamp: { type: Date, default: Date.now },
+      }
+    ],
+    requiredSkills: [{ type: String }], // Array of strings for skills required for the job
 });
 // Update 'updatedAt' timestamp on save and update operations
 jobSchema.pre('save', function (next) { this.updatedAt = Date.now(); next(); });
@@ -216,7 +231,9 @@ app.post('/api/jobs', async (req, res) => {
             ...req.body,
             client: req.body.client.toLowerCase(),
             status: 'open', // Job is open for freelancers to accept
-            escrowStatus: 'pending-deposit' // Initial state, client needs to fund escrow
+            escrowStatus: 'pending-deposit', // Initial state, client needs to fund escrow
+            // Ensure requiredSkills is passed if present in req.body
+            requiredSkills: req.body.requiredSkills || [], // Initialize as empty array if not provided
         };
         const job = new Job(jobData);
         await job.save();
@@ -229,7 +246,7 @@ app.post('/api/jobs', async (req, res) => {
 
 app.get('/api/jobs', async (req, res) => {
     try {
-        // Allow filtering by status and escrowStatus
+        // Allow filtering by status, escrowStatus, and skills
         const queryFilter = {};
         if (req.query.status) {
             queryFilter.status = req.query.status;
@@ -237,6 +254,16 @@ app.get('/api/jobs', async (req, res) => {
         if (req.query.escrowStatus) {
             queryFilter.escrowStatus = req.query.escrowStatus;
         }
+        if (req.query.skills) {
+            const skillArray = req.query.skills.split(',').map(s => s.trim()).filter(s => s !== '');
+            if (skillArray.length > 0) {
+                // Use $in to find jobs that require ANY of the specified skills
+                // Using $all for jobs that require ALL specified skills: queryFilter.requiredSkills = { $all: skillArray };
+                // Using $in for jobs that require ANY specified skills:
+                queryFilter.requiredSkills = { $in: skillArray };
+            }
+        }
+
         const jobs = await Job.find(queryFilter);
         res.json(jobs);
     } catch (error) {
@@ -263,7 +290,8 @@ app.get('/api/jobs/forUser/:address', async (req, res) => {
         const jobs = await Job.find({
             $or: [
                 { client: userAddress },
-                { freelancer: userAddress }
+                { freelancer: userAddress },
+                { "applicants.address": userAddress } // Also include jobs where user is an applicant
             ]
         });
         res.json(jobs);
@@ -307,8 +335,6 @@ app.put('/api/jobs/:id/deposit-confirmed', async (req, res) => {
             {
                 $set: {
                     escrowStatus: 'deposited',
-                    // Optionally, you might want to set main status to 'open' again
-                    // if it was temporarily changed for deposit flow, or keep as is.
                     // For now, it stays 'open' until accepted by freelancer.
                     depositTxHash: req.body.depositTxHash // Store the transaction hash
                 }
@@ -323,95 +349,168 @@ app.put('/api/jobs/:id/deposit-confirmed', async (req, res) => {
 });
 
 
-// NEW: Endpoint for freelancer to accept a job
-app.put('/api/jobs/:id/accept', async (req, res) => {
-    try {
-        const { freelancerAddress } = req.body;
-        const job = await Job.findById(req.params.id);
+// OLD: Endpoint for freelancer to accept a job (REPLACED BY APPLY/APPROVE/ACCEPT-ASSIGNED)
+// app.put('/api/jobs/:id/accept', async (req, res) => {
+//     try {
+//         const { freelancerAddress } = req.body;
+//         const job = await Job.findById(req.params.id);
 
-        if (!job) return res.status(404).json({ error: 'Job not found' });
-        if (job.status !== 'open') return res.status(400).json({ error: 'Job is not open for acceptance.' });
-        if (job.escrowStatus !== 'deposited') return res.status(400).json({ error: 'Job funds not yet deposited by client.' });
+//         if (!job) return res.status(404).json({ error: 'Job not found' });
+//         if (job.status !== 'open') return res.status(400).json({ error: 'Job is not open for acceptance.' });
+//         if (job.escrowStatus !== 'deposited') return res.status(400).json({ error: 'Job funds not yet deposited by client.' });
 
-        const updatedJob = await Job.findByIdAndUpdate(
-            req.params.id,
-            {
-                $set: {
-                    freelancer: freelancerAddress.toLowerCase(),
-                    status: 'pending-client-approval' // Client needs to approve freelancer
-                }
-            },
-            { new: true, runValidators: true }
-        );
-        res.json(updatedJob);
-    } catch (error) {
-        console.error('Error accepting job:', error);
-        res.status(400).json({ error: error.message });
+//         const updatedJob = await Job.findByIdAndUpdate(
+//             req.params.id,
+//             {
+//                 $set: {
+//                     freelancer: freelancerAddress.toLowerCase(),
+//                     status: 'pending-client-approval' // Client needs to approve freelancer
+//                 }
+//             },
+//             { new: true, runValidators: true }
+//         );
+//         res.json(updatedJob);
+//     } catch (error) {
+//         console.error('Error accepting job:', error);
+//         res.status(400).json({ error: error.message });
+//     }
+// });
+
+// NEW: POST /api/jobs/:id/apply - Freelancer applies for a job
+app.post('/api/jobs/:id/apply', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { applicantAddress } = req.body;
+
+    if (!applicantAddress || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid job ID or applicant address.' });
     }
+
+    const job = await Job.findById(id);
+    if (!job) {
+      return res.status(404).json({ message: 'Job not found.' });
+    }
+    if (job.status !== 'open' || job.escrowStatus !== 'deposited') {
+      return res.status(400).json({ message: 'Job is not open for applications or not funded.' });
+    }
+    if (job.applicants.some(app => app.address.toLowerCase() === applicantAddress.toLowerCase())) {
+      return res.status(409).json({ message: 'You have already applied for this job.' });
+    }
+
+    job.applicants.push({ address: applicantAddress.toLowerCase() }); // Store address in lowercase
+    await job.save();
+    res.status(200).json({ message: 'Application submitted successfully.', job });
+  } catch (error) {
+    console.error('Error applying for job:', error);
+    res.status(500).json({ message: error.message });
+  }
 });
 
-// NEW: Endpoint for client to approve a freelancer
-app.put('/api/jobs/:id/approve-freelancer', async (req, res) => {
-    try {
-        const { clientAddress } = req.body;
-        const job = await Job.findById(req.params.id);
+// NEW: PUT /api/jobs/:id/approve-applicant - Client approves an applicant
+app.put('/api/jobs/:id/approve-applicant', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { clientAddress, freelancerAddress } = req.body;
 
-        if (!job) return res.status(404).json({ error: 'Job not found' });
-        if (job.client.toLowerCase() !== clientAddress.toLowerCase()) {
-            return res.status(403).json({ error: 'Unauthorized: Only the client can approve this freelancer.' });
-        }
-        if (job.status !== 'pending-client-approval') {
-            return res.status(400).json({ error: 'Job is not in pending approval state.' });
-        }
-
-        const updatedJob = await Job.findByIdAndUpdate(
-            req.params.id,
-            {
-                $set: {
-                    clientApprovedFreelancer: true,
-                    status: 'in-progress' // Job now officially in progress
-                }
-            },
-            { new: true, runValidators: true }
-        );
-        res.json(updatedJob);
-    } catch (error) {
-        console.error('Error approving freelancer:', error);
-        res.status(400).json({ error: error.message });
+    if (!clientAddress || !freelancerAddress || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid job ID, client address, or freelancer address.' });
     }
+
+    const job = await Job.findById(id);
+    if (!job) {
+      return res.status(404).json({ message: 'Job not found.' });
+    }
+    if (job.client.toLowerCase() !== clientAddress.toLowerCase()) {
+      return res.status(403).json({ message: 'Unauthorized: Only the client can approve applicants for this job.' });
+    }
+    // Job must be open and funded for client to approve an applicant
+    if (job.status !== 'open' || job.escrowStatus !== 'deposited') {
+        return res.status(400).json({ message: 'Job is not open for applicant approval or not funded.' });
+    }
+    if (!job.applicants.some(app => app.address.toLowerCase() === freelancerAddress.toLowerCase())) {
+      return res.status(404).json({ message: 'Applicant not found for this job.' });
+    }
+    if (job.freelancer) { // If a freelancer is already assigned, prevent approving another
+        return res.status(400).json({ message: 'A freelancer is already assigned to this job. Reject them first if you wish to approve another.' });
+    }
+
+
+    job.freelancer = freelancerAddress.toLowerCase(); // Assign freelancer
+    job.status = 'pending-client-approval'; // Freelancer needs to accept this assignment
+    // Remove approved freelancer from applicants list
+    job.applicants = job.applicants.filter(app => app.address.toLowerCase() !== freelancerAddress.toLowerCase());
+    await job.save();
+    res.status(200).json({ message: 'Applicant approved successfully.', job });
+  } catch (error) {
+    console.error('Error approving applicant:', error);
+    res.status(500).json({ message: error.message });
+  }
 });
 
-// NEW: Endpoint for client to reject a freelancer
-app.put('/api/jobs/:id/reject-freelancer', async (req, res) => {
-    try {
-        const { clientAddress } = req.body;
-        const job = await Job.findById(req.params.id);
+// NEW: PUT /api/jobs/:id/reject-applicant - Client rejects an applicant
+app.put('/api/jobs/:id/reject-applicant', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { clientAddress, freelancerAddress } = req.body; // freelancerAddress here is the applicant to reject
 
-        if (!job) return res.status(404).json({ error: 'Job not found' });
-        if (job.client.toLowerCase() !== clientAddress.toLowerCase()) {
-            return res.status(403).json({ error: 'Unauthorized: Only the client can reject this freelancer.' });
-        }
-        if (job.status !== 'pending-client-approval') {
-            return res.status(400).json({ error: 'Job is not in pending approval state.' });
-        }
-
-        const updatedJob = await Job.findByIdAndUpdate(
-            req.params.id,
-            {
-                $set: {
-                    freelancer: null, // Unassign freelancer
-                    clientApprovedFreelancer: false,
-                    status: 'open' // Revert to open for other freelancers
-                }
-            },
-            { new: true, runValidators: true }
-        );
-        res.json(updatedJob);
-    } catch (error) {
-        console.error('Error rejecting freelancer:', error);
-        res.status(400).json({ error: error.message });
+    if (!clientAddress || !freelancerAddress || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid job ID, client address, or applicant address.' });
     }
+
+    const job = await Job.findById(id);
+    if (!job) {
+      return res.status(404).json({ message: 'Job not found.' });
+    }
+    if (job.client.toLowerCase() !== clientAddress.toLowerCase()) {
+      return res.status(403).json({ message: 'Unauthorized: Only the client can reject applicants for this job.' });
+    }
+    // Job must be open and funded for client to reject an applicant
+    if (job.status !== 'open' || job.escrowStatus !== 'deposited') {
+        return res.status(400).json({ message: 'Job is not open for applicant rejection or not funded.' });
+    }
+    if (!job.applicants.some(app => app.address.toLowerCase() === freelancerAddress.toLowerCase())) {
+      return res.status(404).json({ message: 'Applicant not found for this job.' });
+    }
+
+    job.applicants = job.applicants.filter(app => app.address.toLowerCase() !== freelancerAddress.toLowerCase());
+    await job.save();
+    res.status(200).json({ message: 'Applicant rejected successfully.', job });
+  } catch (error) {
+    console.error('Error rejecting applicant:', error);
+    res.status(500).json({ message: error.message });
+  }
 });
+
+// NEW: PUT /api/jobs/:id/accept-assigned - Freelancer accepts the job after client approval
+app.put('/api/jobs/:id/accept-assigned', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { freelancerAddress } = req.body;
+
+    if (!freelancerAddress || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid job ID or freelancer address.' });
+    }
+
+    const job = await Job.findById(id);
+    if (!job) {
+      return res.status(404).json({ message: 'Job not found.' });
+    }
+    if (!job.freelancer || job.freelancer.toLowerCase() !== freelancerAddress.toLowerCase()) { // Ensure they are the assigned freelancer
+      return res.status(403).json({ message: 'You are not the assigned freelancer for this job.' });
+    }
+    if (job.status !== 'pending-client-approval') {
+      return res.status(400).json({ message: 'Job is not in pending client approval state.' });
+    }
+
+    job.status = 'in-progress';
+    await job.save();
+    res.status(200).json({ message: 'Job successfully accepted by assigned freelancer.', job });
+  } catch (error) {
+    console.error('Error accepting assigned job:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
 
 // NEW: Endpoint for freelancer to mark job as completed
 app.put('/api/jobs/:id/mark-completed', async (req, res) => {
@@ -557,6 +656,59 @@ app.post('/api/withdrawals', async (req, res) => {
         res.status(400).json({ error: error.message });
     }
 });
+
+// NEW: POST /api/jobs/:id/messages - Send a message for a job
+app.post('/api/jobs/:id/messages', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { sender, text } = req.body;
+
+    if (!sender || !text || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid job ID, sender, or message text.' });
+    }
+
+    const job = await Job.findById(id);
+    if (!job) {
+      return res.status(404).json({ message: 'Job not found.' });
+    }
+
+    // Ensure only client or assigned freelancer can send messages
+    const isAuthorized = job.client.toLowerCase() === sender.toLowerCase() ||
+                         (job.freelancer && job.freelancer.toLowerCase() === sender.toLowerCase());
+
+    if (!isAuthorized) {
+      return res.status(403).json({ message: 'Only the client or assigned freelancer can send messages for this job.' });
+    }
+
+    const newMessage = { sender: sender.toLowerCase(), text }; // Store sender in lowercase
+    job.messages.push(newMessage);
+    await job.save();
+    res.status(201).json(newMessage); // Return the newly added message
+  } catch (error) {
+    console.error('Error sending message:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// NEW: GET /api/jobs/:id/messages - Get all messages for a job
+app.get('/api/jobs/:id/messages', async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid job ID.' });
+    }
+
+    const job = await Job.findById(id).select('messages'); // Only fetch messages
+    if (!job) {
+      return res.status(404).json({ message: 'Job not found.' });
+    }
+    res.status(200).json(job.messages);
+  } catch (error) {
+    console.error('Error fetching messages:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
 
 // --- Server Start ---
 const PORT = process.env.PORT || 5000;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Link, useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { createWalletClient, custom, parseUnits, encodeFunctionData, createPublicClient, http, formatUnits } from 'viem';
@@ -673,6 +673,8 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
   const [isProcessingTx, setIsProcessingTx] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [isError, setIsError] = useState(false);
+  const [newMessage, setNewMessage] = useState(''); // For in-app messaging
+  const messagesEndRef = useRef(null); // For scrolling messages into view
 
   const navigate = useNavigate();
 
@@ -708,12 +710,18 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
     fetchJobAndBalance();
   }, [id, account, publicClient]); // Re-fetch if ID, account, or publicClient changes
 
+  // Scroll to bottom of messages when they update
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [job?.messages]); // Scroll when job messages change
+
   // Helper to determine if current user is client or freelancer
   const isClient = account && job && job.client.toLowerCase() === account.toLowerCase();
   const isFreelancer = account && job && job.freelancer && job.freelancer.toLowerCase() === account.toLowerCase();
+  const hasApplied = account && job?.applicants?.some(app => app.address.toLowerCase() === account.toLowerCase());
 
 
-  // --- New: Handle Funding Escrow for a Job ---
+  // --- Handle Funding Escrow for a Job ---
   const handleFundEscrow = async () => {
     if (!account || !walletClient || !publicClient || !job) {
       setStatusMessage('Wallet not connected or job data missing.');
@@ -822,10 +830,10 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
     }
   };
 
-  // --- Handle Freelancer Accepting Job ---
-  const handleAccept = async () => {
+  // --- Handle Freelancer Applying for Job ---
+  const handleApply = async () => {
     if (!account) {
-      setStatusMessage('Please connect your wallet to accept jobs.');
+      setStatusMessage('Please connect your wallet to apply for jobs.');
       setIsError(true);
       return;
     }
@@ -835,7 +843,129 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
       return;
     }
     if (job.status !== 'open' || job.escrowStatus !== 'deposited') {
-      setStatusMessage('Job is not open or not funded for acceptance.');
+      setStatusMessage('Job is not open or not funded for applications.');
+      setIsError(true);
+      return;
+    }
+    if (hasApplied) {
+      setStatusMessage('You have already applied for this job.');
+      setIsError(true);
+      return;
+    }
+
+    setIsProcessingTx(true);
+    setStatusMessage('Applying for job...');
+    setIsError(false);
+    try {
+      await axios.post(`${API_BASE_URL}/api/jobs/${id}/apply`, { applicantAddress: account });
+
+      // Update local job state to reflect application
+      setJob(prevJob => ({
+        ...prevJob,
+        applicants: [...(prevJob.applicants || []), { address: account, timestamp: new Date().toISOString() }]
+      }));
+      setStatusMessage('Application submitted successfully! Client will review.');
+      setIsError(false);
+
+    } catch (error) {
+      console.error('Error applying for job:', error);
+      setStatusMessage(`Error applying for job: ${error.message || 'Please try again.'}`);
+      setIsError(true);
+    } finally {
+      setIsProcessingTx(false);
+    }
+  };
+
+  // --- Handle Client Approving an Applicant ---
+  const handleApproveApplicant = async (applicantAddress) => {
+    if (!account || !job || !isClient) {
+      setStatusMessage('Wallet not connected or you are not the client.');
+      setIsError(true);
+      return;
+    }
+    if (job.status !== 'open' && job.status !== 'pending-client-approval') { // Allow approval if still open or if another freelancer was rejected
+      setStatusMessage('Job is not in a state to approve applicants.');
+      setIsError(true);
+      return;
+    }
+
+    setIsProcessingTx(true);
+    setStatusMessage(`Approving applicant ${truncateAddress(applicantAddress)}...`);
+    setIsError(false);
+    try {
+      await axios.put(`${API_BASE_URL}/api/jobs/${id}/approve-applicant`, {
+        clientAddress: account,
+        freelancerAddress: applicantAddress
+      });
+
+      // Update local job state
+      setJob(prevJob => ({
+        ...prevJob,
+        status: 'pending-client-approval',
+        freelancer: applicantAddress,
+        applicants: prevJob.applicants.filter(app => app.address.toLowerCase() !== applicantAddress.toLowerCase()) // Remove approved from applicants list
+      }));
+      setStatusMessage(`Applicant ${truncateAddress(applicantAddress)} approved! Job is now pending freelancer acceptance.`);
+      setIsError(false);
+
+    } catch (error) {
+      console.error('Error approving applicant:', error);
+      setStatusMessage(`Error approving applicant: ${error.message || 'Please try again.'}`);
+      setIsError(true);
+    } finally {
+      setIsProcessingTx(false);
+    }
+  };
+
+  // --- Handle Client Rejecting an Applicant ---
+  const handleRejectApplicant = async (applicantAddress) => {
+    if (!account || !job || !isClient) {
+      setStatusMessage('Wallet not connected or you are not the client.');
+      setIsError(true);
+      return;
+    }
+    if (job.status !== 'open' && job.status !== 'pending-client-approval') {
+      setStatusMessage('Job is not in a state to reject applicants.');
+      setIsError(true);
+      return;
+    }
+
+    setIsProcessingTx(true);
+    setStatusMessage(`Rejecting applicant ${truncateAddress(applicantAddress)}...`);
+    setIsError(false);
+    try {
+      await axios.put(`${API_BASE_URL}/api/jobs/${id}/reject-applicant`, {
+        clientAddress: account,
+        freelancerAddress: applicantAddress // This is the applicant to remove
+      });
+
+      // Update local job state
+      setJob(prevJob => ({
+        ...prevJob,
+        applicants: prevJob.applicants.filter(app => app.address.toLowerCase() !== applicantAddress.toLowerCase())
+      }));
+      setStatusMessage(`Applicant ${truncateAddress(applicantAddress)} rejected.`);
+      setIsError(false);
+
+    } catch (error) {
+      console.error('Error rejecting applicant:', error);
+      setStatusMessage(`Error rejecting applicant: ${error.message || 'Please try again.'}`);
+      setIsError(true);
+    } finally {
+      setIsProcessingTx(false);
+    }
+  };
+
+
+  // --- Handle Freelancer Accepting Job (after client approval) ---
+  const handleAcceptAssignedJob = async () => {
+    if (!account || !job || !isFreelancer) {
+      setStatusMessage('Wallet not connected or you are not the assigned freelancer.');
+      setIsError(true);
+      return;
+    }
+    if (job.status !== 'pending-client-approval' || job.freelancer.toLowerCase() !== account.toLowerCase()) {
+      setStatusMessage('Job is not pending your acceptance or you are not the assigned freelancer.');
       setIsError(true);
       return;
     }
@@ -863,15 +993,13 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
     // --- End Chain Mismatch Check ---
 
     setIsProcessingTx(true);
-    setStatusMessage('Accepting job...');
+    setStatusMessage('Accepting assigned job...');
     setIsError(false);
     try {
-      // Update backend: set freelancer and change status to pending-client-approval
-      await axios.put(`${API_BASE_URL}/api/jobs/${id}/accept`, { freelancerAddress: account });
+      await axios.put(`${API_BASE_URL}/api/jobs/${id}/accept-assigned`, { freelancerAddress: account });
 
-      // Update local job state
-      setJob(prevJob => ({ ...prevJob, status: 'pending-client-approval', freelancer: account }));
-      setStatusMessage('Job accepted! Waiting for client approval.');
+      setJob(prevJob => ({ ...prevJob, status: 'in-progress' }));
+      setStatusMessage('Job accepted! It is now in progress.');
       setIsError(false);
 
       setTimeout(() => {
@@ -879,129 +1007,14 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
       }, 1500);
 
     } catch (error) {
-      console.error('Error accepting job:', error);
-      setStatusMessage(`Error accepting job: ${error.message || 'Please try again.'}`);
+      console.error('Error accepting assigned job:', error);
+      setStatusMessage(`Error accepting assigned job: ${error.message || 'Please try again.'}`);
       setIsError(true);
     } finally {
       setIsProcessingTx(false);
     }
   };
 
-  // --- Handle Client Approving Freelancer ---
-  const handleApproveFreelancer = async () => {
-    if (!account || !job || !isClient) {
-      setStatusMessage('Wallet not connected or you are not the client.');
-      setIsError(true);
-      return;
-    }
-    if (job.status !== 'pending-client-approval') {
-      setStatusMessage('Job is not in pending approval state.');
-      setIsError(true);
-      return;
-    }
-
-    // --- Chain Mismatch Check for Approval ---
-    try {
-      const currentChainId = await walletClient.getChainId();
-      if (currentChainId !== liskSepolia.id) {
-        setStatusMessage(`Wallet is on the wrong network. Please switch to ${liskSepolia.name} (Chain ID: ${liskSepolia.id}). Attempting to switch...`);
-        try {
-          await walletClient.switchChain({ id: liskSepolia.id });
-          setStatusMessage(`Successfully prompted to switch to ${liskSepolia.name}. Please confirm in your wallet and try approving the freelancer again.`);
-          return; // Exit and let user retry after chain switch
-        } catch (switchError) {
-          console.error("Error switching chain:", switchError);
-          setStatusMessage(`Failed to switch to ${liskSepolia.name}. Please switch manually in your wallet. Error: ${switchError.message}`);
-          return;
-        }
-      }
-    } catch (chainCheckError) {
-      console.error("Error checking current chain ID:", chainCheckError);
-      setStatusMessage(`Could not verify wallet chain. Please ensure your wallet is connected and on ${liskSepolia.name}. Error: ${chainCheckError.message}`);
-      return;
-    }
-    // --- End Chain Mismatch Check ---
-
-    setIsProcessingTx(true);
-    setStatusMessage('Approving freelancer...');
-    setIsError(false);
-    try {
-      await axios.put(`${API_BASE_URL}/api/jobs/${id}/approve-freelancer`, { clientAddress: account });
-
-      setJob(prevJob => ({ ...prevJob, status: 'in-progress', clientApprovedFreelancer: true }));
-      setStatusMessage('Freelancer approved! Job is now in progress.');
-      setIsError(false);
-
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 1500);
-
-    } catch (error) {
-      console.error('Error approving freelancer:', error);
-      setStatusMessage(`Error approving freelancer: ${error.message || 'Please try again.'}`);
-      setIsError(true);
-    } finally {
-      setIsProcessingTx(false);
-    }
-  };
-
-  // --- Handle Client Rejecting Freelancer ---
-  const handleRejectFreelancer = async () => {
-    if (!account || !job || !isClient) {
-      setStatusMessage('Wallet not connected or you are not the client.');
-      setIsError(true);
-      return;
-    }
-    if (job.status !== 'pending-client-approval') {
-      setStatusMessage('Job is not in pending approval state.');
-      setIsError(true);
-      return;
-    }
-
-    // --- Chain Mismatch Check for Rejection ---
-    try {
-      const currentChainId = await walletClient.getChainId();
-      if (currentChainId !== liskSepolia.id) {
-        setStatusMessage(`Wallet is on the wrong network. Please switch to ${liskSepolia.name} (Chain ID: ${liskSepolia.id}). Attempting to switch...`);
-        try {
-          await walletClient.switchChain({ id: liskSepolia.id });
-          setStatusMessage(`Successfully prompted to switch to ${liskSepolia.name}. Please confirm in your wallet and try rejecting the freelancer again.`);
-          return; // Exit and let user retry after chain switch
-        } catch (switchError) {
-          console.error("Error switching chain:", switchError);
-          setStatusMessage(`Failed to switch to ${liskSepolia.name}. Please switch manually in your wallet. Error: ${switchError.message}`);
-          return;
-        }
-      }
-    } catch (chainCheckError) {
-      console.error("Error checking current chain ID:", chainCheckError);
-      setStatusMessage(`Could not verify wallet chain. Please ensure your wallet is connected and on ${liskSepolia.name}. Error: ${chainCheckError.message}`);
-      return;
-    }
-    // --- End Chain Mismatch Check ---
-
-    setIsProcessingTx(true);
-    setStatusMessage('Rejecting freelancer...');
-    setIsError(false);
-    try {
-      await axios.put(`${API_BASE_URL}/api/jobs/${id}/reject-freelancer`, { clientAddress: account });
-
-      setJob(prevJob => ({ ...prevJob, status: 'open', freelancer: null, clientApprovedFreelancer: false }));
-      setStatusMessage('Freelancer rejected. Job is now open again.');
-      setIsError(false);
-
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 1500);
-
-    } catch (error) {
-      console.error('Error rejecting freelancer:', error);
-      setStatusMessage(`Error rejecting freelancer: ${error.message || 'Please try again.'}`);
-      setIsError(true);
-    } finally {
-      setIsProcessingTx(false);
-    }
-  };
 
   // --- Handle Freelancer Marking Job as Completed ---
   const handleMarkCompleted = async () => {
@@ -1225,6 +1238,48 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
     }
   };
 
+  // --- Handle Sending a Message ---
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!account) {
+      setStatusMessage('Please connect your wallet to send messages.');
+      setIsError(true);
+      return;
+    }
+    if (!newMessage.trim()) {
+      setStatusMessage('Message cannot be empty.');
+      setIsError(true);
+      return;
+    }
+    if (!job) {
+      setStatusMessage('Job data not available for messaging.');
+      setIsError(true);
+      return;
+    }
+
+    setStatusMessage('Sending message...');
+    setIsError(false);
+    try {
+      const response = await axios.post(`${API_BASE_URL}/api/jobs/${id}/messages`, {
+        sender: account,
+        text: newMessage.trim(),
+      });
+
+      // Update local job state with the new message
+      setJob(prevJob => ({
+        ...prevJob,
+        messages: [...(prevJob.messages || []), response.data] // Assuming backend returns the saved message
+      }));
+      setNewMessage(''); // Clear input field
+      setStatusMessage('Message sent!');
+
+    } catch (error) {
+      console.error('Error sending message:', error);
+      setStatusMessage(`Error sending message: ${error.message || 'Please try again.'}`);
+      setIsError(true);
+    }
+  };
+
 
   if (isLoading) {
     return (
@@ -1260,8 +1315,9 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
 
   // Determine button states based on job status and user role
   const showFundEscrowButton = isClient && job.escrowStatus === 'pending-deposit';
-  const showAcceptJobButton = !isClient && !job.freelancer && job.status === 'open' && job.escrowStatus === 'deposited';
-  const showApproveRejectButtons = isClient && job.status === 'pending-client-approval';
+  const showApplyButton = !isClient && !job.freelancer && job.status === 'open' && job.escrowStatus === 'deposited' && !hasApplied;
+  const showAcceptAssignedJobButton = isFreelancer && job.status === 'pending-client-approval' && job.freelancer.toLowerCase() === account.toLowerCase();
+  const showClientApplicantActions = isClient && job.status === 'open' && job.escrowStatus === 'deposited' && job.applicants && job.applicants.length > 0 && !job.freelancer; // Only show if job is open, funded, has applicants, and no freelancer assigned
   const showMarkCompletedButton = isFreelancer && job.status === 'in-progress';
   const showReleaseFundsButton = isClient && job.status === 'completed' && job.escrowStatus === 'active'; // Client releases after freelancer marks completed
   const showRefundFundsButton = isClient && (job.escrowStatus === 'active' || job.escrowStatus === 'disputed'); // Client can refund if active or disputed
@@ -1280,8 +1336,8 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
       <div className="space-y-3 text-gray-700 mb-6">
         <p className="text-lg">Description: {job.description}</p>
         <p className="text-lg">Amount: <span className="font-semibold text-accent-green">{job.amount} USDC</span></p>
-        <p className="text-lg">Client: <span className="font-mono text-secondary-purple">{job.client ? job.client.substring(0, 6) + '...' + job.client.substring(job.client.length - 4) : 'N/A'}</span></p>
-        <p className="text-lg">Freelancer: <span className="font-mono text-secondary-purple">{job.freelancer ? job.freelancer.substring(0, 6) + '...' + job.freelancer.substring(job.freelancer.length - 4) : 'Not assigned'}</span></p>
+        <p className="text-lg">Client: <span className="font-mono text-secondary-purple">{job.client ? truncateAddress(job.client) : 'N/A'}</span></p>
+        <p className="text-lg">Freelancer: <span className="font-mono text-secondary-purple">{job.freelancer ? truncateAddress(job.freelancer) : 'Not assigned'}</span></p>
         <p className="text-lg">Current Status: <span className={`font-semibold ${job.status === 'open' ? 'text-blue-600' : job.status === 'pending-client-approval' ? 'text-orange-500' : job.status === 'in-progress' ? 'text-yellow-600' : job.status === 'completed' ? 'text-green-600' : job.status === 'disputed' ? 'text-red-600' : 'text-gray-600'}`}>{job.status}</span></p>
         <p className="text-lg">Escrow Status: <span className={`font-semibold ${job.escrowStatus === 'pending-deposit' ? 'text-red-500' : job.escrowStatus === 'deposited' || job.escrowStatus === 'active' ? 'text-green-500' : 'text-gray-600'}`}>{job.escrowStatus}</span></p>
         {isClient && <p className="text-lg">Your USDC Balance: <span className="font-semibold text-primary-blue">{clientUsdcBalance} USDC</span></p>}
@@ -1299,35 +1355,26 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
           </button>
         )}
 
-        {/* Freelancer: Accept Job Button */}
-        {showAcceptJobButton && (
+        {/* Freelancer: Apply for Job Button */}
+        {showApplyButton && (
           <button
             className="px-6 py-3 bg-secondary-purple text-white font-semibold rounded-md hover:bg-purple-700 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={handleAccept}
+            onClick={handleApply}
             disabled={isProcessingTx || !account}
           >
-            {isProcessingTx ? 'Accepting...' : 'Accept Job'}
+            {isProcessingTx ? 'Applying...' : 'Apply for Job'}
           </button>
         )}
 
-        {/* Client: Approve/Reject Freelancer Buttons */}
-        {showApproveRejectButtons && (
-          <>
-            <button
-              className="px-6 py-3 bg-accent-green text-white font-semibold rounded-md hover:bg-green-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-              onClick={handleApproveFreelancer}
-              disabled={isProcessingTx || !account}
-            >
-              {isProcessingTx ? 'Approving...' : 'Approve Freelancer'}
-            </button>
-            <button
-              className="px-6 py-3 bg-red-600 text-white font-semibold rounded-md hover:bg-red-700 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-              onClick={handleRejectFreelancer}
-              disabled={isProcessingTx || !account}
-            >
-              {isProcessingTx ? 'Rejecting...' : 'Reject Freelancer'}
-            </button>
-          </>
+        {/* Freelancer: Accept Assigned Job Button */}
+        {showAcceptAssignedJobButton && (
+          <button
+            className="px-6 py-3 bg-accent-green text-white font-semibold rounded-md hover:bg-green-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleAcceptAssignedJob}
+            disabled={isProcessingTx || !account}
+          >
+            {isProcessingTx ? 'Accept Assigned Job' : 'Accept Assigned Job'}
+          </button>
         )}
 
         {/* Freelancer: Mark as Completed Button */}
@@ -1363,6 +1410,84 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
           </button>
         )}
       </div>
+
+      {/* Client: Applicant List and Actions */}
+      {showClientApplicantActions && (
+        <div className="mt-8 p-4 bg-blue-50 rounded-lg shadow-inner">
+          <h3 className="text-xl font-semibold text-primary-blue mb-4">Job Applicants ({job.applicants.length})</h3>
+          <ul className="space-y-3">
+            {job.applicants.map((applicant, index) => (
+              <li key={index} className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-3 rounded-md shadow-sm">
+                <div className="mb-2 sm:mb-0">
+                  <p className="font-mono text-secondary-purple text-base">{truncateAddress(applicant.address)}</p>
+                  <p className="text-sm text-gray-600">Applied: {new Date(applicant.timestamp).toLocaleString()}</p>
+                </div>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => handleApproveApplicant(applicant.address)}
+                    className="px-4 py-2 bg-accent-green text-white rounded-md hover:bg-green-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                    disabled={isProcessingTx}
+                  >
+                    Approve
+                  </button>
+                  <button
+                    onClick={() => handleRejectApplicant(applicant.address)}
+                    className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                    disabled={isProcessingTx}
+                  >
+                    Reject
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* In-App Messaging Section */}
+      {(isClient || isFreelancer) && job.status !== 'open' && ( // Only show messaging if job is assigned/in progress/completed
+        <div className="mt-8 p-4 bg-gray-50 rounded-lg shadow-inner">
+          <h3 className="text-xl font-semibold text-primary-blue mb-4">Job Messages</h3>
+          <div className="h-64 overflow-y-auto border border-gray-200 rounded-md p-3 mb-4 bg-white">
+            {job.messages && job.messages.length > 0 ? (
+              job.messages.map((message, index) => (
+                <div
+                  key={index}
+                  className={`mb-2 p-2 rounded-lg max-w-[80%] ${
+                    message.sender.toLowerCase() === account.toLowerCase()
+                      ? 'bg-primary-blue text-white ml-auto'
+                      : 'bg-gray-200 text-gray-800 mr-auto'
+                  }`}
+                >
+                  <p className="font-semibold text-sm">{truncateAddress(message.sender)}</p>
+                  <p className="text-base break-words">{message.text}</p>
+                  <p className="text-xs text-right opacity-80 mt-1">{new Date(message.timestamp).toLocaleString()}</p>
+                </div>
+              ))
+            ) : (
+              <p className="text-gray-500 text-center py-4">No messages yet. Start the conversation!</p>
+            )}
+            <div ref={messagesEndRef} /> {/* Scroll target */}
+          </div>
+          <form onSubmit={handleSendMessage} className="flex space-x-2">
+            <input
+              type="text"
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              placeholder="Type your message here..."
+              className="flex-1 p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
+              disabled={isProcessingTx || !account}
+            />
+            <button
+              type="submit"
+              className="px-6 py-3 bg-secondary-purple text-white font-semibold rounded-md hover:bg-purple-700 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isProcessingTx || !account || !newMessage.trim()}
+            >
+              Send
+            </button>
+          </form>
+        </div>
+      )}
 
       <button
         className="mt-8 px-6 py-3 bg-gray-600 text-white font-semibold rounded-md hover:bg-gray-700 transition duration-300"
@@ -1508,6 +1633,7 @@ const BrowseJobs = () => {
   const [jobs, setJobs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
+  const [filterSkills, setFilterSkills] = useState(''); // New state for skill filtering
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -1516,7 +1642,8 @@ const BrowseJobs = () => {
       setErrorMessage('');
       try {
         // Fetch jobs that are 'open' and 'deposited'
-        const response = await axios.get(`${API_BASE_URL}/api/jobs?status=open&escrowStatus=deposited`);
+        // Pass filterSkills as a query parameter
+        const response = await axios.get(`${API_BASE_URL}/api/jobs?status=open&escrowStatus=deposited&skills=${filterSkills}`);
         setJobs(response.data);
       } catch (error) {
         console.error('Error fetching jobs:', error);
@@ -1526,7 +1653,7 @@ const BrowseJobs = () => {
       }
     };
     fetchJobs();
-  }, []);
+  }, [filterSkills]); // Re-fetch jobs when filterSkills changes
 
   return (
     <div className="max-w-6xl mx-auto p-4 bg-white shadow-lg rounded-lg my-8">
@@ -1537,6 +1664,19 @@ const BrowseJobs = () => {
           {errorMessage}
         </div>
       )}
+
+      {/* Skill Filtering Input */}
+      <div className="mb-6">
+        <label htmlFor="filterSkills" className="block text-lg font-medium text-gray-800 mb-2">Filter by Skills (comma-separated):</label>
+        <input
+          type="text"
+          id="filterSkills"
+          value={filterSkills}
+          onChange={(e) => setFilterSkills(e.target.value)}
+          placeholder="e.g., React, Node.js, Solidity"
+          className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
+        />
+      </div>
 
       {isLoading ? (
         <div className="flex items-center justify-center py-8 text-primary-blue">
@@ -1555,7 +1695,10 @@ const BrowseJobs = () => {
                   <div className="mb-2 sm:mb-0">
                     <p className="text-lg font-semibold text-gray-800">{job.title} - <span className="text-accent-green">{job.amount} USDC</span></p>
                     <p className="text-sm text-gray-600 truncate max-w-sm">{job.description}</p>
-                    <p className="text-xs text-gray-500">Client: {job.client ? job.client.substring(0, 6) + '...' + job.client.substring(job.client.length - 4) : 'N/A'} | Status: {job.status} | Escrow: {job.escrowStatus}</p>
+                    <p className="text-xs text-gray-500">Client: {job.client ? truncateAddress(job.client) : 'N/A'} | Status: {job.status} | Escrow: {job.escrowStatus}</p>
+                    {job.requiredSkills && job.requiredSkills.length > 0 && (
+                      <p className="text-xs text-gray-500 mt-1">Required Skills: {job.requiredSkills.join(', ')}</p>
+                    )}
                   </div>
                   <Link
                     className="px-4 py-2 bg-primary-blue text-white rounded-md hover:bg-blue-700 transition duration-300 flex-shrink-0"
@@ -2163,7 +2306,7 @@ function App() {
                 <li><a href="/WHITEPAPER.pdf" target="_blank" rel="noopener noreferrer" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Whitepaper</a></li>
                 <li><a href="#contact" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Contact</a></li>
                 {/* Wallet Connect Button for Mobile Menu */}
-                <li className="w-full px-4 pt-4"> {/* Added px-4 for padding and w-full */}
+                <li className="w-full px-4 pt-4">
                   <button
                     onClick={connectWallet}
                     className="w-full px-6 py-3 bg-accent-green text-white font-semibold rounded-md shadow-lg hover:bg-green-600 transition duration-300 transform hover:scale-105"
