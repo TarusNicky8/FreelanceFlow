@@ -25,7 +25,7 @@ module.exports = {
     ],
   },
   networks: {
-    liskTestnet: {
+    liskSepolia: {
       url: "https://4202.rpc.thirdweb.com",
       chainId: 4202,
       accounts: [process.env.PRIVATE_KEY],

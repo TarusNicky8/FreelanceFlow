@@ -1,17 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link, useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
-import { createWalletClient, custom, parseUnits, encodeFunctionData, createPublicClient, http } from 'viem';
-// import { getDataSuffix, submitReferral } from '@divvi/referral-sdk'; // Commented out
-import logo from './App icon.svg'; 
+import { createWalletClient, custom, parseUnits, encodeFunctionData, createPublicClient, http, formatUnits } from 'viem';
+import { isAddress } from 'viem'; // Import isAddress for validation
+import { getAddress } from 'viem'; // Import getAddress for checksumming
+import { useAccount, useNetwork } from 'wagmi'; // If you're using wagmi for wallet connection, this would be helpful. Assuming not for now.
+
+// import { getDataSuffix, submitReferral } from '@divvi/referral-sdk'; // Uncomment if Divvi is fully integrated
+import logo from './App icon.svg';
 
 const liskSepolia = {
   id: 4202,
-  name: 'Lisk Sepolia Testnet', 
+  name: 'Lisk Sepolia Testnet',
   network: 'lisk-sepolia',
   nativeCurrency: {
     decimals: 18,
-    name: 'ETH', 
+    name: 'ETH',
     symbol: 'ETH',
   },
   rpcUrls: {
@@ -24,6 +28,9 @@ const liskSepolia = {
   testnet: true,
 };
 
+// --- ABIs for USDC and Escrow Contracts ---
+
+// USDC ABI (only approve and balanceOf needed for this app)
 const usdcAbi = [
   {
     "inputs": [
@@ -34,41 +41,96 @@ const usdcAbi = [
     "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
     "stateMutability": "nonpayable",
     "type": "function"
-  }
-];
-
-const escrowAbi = [
+  },
   {
     "inputs": [
-      { "internalType": "address", "name": "freelancer", "type": "address" },
-      { "internalType": "uint256", "name": "amount", "type": "uint256" }
+      { "internalType": "address", "name": "account", "type": "address" }
     ],
-    "name": "deposit",
-    "outputs": [],
-    "stateMutability": "nonpayable",
+    "name": "balanceOf",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "stateMutability": "view",
     "type": "function"
   }
 ];
 
-const escrowAbiForRelease = [ 
+// Escrow Contract ABI (updated for job-specific functions)
+const escrowAbi = [
+  // General Deposit
   {
     "inputs": [
-      { "internalType": "address", "name": "freelancer", "type": "address" },
-      { "internalType": "uint256", "name": "amount", "type": "uint256" },
+      { "internalType": "uint256", "name": "amount", "type": "uint256" }
     ],
-    "name": "release",
+    "name": "depositGeneral",
     "outputs": [],
     "stateMutability": "nonpayable",
-    "type": "function",
+    "type": "function"
   },
+  // Job-specific Deposit
+  {
+    "inputs": [
+      { "internalType": "string", "name": "_jobId", "type": "string" },
+      { "internalType": "address", "name": "_client", "type": "address" },
+      { "internalType": "address", "name": "_freelancer", "type": "address" },
+      { "internalType": "uint256", "name": "_amount", "type": "uint256" }
+    ],
+    "name": "depositJob",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  // Job-specific Release
+  {
+    "inputs": [
+      { "internalType": "string", "name": "_jobId", "type": "string" }
+    ],
+    "name": "releaseJob",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  // Job-specific Refund
+  {
+    "inputs": [
+      { "internalType": "string", "name": "_jobId", "type": "string" }
+    ],
+    "name": "refundJob",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  // Get Job Escrow Details (view function)
+  {
+    "inputs": [
+      { "internalType": "string", "name": "_jobId", "type": "string" }
+    ],
+    "name": "getJobEscrowDetails",
+    "outputs": [
+      { "internalType": "address", "name": "client", "type": "address" },
+      { "internalType": "address", "name": "freelancer", "type": "address" },
+      { "internalType": "uint256", "name": "amount", "type": "uint256" },
+      { "internalType": "uint8", "name": "status", "type": "uint8" } // EscrowStatus enum is uint8
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  // General Deposits mapping (for Dashboard total)
+  {
+    "inputs": [{ "internalType": "address", "name": "", "type": "address" }],
+    "name": "generalDeposits",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "stateMutability": "view",
+    "type": "function",
+  }
 ];
 
-const usdcContractAddress = '0xFD2A349A744616C6077978A3D463C82Ac00A37c1'; 
-const escrowContractAddress = '0x83C9919341aa0705b6b0d79420EfAAE27B53ADCf';
-const defaultFreelancerAddress = '0x0000000000000000000000000000000000000001'; 
+// Contract Addresses (UPDATED AS PER YOUR DEPLOYMENT LOG)
+const usdcContractAddress = '0x0a216126b423E3bdf6eAcf8901e46a13915Fc153';
+const escrowContractAddress = '0xB239CF4B51D8F9761176c7Cf4AA54D172a74B672';
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'; 
+// Backend API Base URL (from environment variable, or fallback to localhost for local dev)
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
 
+// --- Icon Components ---
 const UsdcIcon = () => (
   <img src={process.env.PUBLIC_URL + '/icons/usdc.png'} alt="USDC Icon" className="h-14 w-14 text-blue-600 mb-4 mx-auto" />
 );
@@ -79,12 +141,89 @@ const LiskIcon = () => (
   <img src={process.env.PUBLIC_URL + '/icons/lisk.webp'} alt="Lisk Icon" className="h-14 w-14 text-lisk-blue mb-4 mx-auto" />
 );
 
-const DivviIntegration = ({ account, walletClient, publicClient, status, setStatus, amountToDeposit, setAmountToDeposit, connectWallet, handleDepositUSDC }) => {
+// --- DivviIntegration Component (Now uses depositGeneral) ---
+const DivviIntegration = ({ account, walletClient, publicClient, status, setStatus, amountToDeposit, setAmountToDeposit }) => {
+  const handleDepositUSDCGeneral = async () => {
+    if (!account || !walletClient || !publicClient) {
+      setStatus('Please connect your wallet first.');
+      return;
+    }
+    if (isNaN(parseFloat(amountToDeposit)) || parseFloat(amountToDeposit) <= 0) {
+      setStatus('Please enter a valid amount to deposit.');
+      return;
+    }
+
+    setStatus('Initiating general USDC deposit with Divvi tracking...');
+    try {
+      const amountInSmallestUnit = parseUnits(amountToDeposit, 6); // USDC has 6 decimals
+
+      // --- Divvi SDK Integration (uncomment and install @divvi/referral-sdk to enable) ---
+      // const divviConsumerAddress = '0x58ccf714F804a10cd9FE22fCcc044d77Ea34e5b1';
+      // const divviProviderAddresses = ['0x0423189886d7966f0dd7e7d256898daeee625dca','0xc95876688026be9d6fa7a7c33328bd013effa2bb','0x7beb0e14f8d2e6f6678cc30d867787b384b19e20'];
+      // const dataSuffix = getDataSuffix({
+      //   consumer: divviConsumerAddress,
+      //   providers: divviProviderAddresses,
+      // });
+      // -----------------------------------------------------------------------------------
+
+      // 1. Approve USDC for the Escrow contract
+      const approveCallData = encodeFunctionData({
+        abi: usdcAbi,
+        functionName: 'approve',
+        args: [escrowContractAddress, amountInSmallestUnit],
+      });
+
+      setStatus('Approving USDC for Escrow contract...');
+      const approveTxHash = await walletClient.sendTransaction({
+        account,
+        to: usdcContractAddress,
+        data: approveCallData,
+      });
+
+      setStatus(`Approval transaction sent! Hash: ${approveTxHash}. Waiting for confirmation...`);
+      await publicClient.waitForTransactionReceipt({ hash: approveTxHash });
+      setStatus('USDC Approved. Now initiating general deposit...');
+
+      // 2. Deposit USDC into the Escrow contract's general deposits
+      const depositCallData = encodeFunctionData({
+        abi: escrowAbi,
+        functionName: 'depositGeneral', // Call the general deposit function
+        args: [amountInSmallestUnit],
+      });
+
+      const depositTxHash = await walletClient.sendTransaction({
+        account,
+        to: escrowContractAddress,
+        data: depositCallData, // + dataSuffix if Divvi is enabled
+        value: 0n,
+      });
+
+      setStatus(`Deposit transaction sent! Hash: ${depositTxHash}. Waiting for confirmation...`);
+      await publicClient.waitForTransactionReceipt({ hash: depositTxHash });
+      setStatus('General deposit confirmed. Now reporting referral to Divvi...');
+
+      // --- Divvi SDK Integration (uncomment to enable) ---
+      // const chainId = await walletClient.getChainId();
+      // await submitReferral({
+      //   txHash: depositTxHash,
+      //   chainId,
+      // });
+      // ---------------------------------------------------
+
+      setStatus(`General deposit successful and Divvi referral (mocked) completed! Tx Hash: ${depositTxHash}`);
+      console.log('Divvi referral (mocked) completed!');
+
+    } catch (error) {
+      console.error("Error during general USDC deposit or Divvi integration:", error);
+      setStatus(`Transaction failed or Divvi submission error: ${error.message}`);
+    }
+  };
+
   return (
     <section className="max-w-3xl mx-auto p-6 bg-white shadow-lg rounded-lg my-8 text-center">
-      <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">Divvi Integration Demo: Deposit USDC</h2>
+      <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">Divvi Integration Demo: General Deposit USDC</h2>
       <p className="text-lg text-gray-700 mb-6">
-        This section demonstrates the secure USDC deposit process, enhanced with Divvi tracking for transparent on-chain activity.
+        This section demonstrates the secure USDC deposit process for general funds, enhanced with Divvi tracking for transparent on-chain activity.
       </p>
       <div className="mb-4">
         <label htmlFor="depositAmount" className="block text-lg font-medium text-gray-800 mb-2">Amount to Deposit (USDC):</label>
@@ -97,14 +236,13 @@ const DivviIntegration = ({ account, walletClient, publicClient, status, setStat
           className="w-full max-w-xs p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200 text-gray-800"
         />
       </div>
-      <p className={`mb-4 text-center text-lg ${status.includes('Error') ? 'text-red-600' : 'text-green-600'}`}>{status}</p>
-      {/* The connect wallet button is now in the header, so we remove it from here */}
+      <p className={`mb-4 text-center text-lg ${status.includes('Error') || status.includes('failed') ? 'text-red-600' : 'text-green-600'}`}>{status}</p>
       {account ? (
         <button
-          onClick={handleDepositUSDC} 
+          onClick={handleDepositUSDCGeneral}
           className="px-8 py-4 bg-secondary-purple text-white font-semibold rounded-full shadow-lg hover:bg-purple-700 transition duration-300 transform hover:scale-105"
         >
-          Deposit USDC to Escrow (with Divvi Tracking)
+          Deposit USDC to Escrow (General Funds)
         </button>
       ) : (
         <p className="text-lg text-gray-600">Connect your wallet in the header to deposit USDC.</p>
@@ -113,10 +251,12 @@ const DivviIntegration = ({ account, walletClient, publicClient, status, setStat
   );
 };
 
+// --- Profile Component ---
 const Profile = ({ account }) => {
-  const [profile, setProfile] = useState({ skills: [], portfolio: [], rating: 0 });
+  const [profile, setProfile] = useState({ skills: [], portfolio: [], rating: 0, role: 'freelancer' }); // Default role
   const [skillsInput, setSkillsInput] = useState('');
   const [portfolioInput, setPortfolioInput] = useState('');
+  const [selectedRole, setSelectedRole] = useState('freelancer'); // State for role selection
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [isError, setIsError] = useState(false);
@@ -135,9 +275,11 @@ const Profile = ({ account }) => {
       setIsError(false);
       try {
         const response = await axios.get(`${API_BASE_URL}/api/users/${account}`);
-        setProfile(response.data);
-        setSkillsInput(response.data.skills?.join(', ') || '');
-        setPortfolioInput(response.data.portfolio?.join(', ') || '');
+        const fetchedProfile = response.data;
+        setProfile(fetchedProfile);
+        setSkillsInput(fetchedProfile.skills?.join(', ') || '');
+        setPortfolioInput(fetchedProfile.portfolio?.join(', ') || '');
+        setSelectedRole(fetchedProfile.role || 'freelancer'); // Set selected role from fetched data
         setStatusMessage('Profile loaded successfully.');
       } catch (error) {
         console.error('Error fetching profile:', error);
@@ -168,15 +310,16 @@ const Profile = ({ account }) => {
       await axios.put(`${API_BASE_URL}/api/users/${account}`, {
         skills: updatedSkills,
         portfolio: updatedPortfolio,
+        role: selectedRole, // Include selected role
       });
 
-      setProfile(prev => ({ ...prev, skills: updatedSkills, portfolio: updatedPortfolio }));
+      setProfile(prev => ({ ...prev, skills: updatedSkills, portfolio: updatedPortfolio, role: selectedRole }));
       setStatusMessage('Profile updated successfully!');
       setIsError(false);
-      
+
       setTimeout(() => {
-        navigate('/dashboard'); // navigate is used here
-      }, 1500); 
+        navigate('/dashboard');
+      }, 1500);
 
     } catch (error) {
       console.error('Error updating profile:', error);
@@ -190,7 +333,7 @@ const Profile = ({ account }) => {
   return (
     <div className="max-w-5xl mx-auto p-4 bg-white shadow-lg rounded-lg my-8">
       <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">Freelancer Profile</h2>
-      
+
       <p className="text-lg text-gray-700 mb-4">
         Wallet: <span className="font-mono text-secondary-purple">{account || 'Not connected'}</span>
       </p>
@@ -213,6 +356,20 @@ const Profile = ({ account }) => {
 
       <form onSubmit={handleSave} className="space-y-6">
         <div>
+          <label htmlFor="role" className="block text-lg font-medium text-gray-800 mb-1">Your Role</label>
+          <select
+            id="role"
+            value={selectedRole}
+            onChange={(e) => setSelectedRole(e.target.value)}
+            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
+            disabled={isLoading || !account}
+          >
+            <option value="freelancer">Freelancer</option>
+            <option value="client">Client</option>
+            <option value="both">Both (Freelancer & Client)</option>
+          </select>
+        </div>
+        <div>
           <label htmlFor="skills" className="block text-lg font-medium text-gray-800 mb-1">Skills (comma-separated)</label>
           <input
             type="text"
@@ -221,7 +378,7 @@ const Profile = ({ account }) => {
             onChange={(e) => setSkillsInput(e.target.value)}
             placeholder="e.g., React, Node.js, Solidity, UI/UX Design"
             className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
-            disabled={isLoading || !account} // Disable if loading or not connected
+            disabled={isLoading || !account}
           />
         </div>
         <div>
@@ -233,20 +390,20 @@ const Profile = ({ account }) => {
             onChange={(e) => setPortfolioInput(e.target.value)}
             placeholder="e.g., github.com/your-project, yourportfolio.com/design"
             className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
-            disabled={isLoading || !account} // Disable if loading or not connected
+            disabled={isLoading || !account}
           />
         </div>
         <div>
           <label className="block text-lg font-medium text-gray-800 mb-1">Rating</label>
           <p className="text-xl font-semibold text-accent-green">
-            {profile.rating !== undefined ? `${profile.rating}/5` : 'N/A'} 
+            {profile.rating !== undefined ? `${profile.rating}/5` : 'N/A'}
             <span className="text-sm text-gray-500 ml-2">(based on completed jobs)</span>
           </p>
         </div>
         <button
           type="submit"
           className="w-full px-6 py-3 bg-secondary-purple text-white font-semibold rounded-md hover:bg-purple-700 transition duration-300 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={isLoading || !account} // Disable if loading or not connected
+          disabled={isLoading || !account}
         >
           {isLoading ? 'Saving...' : 'Save Profile'}
         </button>
@@ -254,6 +411,7 @@ const Profile = ({ account }) => {
 
       <div className="mt-8 p-6 bg-gray-50 rounded-lg shadow-inner">
         <h3 className="text-xl font-semibold text-primary-blue mb-3 border-b pb-2">Current Profile Details</h3>
+        <p className="text-base text-gray-700 mb-2">Role: {profile.role || 'N/A'}</p>
         <p className="text-base text-gray-700 mb-2">
           Skills: {profile.skills && profile.skills.length > 0 ? profile.skills.join(', ') : 'No skills added yet.'}
         </p>
@@ -261,10 +419,10 @@ const Profile = ({ account }) => {
           Portfolio: {profile.portfolio && profile.portfolio.length > 0 ? (
             profile.portfolio.map((p, index) => (
               <React.Fragment key={index}>
-                <a 
-                  href={p.startsWith('http') ? p : `https://${p}`} 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
+                <a
+                  href={p.startsWith('http') ? p : `https://${p}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="text-primary-blue hover:underline break-words"
                 >
                   {p}
@@ -279,17 +437,14 @@ const Profile = ({ account }) => {
   );
 };
 
+// --- Dashboard Component ---
 const Dashboard = ({ account }) => {
   const [totalEscrowDeposits, setTotalEscrowDeposits] = useState(0);
-  const [clientJobs, setClientJobs] = useState([]); // Jobs where user is client
-  const [freelancerJobs, setFreelancerJobs] = useState([]); // Jobs where user is freelancer
+  const [clientJobs, setClientJobs] = useState([]);
+  const [freelancerJobs, setFreelancerJobs] = useState([]);
   const [userProfile, setUserProfile] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
-
-  // IMPORTANT: The 'navigate' variable is intentionally removed from here as it's not used in Dashboard.
-  // This was the source of your ESLint 'no-unused-vars' error.
-  // const navigate = useNavigate(); 
 
   useEffect(() => {
     const fetchData = async () => {
@@ -301,20 +456,24 @@ const Dashboard = ({ account }) => {
 
       setIsLoading(true);
       setErrorMessage('');
-      
+
       try {
+        // Fetch general escrow deposits
         const depositResponse = await axios.get(`${API_BASE_URL}/api/deposits/total/${account}`);
         setTotalEscrowDeposits(depositResponse.data.totalDeposits || 0);
 
+        // Fetch all jobs associated with the user
         const jobsResponse = await axios.get(`${API_BASE_URL}/api/jobs/forUser/${account}`);
-        // Ensure jobsResponse.data is an array before filtering
         const allUserJobs = Array.isArray(jobsResponse.data) ? jobsResponse.data : [];
+
+        // Filter jobs by role
         const clientJobsFiltered = allUserJobs.filter(job => job.client.toLowerCase() === account.toLowerCase());
         const freelancerJobsFiltered = allUserJobs.filter(job => job.freelancer && job.freelancer.toLowerCase() === account.toLowerCase());
-        
+
         setClientJobs(clientJobsFiltered);
         setFreelancerJobs(freelancerJobsFiltered);
 
+        // Fetch user profile
         const profileResponse = await axios.get(`${API_BASE_URL}/api/users/${account}`);
         setUserProfile(profileResponse.data);
 
@@ -331,7 +490,7 @@ const Dashboard = ({ account }) => {
   return (
     <div className="max-w-6xl mx-auto p-4 bg-white shadow-lg rounded-lg my-8">
       <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">Your Dashboard</h2>
-      
+
       <p className="text-lg text-gray-700 mb-4">
         Connected Wallet: <span className="font-mono text-secondary-purple">{account || 'Not connected'}</span>
       </p>
@@ -353,12 +512,12 @@ const Dashboard = ({ account }) => {
       ) : (
         <>
           <div className="mb-6 p-4 bg-blue-50 rounded-lg shadow-sm">
-            <h3 className="text-xl font-semibold text-primary-blue mb-2">Total Escrow Deposits</h3>
+            <h3 className="text-xl font-semibold text-primary-blue mb-2">Total General Escrow Deposits</h3>
             <p className="text-3xl font-bold text-accent-green">{totalEscrowDeposits} USDC</p>
-            <p className="text-sm text-gray-600 mt-1">Funds currently held in escrow for your active jobs as a client or freelancer.</p>
+            <p className="text-sm text-gray-600 mt-1">Funds you have generally deposited into escrow (not tied to specific jobs).</p>
           </div>
 
-          {userProfile ? (
+          {userProfile && userProfile.address ? ( // Check if userProfile and its address exist
             <div className="mt-4 p-4 bg-purple-50 rounded-lg shadow-sm">
               <h3 className="text-xl font-semibold text-secondary-purple mb-2">Your Profile at a Glance</h3>
               <p className="text-base text-gray-700">Role: {userProfile.role || 'N/A'}</p>
@@ -390,7 +549,7 @@ const Dashboard = ({ account }) => {
                 <li key={job._id} className="bg-gray-50 p-4 rounded-lg shadow-md flex justify-between items-center">
                   <div>
                     <p className="text-lg font-semibold text-gray-800">{job.title} - <span className="text-accent-green">{job.amount} USDC</span></p>
-                    <p className="text-sm text-gray-600">Freelancer: {job.freelancer || 'Unassigned'} | Status: {job.status || 'Pending'}</p>
+                    <p className="text-sm text-gray-600">Freelancer: {job.freelancer ? job.freelancer.substring(0, 6) + '...' + job.freelancer.substring(job.freelancer.length - 4) : 'Unassigned'} | Status: {job.status} | Escrow: {job.escrowStatus}</p>
                   </div>
                   <Link
                     className="px-4 py-2 bg-secondary-purple text-white rounded-md hover:bg-purple-700 transition duration-300"
@@ -421,7 +580,7 @@ const Dashboard = ({ account }) => {
                 <li key={job._id} className="bg-gray-50 p-4 rounded-lg shadow-md flex justify-between items-center">
                   <div>
                     <p className="text-lg font-semibold text-gray-800">{job.title} - <span className="text-accent-green">{job.amount} USDC</span></p>
-                    <p className="text-sm text-gray-600">Client: {job.client || 'N/A'} | Status: {job.status || 'Pending'}</p>
+                    <p className="text-sm text-gray-600">Client: {job.client ? job.client.substring(0, 6) + '...' + job.client.substring(job.client.length - 4) : 'N/A'} | Status: {job.status} | Escrow: {job.escrowStatus}</p>
                   </div>
                   <Link
                     className="px-4 py-2 bg-secondary-purple text-white rounded-md hover:bg-purple-700 transition duration-300"
@@ -443,9 +602,11 @@ const Dashboard = ({ account }) => {
   );
 };
 
+// --- JobDetails Component ---
 const JobDetails = ({ account, publicClient, walletClient }) => {
   const { id } = useParams();
   const [job, setJob] = useState(null);
+  const [clientUsdcBalance, setClientUsdcBalance] = useState(0); // For client to check balance before funding
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessingTx, setIsProcessingTx] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
@@ -453,25 +614,131 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
 
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchJob = async () => {
-      setIsLoading(true);
-      setStatusMessage('');
-      setIsError(false);
-      try {
-        const response = await axios.get(`${API_BASE_URL}/api/jobs/${id}`);
-        setJob(response.data);
-      } catch (error) {
-        console.error('Error fetching job:', error);
-        setStatusMessage(`Error loading job details: ${error.message || 'Network error'}`);
-        setIsError(true);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchJob();
-  }, [id]);
+  const fetchJobAndBalance = async () => {
+    setIsLoading(true);
+    setStatusMessage('');
+    setIsError(false);
+    try {
+      const jobResponse = await axios.get(`${API_BASE_URL}/api/jobs/${id}`);
+      setJob(jobResponse.data);
 
+      if (account && publicClient && jobResponse.data.client.toLowerCase() === account.toLowerCase()) {
+        // Fetch client's USDC balance if they are the client
+        const balance = await publicClient.readContract({
+          address: usdcContractAddress,
+          abi: usdcAbi,
+          functionName: 'balanceOf',
+          args: [account],
+        });
+        setClientUsdcBalance(parseFloat(formatUnits(balance, 6)));
+      }
+
+    } catch (error) {
+      console.error('Error fetching job or balance:', error);
+      setStatusMessage(`Error loading job details: ${error.message || 'Network error'}`);
+      setIsError(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchJobAndBalance();
+  }, [id, account, publicClient]); // Re-fetch if ID, account, or publicClient changes
+
+  // Helper to determine if current user is client or freelancer
+  const isClient = account && job && job.client.toLowerCase() === account.toLowerCase();
+  const isFreelancer = account && job && job.freelancer && job.freelancer.toLowerCase() === account.toLowerCase();
+
+
+  // --- New: Handle Funding Escrow for a Job ---
+  const handleFundEscrow = async () => {
+    if (!account || !walletClient || !publicClient || !job) {
+      setStatusMessage('Wallet not connected or job data missing.');
+      setIsError(true);
+      return;
+    }
+    if (!isClient) {
+      setStatusMessage('Only the client can fund this job.');
+      setIsError(true);
+      return;
+    }
+    if (job.escrowStatus !== 'pending-deposit') {
+      setStatusMessage('Job is not in a state to be funded.');
+      setIsError(true);
+      return;
+    }
+    if (clientUsdcBalance < job.amount) {
+      setStatusMessage('Insufficient USDC balance to fund this job.');
+      setIsError(true);
+      return;
+    }
+
+    setIsProcessingTx(true);
+    setStatusMessage('Initiating fund deposit for job escrow...');
+    setIsError(false);
+
+    try {
+      const amountInSmallestUnit = parseUnits(job.amount.toString(), 6);
+
+      // 1. Approve USDC for the Escrow contract
+      const approveCallData = encodeFunctionData({
+        abi: usdcAbi,
+        functionName: 'approve',
+        args: [escrowContractAddress, amountInSmallestUnit],
+      });
+
+      setStatusMessage('Approving USDC for Escrow contract...');
+      const approveTxHash = await walletClient.sendTransaction({
+        account,
+        to: usdcContractAddress,
+        data: approveCallData,
+      });
+
+      setStatusMessage(`Approval transaction sent! Hash: ${approveTxHash}. Waiting for confirmation...`);
+      await publicClient.waitForTransactionReceipt({ hash: approveTxHash });
+      setStatusMessage('USDC Approved. Now depositing funds to job escrow...');
+
+      // 2. Deposit USDC into the job-specific escrow
+      const depositJobCallData = encodeFunctionData({
+        abi: escrowAbi,
+        functionName: 'depositJob',
+        args: [job._id, getAddress(job.client), getAddress(job.freelancer || '0x0000000000000000000000000000000000000000'), amountInSmallestUnit], // Pass client, freelancer, and amount
+      });
+
+      const depositTxHash = await walletClient.sendTransaction({
+        account,
+        to: escrowContractAddress,
+        data: depositJobCallData,
+        value: 0n,
+      });
+
+      setStatusMessage(`Deposit transaction sent! Hash: ${depositTxHash}. Waiting for confirmation...`);
+      await publicClient.waitForTransactionReceipt({ hash: depositTxHash });
+      setStatusMessage('Job funds deposited successfully on-chain!');
+
+      // 3. Update backend with deposit confirmation
+      await axios.put(`${API_BASE_URL}/api/jobs/${id}/deposit-confirmed`, {
+        clientAddress: account,
+        depositTxHash: depositTxHash,
+      });
+
+      // Update local job state
+      setJob(prevJob => ({ ...prevJob, escrowStatus: 'deposited' }));
+      setStatusMessage('Job funds confirmed and updated in backend!');
+      setIsError(false);
+      fetchJobAndBalance(); // Re-fetch to update balance and job state
+
+    } catch (error) {
+      console.error("Error funding job escrow:", error);
+      setStatusMessage(`Transaction failed or error funding job: ${error.message || 'Please try again.'}`);
+      setIsError(true);
+    } finally {
+      setIsProcessingTx(false);
+    }
+  };
+
+  // --- Handle Freelancer Accepting Job ---
   const handleAccept = async () => {
     if (!account) {
       setStatusMessage('Please connect your wallet to accept jobs.');
@@ -483,20 +750,27 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
       setIsError(true);
       return;
     }
+    if (job.status !== 'open' || job.escrowStatus !== 'deposited') {
+      setStatusMessage('Job is not open or not funded for acceptance.');
+      setIsError(true);
+      return;
+    }
 
     setIsProcessingTx(true);
     setStatusMessage('Accepting job...');
     setIsError(false);
     try {
-      await axios.put(`${API_BASE_URL}/api/jobs/${id}`, { status: 'in-progress', freelancer: account });
-      
-      setJob(prevJob => ({ ...prevJob, status: 'in-progress', freelancer: account }));
-      setStatusMessage('Job accepted successfully!');
+      // Update backend: set freelancer and change status to pending-client-approval
+      await axios.put(`${API_BASE_URL}/api/jobs/${id}/accept`, { freelancerAddress: account });
+
+      // Update local job state
+      setJob(prevJob => ({ ...prevJob, status: 'pending-client-approval', freelancer: account }));
+      setStatusMessage('Job accepted! Waiting for client approval.');
       setIsError(false);
-      
+
       setTimeout(() => {
         navigate('/dashboard');
-      }, 1500); 
+      }, 1500);
 
     } catch (error) {
       console.error('Error accepting job:', error);
@@ -507,40 +781,159 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
     }
   };
 
-  const handleComplete = async () => {
-    if (!account || !publicClient || !walletClient) {
-      setStatusMessage('Wallet not connected or blockchain clients not ready.');
+  // --- Handle Client Approving Freelancer ---
+  const handleApproveFreelancer = async () => {
+    if (!account || !job || !isClient) {
+      setStatusMessage('Wallet not connected or you are not the client.');
       setIsError(true);
       return;
     }
-    if (!job || !job.freelancer || job.amount === undefined) {
-      setStatusMessage('Job data incomplete. Cannot release funds.');
+    if (job.status !== 'pending-client-approval') {
+      setStatusMessage('Job is not in pending approval state.');
       setIsError(true);
       return;
     }
 
     setIsProcessingTx(true);
-    setStatusMessage('Initiating fund release...');
+    setStatusMessage('Approving freelancer...');
     setIsError(false);
     try {
-      const callData = encodeFunctionData({
-        abi: escrowAbiForRelease,
-        functionName: 'release',
-        args: [job.freelancer, parseUnits(job.amount.toString(), 6)],
+      await axios.put(`${API_BASE_URL}/api/jobs/${id}/approve-freelancer`, { clientAddress: account });
+
+      setJob(prevJob => ({ ...prevJob, status: 'in-progress', clientApprovedFreelancer: true }));
+      setStatusMessage('Freelancer approved! Job is now in progress.');
+      setIsError(false);
+
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 1500);
+
+    } catch (error) {
+      console.error('Error approving freelancer:', error);
+      setStatusMessage(`Error approving freelancer: ${error.message || 'Please try again.'}`);
+      setIsError(true);
+    } finally {
+      setIsProcessingTx(false);
+    }
+  };
+
+  // --- Handle Client Rejecting Freelancer ---
+  const handleRejectFreelancer = async () => {
+    if (!account || !job || !isClient) {
+      setStatusMessage('Wallet not connected or you are not the client.');
+      setIsError(true);
+      return;
+    }
+    if (job.status !== 'pending-client-approval') {
+      setStatusMessage('Job is not in pending approval state.');
+      setIsError(true);
+      return;
+    }
+
+    setIsProcessingTx(true);
+    setStatusMessage('Rejecting freelancer...');
+    setIsError(false);
+    try {
+      await axios.put(`${API_BASE_URL}/api/jobs/${id}/reject-freelancer`, { clientAddress: account });
+
+      setJob(prevJob => ({ ...prevJob, status: 'open', freelancer: null, clientApprovedFreelancer: false }));
+      setStatusMessage('Freelancer rejected. Job is now open again.');
+      setIsError(false);
+
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 1500);
+
+    } catch (error) {
+      console.error('Error rejecting freelancer:', error);
+      setStatusMessage(`Error rejecting freelancer: ${error.message || 'Please try again.'}`);
+      setIsError(true);
+    } finally {
+      setIsProcessingTx(false);
+    }
+  };
+
+  // --- Handle Freelancer Marking Job as Completed ---
+  const handleMarkCompleted = async () => {
+    if (!account || !job || !isFreelancer) {
+      setStatusMessage('Wallet not connected or you are not the assigned freelancer.');
+      setIsError(true);
+      return;
+    }
+    if (job.status !== 'in-progress') {
+      setStatusMessage('Job is not in progress.');
+      setIsError(true);
+      return;
+    }
+
+    setIsProcessingTx(true);
+    setStatusMessage('Marking job as completed...');
+    setIsError(false);
+    try {
+      await axios.put(`${API_BASE_URL}/api/jobs/${id}/mark-completed`, { freelancerAddress: account });
+
+      setJob(prevJob => ({ ...prevJob, status: 'completed' })); // Frontend status update
+      setStatusMessage('Job marked as completed! Client can now release funds.');
+      setIsError(false);
+
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 1500);
+
+    } catch (error) {
+      console.error('Error marking job as completed:', error);
+      setStatusMessage(`Error marking job as completed: ${error.message || 'Please try again.'}`);
+      setIsError(true);
+    } finally {
+      setIsProcessingTx(false);
+    }
+  };
+
+
+  // --- Handle Client Releasing Funds (On-chain) ---
+  const handleReleaseFunds = async () => {
+    if (!account || !publicClient || !walletClient || !job) {
+      setStatusMessage('Wallet not connected or blockchain clients not ready.');
+      setIsError(true);
+      return;
+    }
+    if (!isClient) {
+      setStatusMessage('Only the client can release funds.');
+      setIsError(true);
+      return;
+    }
+    if (job.status !== 'completed' || job.escrowStatus !== 'active') { // Job must be marked completed by freelancer, escrow active
+      setStatusMessage('Job is not in a state for fund release (must be completed and escrow active).');
+      setIsError(true);
+      return;
+    }
+
+    setIsProcessingTx(true);
+    setStatusMessage('Initiating fund release on-chain...');
+    setIsError(false);
+    try {
+      const releaseCallData = encodeFunctionData({
+        abi: escrowAbi,
+        functionName: 'releaseJob', // Call job-specific release
+        args: [job._id], // Pass job ID
       });
 
       const txHash = await walletClient.sendTransaction({
         account,
         to: escrowContractAddress,
-        data: callData,
+        data: releaseCallData,
       });
 
       setStatusMessage(`Transaction sent! Hash: ${txHash}. Waiting for confirmation...`);
       await publicClient.waitForTransactionReceipt({ hash: txHash });
 
-      await axios.put(`${API_BASE_URL}/api/jobs/${id}`, { status: 'completed' });
-      
-      setJob(prevJob => ({ ...prevJob, status: 'completed' }));
+      // Update backend after successful on-chain release
+      await axios.put(`${API_BASE_URL}/api/jobs/${id}/release-confirmed`, {
+        clientAddress: account,
+        completionTxHash: txHash,
+      });
+
+      setJob(prevJob => ({ ...prevJob, escrowStatus: 'released' })); // Update local escrow status
       setStatusMessage('Funds released successfully, job marked as completed!');
       setIsError(false);
 
@@ -549,13 +942,73 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
       }, 1500);
 
     } catch (error) {
-      console.error('Error completing job or releasing funds:', error);
-      setStatusMessage(`Transaction failed or error completing job: ${error.message || 'Please try again.'}`);
+      console.error('Error releasing funds:', error);
+      setStatusMessage(`Transaction failed or error releasing funds: ${error.message || 'Please try again.'}`);
       setIsError(true);
     } finally {
       setIsProcessingTx(false);
     }
   };
+
+  // --- Handle Client Refunding Funds (On-chain) ---
+  const handleRefundFunds = async () => {
+    if (!account || !publicClient || !walletClient || !job) {
+      setStatusMessage('Wallet not connected or blockchain clients not ready.');
+      setIsError(true);
+      return;
+    }
+    if (!isClient) {
+      setStatusMessage('Only the client can refund funds.');
+      setIsError(true);
+      return;
+    }
+    if (job.escrowStatus !== 'active' && job.escrowStatus !== 'disputed') {
+      setStatusMessage('Job is not in an active or disputed state for refund.');
+      setIsError(true);
+      return;
+    }
+
+    setIsProcessingTx(true);
+    setStatusMessage('Initiating fund refund on-chain...');
+    setIsError(false);
+    try {
+      const refundCallData = encodeFunctionData({
+        abi: escrowAbi,
+        functionName: 'refundJob', // Call job-specific refund
+        args: [job._id], // Pass job ID
+      });
+
+      const txHash = await walletClient.sendTransaction({
+        account,
+        to: escrowContractAddress,
+        data: refundCallData,
+      });
+
+      setStatusMessage(`Transaction sent! Hash: ${txHash}. Waiting for confirmation...`);
+      await publicClient.waitForTransactionReceipt({ hash: txHash });
+
+      // Update backend after successful on-chain refund
+      await axios.put(`${API_BASE_URL}/api/jobs/${id}/refund-confirmed`, {
+        clientAddress: account,
+      });
+
+      setJob(prevJob => ({ ...prevJob, escrowStatus: 'refunded', status: 'cancelled' })); // Update local statuses
+      setStatusMessage('Funds refunded successfully, job marked as cancelled!');
+      setIsError(false);
+
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 1500);
+
+    } catch (error) {
+      console.error('Error refunding funds:', error);
+      setStatusMessage(`Transaction failed or error refunding funds: ${error.message || 'Please try again.'}`);
+      setIsError(true);
+    } finally {
+      setIsProcessingTx(false);
+    }
+  };
+
 
   if (isLoading) {
     return (
@@ -589,10 +1042,19 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
     );
   }
 
+  // Determine button states based on job status and user role
+  const showFundEscrowButton = isClient && job.escrowStatus === 'pending-deposit';
+  const showAcceptJobButton = !isClient && !job.freelancer && job.status === 'open' && job.escrowStatus === 'deposited';
+  const showApproveRejectButtons = isClient && job.status === 'pending-client-approval';
+  const showMarkCompletedButton = isFreelancer && job.status === 'in-progress';
+  const showReleaseFundsButton = isClient && job.status === 'completed' && job.escrowStatus === 'active'; // Client releases after freelancer marks completed
+  const showRefundFundsButton = isClient && (job.escrowStatus === 'active' || job.escrowStatus === 'disputed'); // Client can refund if active or disputed
+
+
   return (
     <div className="max-w-5xl mx-auto p-4 bg-white shadow-lg rounded-lg my-8">
       <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">{job.title}</h2>
-      
+
       {statusMessage && (
         <div className={`p-3 mb-4 rounded-md ${isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
           {statusMessage}
@@ -602,29 +1064,86 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
       <div className="space-y-3 text-gray-700 mb-6">
         <p className="text-lg">Description: {job.description}</p>
         <p className="text-lg">Amount: <span className="font-semibold text-accent-green">{job.amount} USDC</span></p>
-        <p className="text-lg">Client: <span className="font-mono text-secondary-purple">{job.client || 'N/A'}</span></p>
-        <p className="text-lg">Freelancer: <span className="font-mono text-secondary-purple">{job.freelancer || 'Not assigned'}</span></p>
-        <p className="text-lg">Current Status: <span className={`font-semibold ${job.status === 'open' ? 'text-blue-600' : job.status === 'in-progress' ? 'text-yellow-600' : job.status === 'completed' ? 'text-green-600' : 'text-gray-600'}`}>{job.status}</span></p>
+        <p className="text-lg">Client: <span className="font-mono text-secondary-purple">{job.client ? job.client.substring(0, 6) + '...' + job.client.substring(job.client.length - 4) : 'N/A'}</span></p>
+        <p className="text-lg">Freelancer: <span className="font-mono text-secondary-purple">{job.freelancer ? job.freelancer.substring(0, 6) + '...' + job.freelancer.substring(job.freelancer.length - 4) : 'Not assigned'}</span></p>
+        <p className="text-lg">Current Status: <span className={`font-semibold ${job.status === 'open' ? 'text-blue-600' : job.status === 'pending-client-approval' ? 'text-orange-500' : job.status === 'in-progress' ? 'text-yellow-600' : job.status === 'completed' ? 'text-green-600' : job.status === 'disputed' ? 'text-red-600' : 'text-gray-600'}`}>{job.status}</span></p>
+        <p className="text-lg">Escrow Status: <span className={`font-semibold ${job.escrowStatus === 'pending-deposit' ? 'text-red-500' : job.escrowStatus === 'deposited' || job.escrowStatus === 'active' ? 'text-green-500' : 'text-gray-600'}`}>{job.escrowStatus}</span></p>
+        {isClient && <p className="text-lg">Your USDC Balance: <span className="font-semibold text-primary-blue">{clientUsdcBalance} USDC</span></p>}
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4">
-        {job.status === 'open' && account && account.toLowerCase() !== job.client.toLowerCase() && (
+        {/* Client: Fund Escrow Button */}
+        {showFundEscrowButton && (
+          <button
+            className="px-6 py-3 bg-primary-blue text-white font-semibold rounded-md hover:bg-blue-700 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleFundEscrow}
+            disabled={isProcessingTx || !account || clientUsdcBalance < job.amount}
+          >
+            {isProcessingTx ? 'Funding Escrow...' : 'Fund Job Escrow'}
+          </button>
+        )}
+
+        {/* Freelancer: Accept Job Button */}
+        {showAcceptJobButton && (
           <button
             className="px-6 py-3 bg-secondary-purple text-white font-semibold rounded-md hover:bg-purple-700 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={handleAccept}
-            disabled={isProcessingTx || !account} // Disable if loading or not connected
+            disabled={isProcessingTx || !account}
           >
             {isProcessingTx ? 'Accepting...' : 'Accept Job'}
           </button>
         )}
 
-        {job.status === 'in-progress' && account && account.toLowerCase() === job.client.toLowerCase() && (
+        {/* Client: Approve/Reject Freelancer Buttons */}
+        {showApproveRejectButtons && (
+          <>
+            <button
+              className="px-6 py-3 bg-accent-green text-white font-semibold rounded-md hover:bg-green-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handleApproveFreelancer}
+              disabled={isProcessingTx || !account}
+            >
+              {isProcessingTx ? 'Approving...' : 'Approve Freelancer'}
+            </button>
+            <button
+              className="px-6 py-3 bg-red-600 text-white font-semibold rounded-md hover:bg-red-700 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handleRejectFreelancer}
+              disabled={isProcessingTx || !account}
+            >
+              {isProcessingTx ? 'Rejecting...' : 'Reject Freelancer'}
+            </button>
+          </>
+        )}
+
+        {/* Freelancer: Mark as Completed Button */}
+        {showMarkCompletedButton && (
+          <button
+            className="px-6 py-3 bg-yellow-600 text-white font-semibold rounded-md hover:bg-yellow-700 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleMarkCompleted}
+            disabled={isProcessingTx || !account}
+          >
+            {isProcessingTx ? 'Marking...' : 'Mark as Completed'}
+          </button>
+        )}
+
+        {/* Client: Release Funds Button */}
+        {showReleaseFundsButton && (
           <button
             className="px-6 py-3 bg-accent-green text-white font-semibold rounded-md hover:bg-green-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={handleComplete}
-            disabled={isProcessingTx || !account} // Disable if loading or not connected
+            onClick={handleReleaseFunds}
+            disabled={isProcessingTx || !account}
           >
             {isProcessingTx ? 'Releasing Funds...' : 'Release Funds'}
+          </button>
+        )}
+
+        {/* Client: Refund Funds Button */}
+        {showRefundFundsButton && (
+          <button
+            className="px-6 py-3 bg-red-500 text-white font-semibold rounded-md hover:bg-red-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleRefundFunds}
+            disabled={isProcessingTx || !account}
+          >
+            {isProcessingTx ? 'Refunding...' : 'Refund Funds'}
           </button>
         )}
       </div>
@@ -639,6 +1158,7 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
   );
 };
 
+// --- PostJob Component ---
 const PostJob = ({ account }) => {
   const navigate = useNavigate();
   const [jobTitle, setJobTitle] = useState('');
@@ -666,23 +1186,24 @@ const PostJob = ({ account }) => {
     setIsError(false);
 
     try {
-      await axios.post(`${API_BASE_URL}/api/jobs`, {
+      const response = await axios.post(`${API_BASE_URL}/api/jobs`, {
         title: jobTitle,
         description: jobDescription,
         amount: parseFloat(jobAmount),
-        client: account, 
-        status: 'open' 
+        client: account,
+        status: 'open', // Initial status
+        escrowStatus: 'pending-deposit' // Initial escrow status
       });
 
-      setStatusMessage('Job posted successfully!');
+      setStatusMessage('Job posted successfully! Redirecting to job details to fund escrow.');
       setIsError(false);
       setJobTitle('');
       setJobDescription('');
       setJobAmount('');
 
       setTimeout(() => {
-        navigate('/dashboard');
-      }, 1500);
+        navigate(`/job/${response.data._id}`); // Navigate to the newly posted job's details page
+      }, 2000);
 
     } catch (error) {
       console.error('Error posting job:', error);
@@ -696,7 +1217,7 @@ const PostJob = ({ account }) => {
   return (
     <div className="max-w-3xl mx-auto p-4 bg-white shadow-lg rounded-lg my-8">
       <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">Post a New Job</h2>
-      
+
       <p className="text-lg text-gray-700 mb-4">
         Connected Wallet: <span className="font-mono text-secondary-purple">{account || 'Not connected'}</span>
       </p>
@@ -727,7 +1248,7 @@ const PostJob = ({ account }) => {
             onChange={(e) => setJobTitle(e.target.value)}
             placeholder="e.g., Build a React Component"
             className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
-            disabled={isLoading || !account} // Disable if loading or not connected
+            disabled={isLoading || !account}
           />
         </div>
         <div>
@@ -739,7 +1260,7 @@ const PostJob = ({ account }) => {
             placeholder="Detailed description of the task..."
             rows="5"
             className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
-            disabled={isLoading || !account} // Disable if loading or not connected
+            disabled={isLoading || !account}
           ></textarea>
         </div>
         <div>
@@ -751,13 +1272,13 @@ const PostJob = ({ account }) => {
             onChange={(e) => setJobAmount(e.target.value)}
             placeholder="e.g., 500"
             className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
-            disabled={isLoading || !account} // Disable if loading or not connected
+            disabled={isLoading || !account}
           />
         </div>
         <button
           type="submit"
           className="w-full px-6 py-3 bg-secondary-purple text-white font-semibold rounded-md hover:bg-purple-700 transition duration-300 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={isLoading || !account} // Disable if loading or not connected
+          disabled={isLoading || !account}
         >
           {isLoading ? 'Posting...' : 'Post Job'}
         </button>
@@ -766,7 +1287,7 @@ const PostJob = ({ account }) => {
   );
 };
 
-// --- NEW: BrowseJobs Component ---
+// --- BrowseJobs Component ---
 const BrowseJobs = () => {
   const [jobs, setJobs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -778,8 +1299,8 @@ const BrowseJobs = () => {
       setIsLoading(true);
       setErrorMessage('');
       try {
-        // Fetch jobs from your backend API
-        const response = await axios.get(`${API_BASE_URL}/api/jobs?status=open`);
+        // Fetch jobs that are 'open' and 'deposited'
+        const response = await axios.get(`${API_BASE_URL}/api/jobs?status=open&escrowStatus=deposited`);
         setJobs(response.data);
       } catch (error) {
         console.error('Error fetching jobs:', error);
@@ -794,7 +1315,7 @@ const BrowseJobs = () => {
   return (
     <div className="max-w-6xl mx-auto p-4 bg-white shadow-lg rounded-lg my-8">
       <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">Browse Available Jobs</h2>
-      
+
       {errorMessage && (
         <div className="p-3 mb-4 rounded-md bg-red-100 text-red-700">
           {errorMessage}
@@ -818,7 +1339,7 @@ const BrowseJobs = () => {
                   <div className="mb-2 sm:mb-0">
                     <p className="text-lg font-semibold text-gray-800">{job.title} - <span className="text-accent-green">{job.amount} USDC</span></p>
                     <p className="text-sm text-gray-600 truncate max-w-sm">{job.description}</p>
-                    <p className="text-xs text-gray-500">Client: {job.client} | Status: {job.status}</p>
+                    <p className="text-xs text-gray-500">Client: {job.client ? job.client.substring(0, 6) + '...' + job.client.substring(job.client.length - 4) : 'N/A'} | Status: {job.status} | Escrow: {job.escrowStatus}</p>
                   </div>
                   <Link
                     className="px-4 py-2 bg-primary-blue text-white rounded-md hover:bg-blue-700 transition duration-300 flex-shrink-0"
@@ -840,7 +1361,7 @@ const BrowseJobs = () => {
   );
 };
 
-// --- NEW: CrossChainIntegration Component ---
+// --- CrossChainIntegration Component ---
 const CrossChainIntegration = ({ account, walletClient, publicClient }) => {
   const [sourceChain, setSourceChain] = useState('Lisk Sepolia');
   const [destinationChain, setDestinationChain] = useState('Optimism/Base (Mock)');
@@ -916,7 +1437,7 @@ const CrossChainIntegration = ({ account, walletClient, publicClient }) => {
             value={sourceChain}
             onChange={(e) => setSourceChain(e.target.value)}
             className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
-            disabled={isProcessing || !account} // Disable if loading or not connected
+            disabled={isProcessing || !account}
           >
             <option value="Lisk Sepolia">Lisk Sepolia Testnet</option>
             {/* Add more options as actual LayerZero integrations are built */}
@@ -929,7 +1450,7 @@ const CrossChainIntegration = ({ account, walletClient, publicClient }) => {
             value={destinationChain}
             onChange={(e) => setDestinationChain(e.target.value)}
             className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
-            disabled={isProcessing || !account} // Disable if loading or not connected
+            disabled={isProcessing || !account}
           >
             <option value="Optimism/Base (Mock)">Optimism/Base (Mock)</option>
             {/* Add more options as actual LayerZero integrations are built */}
@@ -944,7 +1465,7 @@ const CrossChainIntegration = ({ account, walletClient, publicClient }) => {
             onChange={(e) => setTransferAmount(e.target.value)}
             placeholder="e.g., 50"
             className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
-            disabled={isProcessing || !account} // Disable if loading or not connected
+            disabled={isProcessing || !account}
           />
         </div>
         <button
@@ -959,7 +1480,7 @@ const CrossChainIntegration = ({ account, walletClient, publicClient }) => {
   );
 };
 
-// --- NEW: DisputeResolution Component ---
+// --- DisputeResolution Component ---
 const DisputeResolution = ({ account }) => {
   const [jobId, setJobId] = useState('');
   const [disputeReason, setDisputeReason] = useState('');
@@ -985,12 +1506,13 @@ const DisputeResolution = ({ account }) => {
     setIsError(false);
 
     try {
-      // --- Mocking Dispute Submission ---
-      // In a real scenario, this would interact with your backend's dispute module
-      // which might then update a smart contract state or log the dispute.
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate network delay
+      // Call backend to submit dispute
+      await axios.post(`${API_BASE_URL}/api/disputes`, {
+        jobId: jobId,
+        reporterAddress: account,
+        reason: disputeReason,
+      });
 
-      console.log(`Dispute submitted for Job ID: ${jobId}, Reason: ${disputeReason}, by: ${account}`);
       setStatusMessage('Dispute submitted successfully! Our team will review it.');
       setIsError(false);
       setJobId('');
@@ -1009,7 +1531,7 @@ const DisputeResolution = ({ account }) => {
     <div className="max-w-3xl mx-auto p-6 bg-white shadow-lg rounded-lg my-8">
       <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">Dispute Resolution</h2>
       <p className="text-lg text-gray-700 mb-6">
-        If there's an issue with a job, you can formally initiate a dispute here.
+        If there's an issue with a job, you can formally initiate a dispute here. This will mark the job as 'disputed' in the system.
       </p>
 
       <p className="text-lg text-gray-700 mb-4">
@@ -1040,9 +1562,9 @@ const DisputeResolution = ({ account }) => {
             id="jobId"
             value={jobId}
             onChange={(e) => setJobId(e.target.value)}
-            placeholder="e.g., job123xyz"
+            placeholder="e.g., 60d5ec49f8c7e2a4b8f0e5b1 (MongoDB Job ID)"
             className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
-            disabled={isLoading || !account} // Disable if loading or not connected
+            disabled={isLoading || !account}
           />
         </div>
         <div>
@@ -1054,7 +1576,7 @@ const DisputeResolution = ({ account }) => {
             placeholder="Please describe the issue in detail..."
             rows="5"
             className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
-            disabled={isLoading || !account} // Disable if loading or not connected
+            disabled={isLoading || !account}
           ></textarea>
         </div>
         <button
@@ -1069,10 +1591,10 @@ const DisputeResolution = ({ account }) => {
   );
 };
 
-// --- NEW: Withdrawal Component (Mock Fiat On/Off-Ramp) ---
+// --- Withdrawal Component (Mock Fiat On/Off-Ramp) ---
 const Withdrawal = ({ account }) => {
   const [amount, setAmount] = useState('');
-  const [fiatCurrency, setFiatCurrency] = useState('KES'); // Default to Kenyan Shilling
+  const [fiatCurrency, setFiatCurrency] = useState('KES');
   const [bankDetails, setBankDetails] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
@@ -1096,23 +1618,22 @@ const Withdrawal = ({ account }) => {
     setIsError(false);
 
     try {
-      // --- Mocking Fiat On/Off-Ramp Integration ---
-      // In a real scenario, this would involve:
-      // 1. Interacting with a crypto-to-fiat on/off-ramp provider's API (e.g., Circle, Transak, Banxa).
-      // 2. This would likely involve KYC/AML checks, and then converting USDC to fiat.
-      // 3. The provider would then initiate a local bank transfer.
-      // This is a complex integration and is mocked for frontend demonstration.
-      await new Promise(resolve => setTimeout(resolve, 3000)); // Simulate network delay
+      // Call backend to submit withdrawal request
+      await axios.post(`${API_BASE_URL}/api/withdrawals`, {
+        requestorAddress: account,
+        usdcAmount: parseFloat(amount),
+        fiatCurrency: fiatCurrency,
+        bankDetails: bankDetails, // In a real app, this would be structured data
+      });
 
-      console.log(`Withdrawal simulated: ${amount} USDC to ${fiatCurrency} for account ${account} with details ${bankDetails}`);
-      setStatusMessage(`Withdrawal of ${amount} USDC to ${fiatCurrency} simulated successfully! Funds should arrive in 3-5 business days.`);
+      setStatusMessage(`Withdrawal request submitted! Our team will process your ${amount} USDC to ${fiatCurrency}.`);
       setIsError(false);
       setAmount('');
       setBankDetails('');
 
     } catch (error) {
-      console.error('Error during simulated withdrawal:', error);
-      setStatusMessage(`Simulated withdrawal failed: ${error.message || 'Please try again.'}`);
+      console.error('Error during withdrawal:', error);
+      setStatusMessage(`Withdrawal failed: ${error.message || 'Please try again.'}`);
       setIsError(true);
     } finally {
       setIsLoading(false);
@@ -1156,7 +1677,7 @@ const Withdrawal = ({ account }) => {
             onChange={(e) => setAmount(e.target.value)}
             placeholder="e.g., 100"
             className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
-            disabled={isLoading || !account} // Disable if loading or not connected
+            disabled={isLoading || !account}
           />
         </div>
         <div>
@@ -1166,7 +1687,7 @@ const Withdrawal = ({ account }) => {
             value={fiatCurrency}
             onChange={(e) => setFiatCurrency(e.target.value)}
             className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
-            disabled={isLoading || !account} // Disable if loading or not connected
+            disabled={isLoading || !account}
           >
             <option value="KES">Kenyan Shilling (KES)</option>
             <option value="NGN">Nigerian Naira (NGN)</option>
@@ -1184,7 +1705,7 @@ const Withdrawal = ({ account }) => {
             placeholder="Bank Name, Account Number, SWIFT/BIC, etc."
             rows="3"
             className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
-            disabled={isLoading || !account} // Disable if loading or not connected
+            disabled={isLoading || !account}
           ></textarea>
         </div>
         <button
@@ -1202,12 +1723,12 @@ const Withdrawal = ({ account }) => {
 
 function App() {
   const [walletClient, setWalletClient] = useState(null);
-  const [publicClient, setPublicClient] = useState(null); 
+  const [publicClient, setPublicClient] = useState(null);
   const [account, setAccount] = useState(null);
-  const [status, setStatus] = useState(''); 
-  const [amountToDeposit, setAmountToDeposit] = useState('100'); 
+  const [status, setStatus] = useState('');
+  const [amountToDeposit, setAmountToDeposit] = useState('100');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isInfoMenuOpen, setIsInfoMenuOpen] = useState(false); 
+  const [isInfoMenuOpen, setIsInfoMenuOpen] = useState(false);
 
   // Function to truncate address for display
   const truncateAddress = (address) => {
@@ -1216,9 +1737,6 @@ function App() {
   };
 
   const connectWallet = async () => {
-    // Log window.ethereum to the console for debugging
-    console.log('window.ethereum:', window.ethereum);
-
     setStatus('Connecting wallet...');
     try {
       if (typeof window.ethereum === 'undefined') {
@@ -1227,25 +1745,24 @@ function App() {
       }
 
       // Request accounts directly from MetaMask
-      const addresses = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      const [address] = await window.ethereum.request({ method: 'eth_requestAccounts' });
 
       const client = createWalletClient({
         chain: liskSepolia,
         transport: custom(window.ethereum),
       });
-      const publicClientInstance = createPublicClient({ 
+      const publicClientInstance = createPublicClient({
         chain: liskSepolia,
         transport: http(liskSepolia.rpcUrls.default.http[0]),
       });
-      
+
       setWalletClient(client);
-      setPublicClient(publicClientInstance); 
-      setAccount(addresses[0]);
-      setStatus(`Wallet connected: ${truncateAddress(addresses[0])}`);
+      setPublicClient(publicClientInstance);
+      setAccount(address);
+      setStatus(`Wallet connected: ${truncateAddress(address)}`);
     } catch (error) {
       console.error("Error connecting wallet:", error);
-      // Check if the error is due to user rejecting the connection
-      if (error.code === 4001) { // EIP-1193 user rejected request error code
+      if (error.code === 4001) {
         setStatus('Wallet connection rejected by user.');
       } else {
         setStatus(`Error connecting wallet: ${error.message}`);
@@ -1256,7 +1773,7 @@ function App() {
   // Listen for account changes (e.g., user changes account in MetaMask)
   useEffect(() => {
     if (window.ethereum) {
-      window.ethereum.on('accountsChanged', (accounts) => {
+      const handleAccountsChanged = (accounts) => {
         if (accounts.length > 0) {
           setAccount(accounts[0]);
           setStatus(`Wallet changed to: ${truncateAddress(accounts[0])}`);
@@ -1266,101 +1783,34 @@ function App() {
           setPublicClient(null);
           setStatus('Wallet disconnected.');
         }
-      });
-      // Optional: Reconnect on initial load if an account is already connected
-      // This is a basic check; a more robust solution might involve `walletClient.getAddresses()`
-      // if (window.ethereum.selectedAddress) {
-      //   connectWallet();
-      // }
+      };
+
+      // Initial check for already connected account
+      window.ethereum.request({ method: 'eth_accounts' })
+        .then(handleAccountsChanged)
+        .catch(error => console.error("Error checking initial accounts:", error));
+
+      window.ethereum.on('accountsChanged', handleAccountsChanged);
+
+      // Cleanup listener on component unmount
+      return () => {
+        window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+      };
     }
-    // Cleanup listener on component unmount
-    return () => {
-      if (window.ethereum) {
-        window.ethereum.removeListener('accountsChanged', () => {});
-      }
-    };
   }, []); // Empty dependency array means this runs once on mount
 
-  const handleDepositUSDC = async () => {
-    if (!account || !walletClient || !publicClient) {
-      setStatus('Please connect your wallet first.');
-      return;
-    }
-    if (isNaN(parseFloat(amountToDeposit)) || parseFloat(amountToDeposit) <= 0) {
-      setStatus('Please enter a valid amount to deposit.');
-      return;
-    }
-
-    setStatus('Initiating USDC deposit with Divvi tracking...');
-    try {
-      const amountInSmallestUnit = parseUnits(amountToDeposit, 6); 
-
-      // const divviConsumerAddress = '0x58ccf714F804a10cd9FE22fCcc044d77Ea34e5b1'; // Commented out
-      // const divviProviderAddresses = ['0x0423189886d7966f0dd7e7d256898daeee625dca','0xc95876688026be9d6fa7a7c33328bd013effa2bb','0x7beb0e14f8d2e6f6678cc30d867787b384b19e20']; // Commented out
-
-      const approveCallData = encodeFunctionData({
-        abi: usdcAbi,
-        functionName: 'approve',
-        args: [escrowContractAddress, amountInSmallestUnit],
-      });
-
-      setStatus('Approving USDC for Escrow contract...');
-      const approveTxHash = await walletClient.sendTransaction({
-        account,
-        to: usdcContractAddress,
-        data: approveCallData,
-      });
-
-      setStatus(`Approval transaction sent! Hash: ${approveTxHash}. Waiting for confirmation...`);
-      await publicClient.waitForTransactionReceipt({ hash: approveTxHash });
-      setStatus('USDC Approved. Now initiating deposit...');
-
-      const depositCallData = encodeFunctionData({
-        abi: escrowAbi,
-        functionName: 'deposit',
-        args: [defaultFreelancerAddress, amountInSmallestUnit],
-      });
-
-      // const dataSuffix = getDataSuffix({ // Commented out
-      //   consumer: divviConsumerAddress, // Commented out
-      //   providers: divviProviderAddresses, // Commented out
-      // }); // Commented out
-
-      const depositTxHash = await walletClient.sendTransaction({
-        account,
-        to: escrowContractAddress,
-        data: depositCallData, // dataSuffix removed
-        value: 0n, 
-      });
-
-      setStatus(`Deposit transaction sent! Hash: ${depositTxHash}. Waiting for confirmation...`);
-      await publicClient.waitForTransactionReceipt({ hash: depositTxHash });
-      setStatus('Deposit confirmed. Now reporting referral to Divvi...');
-
-      // const chainId = await walletClient.getChainId(); // Commented out
-      // await submitReferral({ // Commented out
-      //   txHash: depositTxHash, // Commented out
-      //   chainId, // Commented out
-      // }); // Commented out
-
-      setStatus(`Deposit successful and Divvi referral (mocked) completed! Tx Hash: ${depositTxHash}`); // Updated status message
-      console.log('Divvi referral (mocked) completed!'); // Updated console log
-
-    } catch (error) {
-      console.error("Error during USDC deposit or Divvi integration:", error);
-      setStatus(`Transaction failed or Divvi submission error: ${error.message}`);
-    }
-  };
+  // handleDepositUSDC from DivviIntegration is moved into DivviIntegration component itself
+  // to encapsulate its logic and use the new depositGeneral function.
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
-    if (isInfoMenuOpen) setIsInfoMenuOpen(false); 
+    if (isInfoMenuOpen) setIsInfoMenuOpen(false);
   };
 
   return (
-    <BrowserRouter> 
+    <BrowserRouter>
       <div className="bg-gradient-to-br from-gray-50 to-gray-200 min-h-screen font-sans text-gray-800">
-        
+
         <header className="bg-primary-blue text-white p-4 shadow-lg sticky top-0 z-50 transition duration-300 ease-in-out">
           <div className="max-w-6xl mx-auto flex items-center justify-between">
             <Link to="/" className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
@@ -1368,14 +1818,14 @@ function App() {
               <span className="text-lg sm:text-2xl font-bold whitespace-nowrap">FreelanceFlow</span>
             </Link>
             <nav className="hidden md:flex flex-1 justify-between items-center ml-8">
-              <div className="flex items-center gap-x-6 text-lg"> 
+              <div className="flex items-center gap-x-6 text-lg">
                 <Link to="/" className="hover:text-blue-200 transition duration-300 ease-in-out">Home</Link>
                 <Link to="/dashboard" className="hover:text-blue-200 transition duration-300 ease-in-out">Dashboard</Link>
                 <Link to="/profile" className="hover:text-blue-200 transition duration-300 ease-in-out">Profile</Link>
                 <Link to="/post-job" className="hover:text-blue-200 transition duration-300 ease-in-out">Post Job</Link>
-                <Link to="/browse-jobs" className="hover:text-blue-200 transition duration-300 ease-in-out">Browse Jobs</Link> 
+                <Link to="/browse-jobs" className="hover:text-blue-200 transition duration-300 ease-in-out">Browse Jobs</Link>
               </div>
-              <div className="flex items-center gap-x-4"> {/* Container for More Info and Wallet Connect */}
+              <div className="flex items-center gap-x-4">
                 <div className="relative">
                   <button
                     onClick={() => setIsInfoMenuOpen(!isInfoMenuOpen)}
@@ -1389,7 +1839,7 @@ function App() {
                   {isInfoMenuOpen && (
                     <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
                       <Link to="/divvi-integration" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Divvi Demo</Link>
-                      <Link to="/cross-chain-transfer" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Cross-Chain Transfer</Link> 
+                      <Link to="/cross-chain-transfer" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Cross-Chain Transfer</Link>
                       <Link to="/dispute-resolution" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Dispute Resolution</Link>
                       <Link to="/withdraw" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Withdraw Funds</Link>
                       <a href="#about" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">About</a>
@@ -1412,12 +1862,12 @@ function App() {
                 </button>
               </div>
             </nav>
-            <button 
+            <button
               onClick={toggleMobileMenu}
               className="md:hidden text-white text-2xl focus:outline-none p-2 -mr-2"
               aria-label="Toggle navigation"
             >
-              &#9776; 
+              &#9776;
             </button>
           </div>
           {isMobileMenuOpen && (
@@ -1427,19 +1877,19 @@ function App() {
                 <li><Link to="/dashboard" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Dashboard</Link></li>
                 <li><Link to="/profile" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Profile</Link></li>
                 <li><Link to="/post-job" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Post Job</Link></li>
-                <li><Link to="/browse-jobs" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Browse Jobs</Link></li> 
+                <li><Link to="/browse-jobs" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Browse Jobs</Link></li>
                 <li className="text-gray-300 text-sm mt-4 mb-2">--- Information & Demos ---</li>
                 <li><Link to="/divvi-integration" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Divvi Demo</Link></li>
-                <li><Link to="/cross-chain-transfer" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Cross-Chain Transfer</Link></li> 
+                <li><Link to="/cross-chain-transfer" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Cross-Chain Transfer</Link></li>
                 <li><Link to="/dispute-resolution" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Dispute Resolution</Link></li>
                 <li><Link to="/withdraw" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Withdraw Funds</Link></li>
                 <li><a href="#about" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">About</a></li>
-                <li><a href="#vision" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Vision</a></li> 
-                <li><a href="#mission" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Mission</a></li> 
+                <li><a href="#vision" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Vision</a></li>
+                <li><a href="#mission" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Mission</a></li>
                 <li><a href="#features" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Features</a></li>
                 <li><a href="#team" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Team</a></li>
                 <li><a href="#roadmap" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Roadmap</a></li>
-                <li><a href="/WHITEPAPER.pdf" target="_blank" rel="noopener noreferrer" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Whitepaper</a></li> 
+                <li><a href="/WHITEPAPER.pdf" target="_blank" rel="noopener noreferrer" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Whitepaper</a></li>
                 <li><a href="#contact" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Contact</a></li>
                 {/* Wallet Connect Button for Mobile Menu */}
                 <li>
@@ -1460,10 +1910,10 @@ function App() {
             <>
               <section className="relative bg-gradient-to-br from-primary-blue to-secondary-purple text-white py-24 text-center overflow-hidden animate-gradient">
                 <div className="absolute inset-0 z-0 overflow-hidden">
-                  <div className="absolute top-0 left-1/4 h-full w-px bg-white/20 animate-line-flow"></div> 
-                  <div className="absolute top-0 left-3/4 h-full w-px bg-white/20 animate-line-flow-delay-2"></div> 
-                  <div className="absolute top-0 left-1/6 h-full w-px bg-white/20 animate-line-flow-delay-1"></div> 
-                  <div className="absolute top-0 left-5/6 h-full w-px bg-white/20 animate-line-flow-delay-2"></div> 
+                  <div className="absolute top-0 left-1/4 h-full w-px bg-white/20 animate-line-flow"></div>
+                  <div className="absolute top-0 left-3/4 h-full w-px bg-white/20 animate-line-flow-delay-2"></div>
+                  <div className="absolute top-0 left-1/6 h-full w-px bg-white/20 animate-line-flow-delay-1"></div>
+                  <div className="absolute top-0 left-5/6 h-full w-px bg-white/20 animate-line-flow-delay-2"></div>
                 </div>
 
                 <div className="max-w-5xl mx-auto relative z-10 px-4">
@@ -1520,17 +1970,17 @@ function App() {
                       <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple mt-4 mb-2">Low-Cost USDC Payments</h3>
                       <p className="text-base sm:text-lg text-gray-700 transition duration-300 ease-in-out">Receive and send USDC stablecoin with significantly reduced transaction fees, maximizing your earnings.</p>
                     </div>
-                    
-                    <div className="bg-gray-50 p-6 sm:p-8 rounded-lg shadow-xl text-center hover:scale-105 transition duration-300 ease-in-out transform animate-icon-float animate-glowing-border"> 
+
+                    <div className="bg-gray-50 p-6 sm:p-8 rounded-lg shadow-xl text-center hover:scale-105 transition duration-300 ease-in-out transform animate-icon-float animate-glowing-border">
                       <SecurityIcon />
                       <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple mt-4 mb-2">Built-in Escrow Security</h3>
-                      <p className="text-base sm:text-lg text-gray-700">Funds are held securely by smart contracts and released only when both parties confirm work completion, ensuring trust and fairness and mitigating disputes.</p> 
+                      <p className="text-base sm:text-lg text-gray-700">Funds are held securely by smart contracts and released only when both parties confirm work completion, ensuring trust and fairness and mitigating disputes.</p>
                     </div>
-                    
-                    <div className="bg-gray-50 p-6 sm:p-8 rounded-lg shadow-xl text-center hover:scale-105 transition duration-300 ease-in-out transform animate-icon-float animate-glowing-border"> 
+
+                    <div className="bg-gray-50 p-6 sm:p-8 rounded-lg shadow-xl text-center hover:scale-105 transition duration-300 ease-in-out transform animate-icon-float animate-glowing-border">
                       <LiskIcon />
                       <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple mt-4 mb-2">Robust Blockchain Infrastructure</h3>
-                      <p className="text-base sm:text-lg text-gray-700">Powered by a scalable and efficient Layer 2 blockchain, providing a reliable and future-proof foundation for decentralized payments worldwide.</p> 
+                      <p className="text-base sm:text-lg text-gray-700">Powered by a scalable and efficient Layer 2 blockchain, providing a reliable and future-proof foundation for decentralized payments worldwide.</p>
                     </div>
                   </div>
                 </div>
@@ -1598,7 +2048,7 @@ function App() {
               <section id="roadmap" className="py-16 sm:py-20 bg-gray-100">
                 <div className="max-w-4xl mx-auto text-center px-4 transition duration-300 ease-in-out">
                   <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-8">Our Product Roadmap</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-left"> 
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-left">
                     <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl hover:scale-105 transition duration-300 ease-in-out transform">
                       <div className="flex items-center mb-4">
                         <h3 className="text-lg sm:text-xl font-bold text-primary-blue">Phase 1: Initial Launch & Foundation</h3>
@@ -1609,7 +2059,7 @@ function App() {
                       </p>
                       <p className="text-sm text-gray-500 mt-2">(July 2025)</p>
                     </div>
-                    
+
                     <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl hover:scale-105 transition duration-300 ease-in-out transform">
                       <div className="flex items-center mb-4">
                         <h3 className="text-lg sm:text-xl font-bold text-primary-blue">Phase 2: Minimum Viable Product Beta</h3>
@@ -1651,7 +2101,7 @@ function App() {
                   <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-4">Deep Dive: Our Whitepaper</h2>
                   <p className="text-lg sm:text-xl mb-8">Explore the comprehensive technical architecture, economic model, and long-term vision of FreelanceFlow in our detailed Whitepaper.</p>
                   <a
-                    href="/WHITEPAPER.pdf" 
+                    href="/WHITEPAPER.pdf"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-block px-8 py-3 bg-secondary-purple text-white font-semibold rounded-lg hover:bg-purple-700 shadow-lg transition duration-300"
@@ -1660,14 +2110,14 @@ function App() {
                   </a>
                 </div>
               </section>
-              
+
               <section id="contact" className="py-12 sm:py-16 bg-primary-blue text-white text-center pb-20">
                 <div className="max-w-4xl mx-auto px-4 transition duration-300 ease-in-out">
                   <h2 className="text-3xl sm:text-4xl font-bold mb-4">Connect with FreelanceFlow</h2>
                   <p className="text-lg sm:text-xl mb-8">Have questions, feedback, or want to partner? Reach out to us!</p>
                   <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
                     <a
-                      href="https://github.com/TarusNicky8/FreelanceFlow/blob/main/README.md" 
+                      href="https://github.com/TarusNicky8/FreelanceFlow/blob/main/README.md"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-block px-8 py-3 bg-secondary-purple text-white font-semibold rounded-lg hover:bg-purple-700 shadow-lg transition duration-300"
@@ -1675,7 +2125,7 @@ function App() {
                       Explore Our GitHub
                     </a>
                     <a
-                      href="mailto:nicodemuskiptoo88@gmail.com" 
+                      href="mailto:nicodemuskiptoo88@gmail.com"
                       className="inline-block px-8 py-3 bg-gray-200 text-primary-blue font-semibold rounded-lg hover:bg-gray-300 shadow-lg transition duration-300"
                     >
                       Email Us Directly
@@ -1684,10 +2134,10 @@ function App() {
                 </div>
               </section>
 
-              
+
               <footer className="bg-gray-800 text-white py-6 sm:py-8 text-center text-sm">
                 <div className="max-w-5xl mx-auto px-4 transition duration-300 ease-in-out">
-                  <p className="mb-3">&copy; {new Date().getFullYear()} FreelanceFlow. All rights reserved. Your gateway to global opportunities.</p> 
+                  <p className="mb-3">&copy; {new Date().getFullYear()} FreelanceFlow. All rights reserved. Your gateway to global opportunities.</p>
                   <div className="mt-2 flex flex-wrap justify-center gap-x-6 gap-y-3 text-2xl">
                     <a href="https://github.com/TarusNicky8" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition duration-300">
                       <i className="fab fa-github"></i>
@@ -1711,20 +2161,18 @@ function App() {
           <Route path="/profile" element={<Profile account={account} />} />
           <Route path="/job/:id" element={<JobDetails account={account} publicClient={publicClient} walletClient={walletClient} />} />
           <Route path="/divvi-integration" element={
-            <DivviIntegration 
-              account={account} 
-              walletClient={walletClient} 
-              publicClient={publicClient} 
-              status={status} 
-              setStatus={setStatus} 
-              amountToDeposit={amountToDeposit} 
-              setAmountToDeposit={setAmountToDeposit} 
-              connectWallet={connectWallet} 
-              handleDepositUSDC={handleDepositUSDC} 
+            <DivviIntegration
+              account={account}
+              walletClient={walletClient}
+              publicClient={publicClient}
+              status={status}
+              setStatus={setStatus}
+              amountToDeposit={amountToDeposit}
+              setAmountToDeposit={setAmountToDeposit}
             />
           } />
           <Route path="/post-job" element={<PostJob account={account} />} />
-          <Route path="/browse-jobs" element={<BrowseJobs />} /> 
+          <Route path="/browse-jobs" element={<BrowseJobs />} />
           <Route path="/cross-chain-transfer" element={<CrossChainIntegration account={account} publicClient={publicClient} walletClient={walletClient} />} />
           <Route path="/dispute-resolution" element={<DisputeResolution account={account} />} />
           <Route path="/withdraw" element={<Withdrawal account={account} />} />
