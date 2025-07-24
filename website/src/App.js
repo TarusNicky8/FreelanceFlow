@@ -2175,7 +2175,7 @@ function App() {
           <Route path="/dashboard" element={<Dashboard account={account} />} />
           <Route path="/profile" element={<Profile account={account} />} />
           <Route path="/job/:id" element={<JobDetails account={account} publicClient={publicClient} walletClient={walletClient} />} />
-          <Route path="/deposit-funds" element={ {/* Changed path */}
+          <Route path="/deposit-funds" element={
             <DivviIntegration
               account={account}
               walletClient={walletClient}
