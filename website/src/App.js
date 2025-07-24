@@ -4,9 +4,7 @@ import axios from 'axios';
 import { createWalletClient, custom, parseUnits, encodeFunctionData, createPublicClient, http, formatUnits } from 'viem';
 import { isAddress } from 'viem'; // Import isAddress for validation
 import { getAddress } from 'viem'; // Import getAddress for checksumming
-// Removed: import { useAccount, useNetwork } from 'wagmi'; // If you're using wagmi for wallet connection, this would be helpful. Assuming not for now.
 
-// import { getDataSuffix, submitReferral } from '@divvi/referral-sdk'; // Uncomment if Divvi is fully integrated
 import logo from './App icon.svg';
 
 const liskSepolia = {
@@ -143,12 +141,7 @@ const LiskIcon = () => (
 
 // --- DivviIntegration Component (Now uses depositGeneral) ---
 const DivviIntegration = ({ account, walletClient, publicClient, status, setStatus, amountToDeposit, setAmountToDeposit }) => {
-  // Debugging log for wallet connection status
-  useEffect(() => {
-    console.log("DivviIntegration - account:", account);
-    console.log("DivviIntegration - walletClient:", walletClient);
-    console.log("DivviIntegration - publicClient:", publicClient);
-  }, [account, walletClient, publicClient]);
+  // Removed debugging log for wallet connection status
 
   const handleDepositUSDCGeneral = async () => {
     if (!account || !walletClient || !publicClient) {
@@ -1743,6 +1736,29 @@ function App() {
     return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
   };
 
+  const initializeWeb3Clients = async (connectedAddress) => {
+    try {
+      const client = createWalletClient({
+        chain: liskSepolia,
+        transport: custom(window.ethereum),
+      });
+      const publicClientInstance = createPublicClient({
+        chain: liskSepolia,
+        transport: http(liskSepolia.rpcUrls.default.http[0]),
+      });
+      setWalletClient(client);
+      setPublicClient(publicClientInstance);
+      setAccount(connectedAddress);
+      setStatus(`Wallet connected: ${truncateAddress(connectedAddress)}`);
+    } catch (error) {
+      console.error("Error initializing Web3 clients:", error);
+      setStatus(`Error initializing wallet: ${error.message}`);
+      setAccount(null);
+      setWalletClient(null);
+      setPublicClient(null);
+    }
+  };
+
   const connectWallet = async () => {
     setStatus('Connecting wallet...');
     try {
@@ -1753,20 +1769,7 @@ function App() {
 
       // Request accounts directly from MetaMask
       const [address] = await window.ethereum.request({ method: 'eth_requestAccounts' });
-
-      const client = createWalletClient({
-        chain: liskSepolia,
-        transport: custom(window.ethereum),
-      });
-      const publicClientInstance = createPublicClient({
-        chain: liskSepolia,
-        transport: http(liskSepolia.rpcUrls.default.http[0]),
-      });
-
-      setWalletClient(client);
-      setPublicClient(publicClientInstance);
-      setAccount(address);
-      setStatus(`Wallet connected: ${truncateAddress(address)}`);
+      await initializeWeb3Clients(address); // Initialize clients after getting address
     } catch (error) {
       console.error("Error connecting wallet:", error);
       if (error.code === 4001) {
@@ -1774,16 +1777,18 @@ function App() {
       } else {
         setStatus(`Error connecting wallet: ${error.message}`);
       }
+      setAccount(null);
+      setWalletClient(null);
+      setPublicClient(null);
     }
   };
 
   // Listen for account changes (e.g., user changes account in MetaMask)
   useEffect(() => {
     if (window.ethereum) {
-      const handleAccountsChanged = (accounts) => {
+      const handleAccountsChanged = async (accounts) => {
         if (accounts.length > 0) {
-          setAccount(accounts[0]);
-          setStatus(`Wallet changed to: ${truncateAddress(accounts[0])}`);
+          await initializeWeb3Clients(accounts[0]); // Re-initialize clients on account change
         } else {
           setAccount(null);
           setWalletClient(null);
@@ -1792,9 +1797,15 @@ function App() {
         }
       };
 
-      // Initial check for already connected account
+      // Initial check for already connected account on component mount
       window.ethereum.request({ method: 'eth_accounts' })
-        .then(handleAccountsChanged)
+        .then(async (accounts) => {
+          if (accounts.length > 0) {
+            await initializeWeb3Clients(accounts[0]);
+          } else {
+            setStatus('No wallet connected initially.');
+          }
+        })
         .catch(error => console.error("Error checking initial accounts:", error));
 
       window.ethereum.on('accountsChanged', handleAccountsChanged);
@@ -1805,9 +1816,6 @@ function App() {
       };
     }
   }, []); // Empty dependency array means this runs once on mount
-
-  // handleDepositUSDC from DivviIntegration is moved into DivviIntegration component itself
-  // to encapsulate its logic and use the new depositGeneral function.
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
@@ -1845,7 +1853,7 @@ function App() {
                   </button>
                   {isInfoMenuOpen && (
                     <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
-                      <Link to="/divvi-integration" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Deposit Funds</Link> {/* Changed label */}
+                      <Link to="/deposit-funds" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Deposit Funds</Link> {/* Changed label */}
                       <Link to="/cross-chain-transfer" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Cross-Chain Transfer</Link>
                       <Link to="/dispute-resolution" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Dispute Resolution</Link>
                       <Link to="/withdraw" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Withdraw Funds</Link>
@@ -1886,7 +1894,7 @@ function App() {
                 <li><Link to="/post-job" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Post Job</Link></li>
                 <li><Link to="/browse-jobs" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Browse Jobs</Link></li>
                 <li className="text-gray-300 text-sm mt-4 mb-2">--- Information & Demos ---</li>
-                <li><Link to="/divvi-integration" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Deposit Funds</Link></li> {/* Changed label */}
+                <li><Link to="/deposit-funds" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Deposit Funds</Link></li> {/* Changed label */}
                 <li><Link to="/cross-chain-transfer" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Cross-Chain Transfer</Link></li>
                 <li><Link to="/dispute-resolution" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Dispute Resolution</Link></li>
                 <li><Link to="/withdraw" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Withdraw Funds</Link></li>
@@ -2167,7 +2175,7 @@ function App() {
           <Route path="/dashboard" element={<Dashboard account={account} />} />
           <Route path="/profile" element={<Profile account={account} />} />
           <Route path="/job/:id" element={<JobDetails account={account} publicClient={publicClient} walletClient={walletClient} />} />
-          <Route path="/divvi-integration" element={
+          <Route path="/deposit-funds" element={ {/* Changed path */}
             <DivviIntegration
               account={account}
               walletClient={walletClient}
