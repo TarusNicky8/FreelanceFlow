@@ -141,8 +141,6 @@ const LiskIcon = () => (
 
 // --- DivviIntegration Component (Now uses depositGeneral) ---
 const DivviIntegration = ({ account, walletClient, publicClient, status, setStatus, amountToDeposit, setAmountToDeposit }) => {
-  // Removed debugging log for wallet connection status
-
   const handleDepositUSDCGeneral = async () => {
     if (!account || !walletClient || !publicClient) {
       setStatus('Please connect your wallet first.');
@@ -152,6 +150,29 @@ const DivviIntegration = ({ account, walletClient, publicClient, status, setStat
       setStatus('Please enter a valid amount to deposit.');
       return;
     }
+
+    // --- Chain Mismatch Check ---
+    try {
+      const currentChainId = await walletClient.getChainId();
+      if (currentChainId !== liskSepolia.id) {
+        setStatus(`Wallet is on the wrong network. Please switch to ${liskSepolia.name} (Chain ID: ${liskSepolia.id}). Attempting to switch...`);
+        try {
+          await walletClient.switchChain({ id: liskSepolia.id });
+          setStatus(`Successfully switched to ${liskSepolia.name}. Please try the deposit again.`);
+          return; // Exit and let user retry after chain switch
+        } catch (switchError) {
+          console.error("Error switching chain:", switchError);
+          setStatus(`Failed to switch to ${liskSepolia.name}. Please switch manually in your wallet. Error: ${switchError.message}`);
+          return;
+        }
+      }
+    } catch (chainCheckError) {
+      console.error("Error checking current chain ID:", chainCheckError);
+      setStatus(`Could not verify wallet chain. Please ensure your wallet is connected and on ${liskSepolia.name}. Error: ${chainCheckError.message}`);
+      return;
+    }
+    // --- End Chain Mismatch Check ---
+
 
     setStatus('Initiating general USDC deposit with Divvi tracking...');
     try {
@@ -221,9 +242,9 @@ const DivviIntegration = ({ account, walletClient, publicClient, status, setStat
 
   return (
     <section className="max-w-3xl mx-auto p-6 bg-white shadow-lg rounded-lg my-8 text-center">
-      <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">Deposit Funds (General Escrow)</h2>
+      <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">Divvi Integration Demo: General Deposit USDC</h2>
       <p className="text-lg text-gray-700 mb-6">
-        Deposit USDC into the general escrow for future use. This process is enhanced with Divvi tracking for transparent on-chain activity.
+        This section demonstrates the secure USDC deposit process for general funds, enhanced with Divvi tracking for transparent on-chain activity.
       </p>
       <div className="mb-4">
         <label htmlFor="depositAmount" className="block text-lg font-medium text-gray-800 mb-2">Amount to Deposit (USDC):</label>
@@ -674,6 +695,28 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
       return;
     }
 
+    // --- Chain Mismatch Check for Job Funding ---
+    try {
+      const currentChainId = await walletClient.getChainId();
+      if (currentChainId !== liskSepolia.id) {
+        setStatusMessage(`Wallet is on the wrong network. Please switch to ${liskSepolia.name} (Chain ID: ${liskSepolia.id}). Attempting to switch...`);
+        try {
+          await walletClient.switchChain({ id: liskSepolia.id });
+          setStatusMessage(`Successfully switched to ${liskSepolia.name}. Please try funding the job again.`);
+          return; // Exit and let user retry after chain switch
+        } catch (switchError) {
+          console.error("Error switching chain:", switchError);
+          setStatusMessage(`Failed to switch to ${liskSepolia.name}. Please switch manually in your wallet. Error: ${switchError.message}`);
+          return;
+        }
+      }
+    } catch (chainCheckError) {
+      console.error("Error checking current chain ID:", chainCheckError);
+      setStatusMessage(`Could not verify wallet chain. Please ensure your wallet is connected and on ${liskSepolia.name}. Error: ${chainCheckError.message}`);
+      return;
+    }
+    // --- End Chain Mismatch Check ---
+
     setIsProcessingTx(true);
     setStatusMessage('Initiating fund deposit for job escrow...');
     setIsError(false);
@@ -756,6 +799,28 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
       return;
     }
 
+    // --- Chain Mismatch Check for Job Acceptance ---
+    try {
+      const currentChainId = await walletClient.getChainId();
+      if (currentChainId !== liskSepolia.id) {
+        setStatusMessage(`Wallet is on the wrong network. Please switch to ${liskSepolia.name} (Chain ID: ${liskSepolia.id}). Attempting to switch...`);
+        try {
+          await walletClient.switchChain({ id: liskSepolia.id });
+          setStatusMessage(`Successfully switched to ${liskSepolia.name}. Please try accepting the job again.`);
+          return; // Exit and let user retry after chain switch
+        } catch (switchError) {
+          console.error("Error switching chain:", switchError);
+          setStatusMessage(`Failed to switch to ${liskSepolia.name}. Please switch manually in your wallet. Error: ${switchError.message}`);
+          return;
+        }
+      }
+    } catch (chainCheckError) {
+      console.error("Error checking current chain ID:", chainCheckError);
+      setStatusMessage(`Could not verify wallet chain. Please ensure your wallet is connected and on ${liskSepolia.name}. Error: ${chainCheckError.message}`);
+      return;
+    }
+    // --- End Chain Mismatch Check ---
+
     setIsProcessingTx(true);
     setStatusMessage('Accepting job...');
     setIsError(false);
@@ -794,6 +859,28 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
       return;
     }
 
+    // --- Chain Mismatch Check for Approval ---
+    try {
+      const currentChainId = await walletClient.getChainId();
+      if (currentChainId !== liskSepolia.id) {
+        setStatusMessage(`Wallet is on the wrong network. Please switch to ${liskSepolia.name} (Chain ID: ${liskSepolia.id}). Attempting to switch...`);
+        try {
+          await walletClient.switchChain({ id: liskSepolia.id });
+          setStatusMessage(`Successfully switched to ${liskSepolia.name}. Please try approving the freelancer again.`);
+          return; // Exit and let user retry after chain switch
+        } catch (switchError) {
+          console.error("Error switching chain:", switchError);
+          setStatusMessage(`Failed to switch to ${liskSepolia.name}. Please switch manually in your wallet. Error: ${switchError.message}`);
+          return;
+        }
+      }
+    } catch (chainCheckError) {
+      console.error("Error checking current chain ID:", chainCheckError);
+      setStatusMessage(`Could not verify wallet chain. Please ensure your wallet is connected and on ${liskSepolia.name}. Error: ${chainCheckError.message}`);
+      return;
+    }
+    // --- End Chain Mismatch Check ---
+
     setIsProcessingTx(true);
     setStatusMessage('Approving freelancer...');
     setIsError(false);
@@ -830,6 +917,28 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
       return;
     }
 
+    // --- Chain Mismatch Check for Rejection ---
+    try {
+      const currentChainId = await walletClient.getChainId();
+      if (currentChainId !== liskSepolia.id) {
+        setStatusMessage(`Wallet is on the wrong network. Please switch to ${liskSepolia.name} (Chain ID: ${liskSepolia.id}). Attempting to switch...`);
+        try {
+          await walletClient.switchChain({ id: liskSepolia.id });
+          setStatusMessage(`Successfully switched to ${liskSepolia.name}. Please try rejecting the freelancer again.`);
+          return; // Exit and let user retry after chain switch
+        } catch (switchError) {
+          console.error("Error switching chain:", switchError);
+          setStatusMessage(`Failed to switch to ${liskSepolia.name}. Please switch manually in your wallet. Error: ${switchError.message}`);
+          return;
+        }
+      }
+    } catch (chainCheckError) {
+      console.error("Error checking current chain ID:", chainCheckError);
+      setStatusMessage(`Could not verify wallet chain. Please ensure your wallet is connected and on ${liskSepolia.name}. Error: ${chainCheckError.message}`);
+      return;
+    }
+    // --- End Chain Mismatch Check ---
+
     setIsProcessingTx(true);
     setStatusMessage('Rejecting freelancer...');
     setIsError(false);
@@ -865,6 +974,28 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
       setIsError(true);
       return;
     }
+
+    // --- Chain Mismatch Check for Marking Completed ---
+    try {
+      const currentChainId = await walletClient.getChainId();
+      if (currentChainId !== liskSepolia.id) {
+        setStatusMessage(`Wallet is on the wrong network. Please switch to ${liskSepolia.name} (Chain ID: ${liskSepolia.id}). Attempting to switch...`);
+        try {
+          await walletClient.switchChain({ id: liskSepolia.id });
+          setStatusMessage(`Successfully switched to ${liskSepolia.name}. Please try marking as completed again.`);
+          return; // Exit and let user retry after chain switch
+        } catch (switchError) {
+          console.error("Error switching chain:", switchError);
+          setStatusMessage(`Failed to switch to ${liskSepolia.name}. Please switch manually in your wallet. Error: ${switchError.message}`);
+          return;
+        }
+      }
+    } catch (chainCheckError) {
+      console.error("Error checking current chain ID:", chainCheckError);
+      setStatusMessage(`Could not verify wallet chain. Please ensure your wallet is connected and on ${liskSepolia.name}. Error: ${chainCheckError.message}`);
+      return;
+    }
+    // --- End Chain Mismatch Check ---
 
     setIsProcessingTx(true);
     setStatusMessage('Marking job as completed...');
@@ -907,6 +1038,28 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
       setIsError(true);
       return;
     }
+
+    // --- Chain Mismatch Check for Release Funds ---
+    try {
+      const currentChainId = await walletClient.getChainId();
+      if (currentChainId !== liskSepolia.id) {
+        setStatusMessage(`Wallet is on the wrong network. Please switch to ${liskSepolia.name} (Chain ID: ${liskSepolia.id}). Attempting to switch...`);
+        try {
+          await walletClient.switchChain({ id: liskSepolia.id });
+          setStatusMessage(`Successfully switched to ${liskSepolia.name}. Please try releasing funds again.`);
+          return; // Exit and let user retry after chain switch
+        } catch (switchError) {
+          console.error("Error switching chain:", switchError);
+          setStatusMessage(`Failed to switch to ${liskSepolia.name}. Please switch manually in your wallet. Error: ${switchError.message}`);
+          return;
+        }
+      }
+    } catch (chainCheckError) {
+      console.error("Error checking current chain ID:", chainCheckError);
+      setStatusMessage(`Could not verify wallet chain. Please ensure your wallet is connected and on ${liskSepolia.name}. Error: ${chainCheckError.message}`);
+      return;
+    }
+    // --- End Chain Mismatch Check ---
 
     setIsProcessingTx(true);
     setStatusMessage('Initiating fund release on-chain...');
@@ -967,6 +1120,28 @@ const JobDetails = ({ account, publicClient, walletClient }) => {
       setIsError(true);
       return;
     }
+
+    // --- Chain Mismatch Check for Refund Funds ---
+    try {
+      const currentChainId = await walletClient.getChainId();
+      if (currentChainId !== liskSepolia.id) {
+        setStatusMessage(`Wallet is on the wrong network. Please switch to ${liskSepolia.name} (Chain ID: ${liskSepolia.id}). Attempting to switch...`);
+        try {
+          await walletClient.switchChain({ id: liskSepolia.id });
+          setStatusMessage(`Successfully switched to ${liskSepolia.name}. Please try refunding funds again.`);
+          return; // Exit and let user retry after chain switch
+        } catch (switchError) {
+          console.error("Error switching chain:", switchError);
+          setStatusMessage(`Failed to switch to ${liskSepolia.name}. Please switch manually in your wallet. Error: ${switchError.message}`);
+          return;
+        }
+      }
+    } catch (chainCheckError) {
+      console.error("Error checking current chain ID:", chainCheckError);
+      setStatusMessage(`Could not verify wallet chain. Please ensure your wallet is connected and on ${liskSepolia.name}. Error: ${chainCheckError.message}`);
+      return;
+    }
+    // --- End Chain Mismatch Check ---
 
     setIsProcessingTx(true);
     setStatusMessage('Initiating fund refund on-chain...');
@@ -1382,6 +1557,28 @@ const CrossChainIntegration = ({ account, walletClient, publicClient }) => {
       return;
     }
 
+    // --- Chain Mismatch Check for Cross-Chain Transfer ---
+    try {
+      const currentChainId = await walletClient.getChainId();
+      if (currentChainId !== liskSepolia.id) {
+        setStatusMessage(`Wallet is on the wrong network. Please switch to ${liskSepolia.name} (Chain ID: ${liskSepolia.id}). Attempting to switch...`);
+        try {
+          await walletClient.switchChain({ id: liskSepolia.id });
+          setStatusMessage(`Successfully switched to ${liskSepolia.name}. Please try the transfer again.`);
+          return; // Exit and let user retry after chain switch
+        } catch (switchError) {
+          console.error("Error switching chain:", switchError);
+          setStatusMessage(`Failed to switch to ${liskSepolia.name}. Please switch manually in your wallet. Error: ${switchError.message}`);
+          return;
+        }
+      }
+    } catch (chainCheckError) {
+      console.error("Error checking current chain ID:", chainCheckError);
+      setStatusMessage(`Could not verify wallet chain. Please ensure your wallet is connected and on ${liskSepolia.name}. Error: ${chainCheckError.message}`);
+      return;
+    }
+    // --- End Chain Mismatch Check ---
+
     setIsProcessing(true);
     setStatusMessage(`Initiating cross-chain transfer of ${transferAmount} USDC from ${sourceChain} to ${destinationChain}...`);
     setIsError(false);
@@ -1788,7 +1985,7 @@ function App() {
     if (window.ethereum) {
       const handleAccountsChanged = async (accounts) => {
         if (accounts.length > 0) {
-          await initializeWeb3Clients(accounts[0]); // Re-initialize clients on account change
+          await initializeWeb3Clients(accounts[0]);
         } else {
           setAccount(null);
           setWalletClient(null);
@@ -1809,10 +2006,28 @@ function App() {
         .catch(error => console.error("Error checking initial accounts:", error));
 
       window.ethereum.on('accountsChanged', handleAccountsChanged);
+      window.ethereum.on('chainChanged', (chainId) => {
+        // Re-initialize clients if chain changes to ensure they are bound to the new chain
+        // This also implicitly updates the account if MetaMask changes it on chain switch
+        window.ethereum.request({ method: 'eth_accounts' })
+          .then(async (accounts) => {
+            if (accounts.length > 0) {
+              await initializeWeb3Clients(accounts[0]);
+            } else {
+              setAccount(null);
+              setWalletClient(null);
+              setPublicClient(null);
+              setStatus('Wallet disconnected or chain changed to unknown network.');
+            }
+          })
+          .catch(error => console.error("Error on chainChanged accounts check:", error));
+      });
+
 
       // Cleanup listener on component unmount
       return () => {
         window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+        window.ethereum.removeListener('chainChanged', () => {}); // Remove anonymous function listener
       };
     }
   }, []); // Empty dependency array means this runs once on mount
@@ -1853,7 +2068,7 @@ function App() {
                   </button>
                   {isInfoMenuOpen && (
                     <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
-                      <Link to="/deposit-funds" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Deposit Funds</Link> {/* Changed label */}
+                      <Link to="/divvi-integration" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Divvi Integration Demo</Link> {/* Reverted label */}
                       <Link to="/cross-chain-transfer" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Cross-Chain Transfer</Link>
                       <Link to="/dispute-resolution" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Dispute Resolution</Link>
                       <Link to="/withdraw" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Withdraw Funds</Link>
@@ -1894,7 +2109,7 @@ function App() {
                 <li><Link to="/post-job" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Post Job</Link></li>
                 <li><Link to="/browse-jobs" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Browse Jobs</Link></li>
                 <li className="text-gray-300 text-sm mt-4 mb-2">--- Information & Demos ---</li>
-                <li><Link to="/deposit-funds" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Deposit Funds</Link></li> {/* Changed label */}
+                <li><Link to="/divvi-integration" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Divvi Integration Demo</Link></li> {/* Reverted label */}
                 <li><Link to="/cross-chain-transfer" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Cross-Chain Transfer</Link></li>
                 <li><Link to="/dispute-resolution" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Dispute Resolution</Link></li>
                 <li><Link to="/withdraw" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Withdraw Funds</Link></li>
@@ -2175,7 +2390,7 @@ function App() {
           <Route path="/dashboard" element={<Dashboard account={account} />} />
           <Route path="/profile" element={<Profile account={account} />} />
           <Route path="/job/:id" element={<JobDetails account={account} publicClient={publicClient} walletClient={walletClient} />} />
-          <Route path="/deposit-funds" element={
+          <Route path="/divvi-integration" element={
             <DivviIntegration
               account={account}
               walletClient={walletClient}
