@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { BrowserRouter, Routes, Route, Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link, useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { createWalletClient, custom, parseUnits, encodeFunctionData, createPublicClient, http, formatUnits } from 'viem';
 import { isAddress } from 'viem'; // Import isAddress for validation
@@ -149,7 +149,7 @@ const LiskIcon = () => (
 const Notification = ({ message, type, onClose }) => {
   if (!message) return null;
 
-  const bgColor = type === 'error' ? 'bg-red-500' : 'bg-green-500';
+  const bgColor = type === 'error' ? 'bg-red-500' : type === 'success' ? 'bg-green-500' : 'bg-blue-500';
   const textColor = 'text-white';
 
   return (
@@ -162,12 +162,44 @@ const Notification = ({ message, type, onClose }) => {
   );
 };
 
+// --- Confirmation Modal Component ---
+const ConfirmationModal = ({ isOpen, title, message, onConfirm, onCancel, confirmButtonText, cancelButtonText, isProcessing, children }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50">
+      <div className="bg-white p-8 rounded-lg shadow-xl max-w-md w-full text-center">
+        <h3 className="text-2xl font-bold text-primary-blue mb-4">{title}</h3>
+        <p className="text-lg text-gray-700 mb-6">{message}</p>
+        {children} {/* Render children (e.g., additional form elements) here */}
+        <div className="flex justify-center space-x-4 mt-6">
+          <button
+            onClick={onConfirm}
+            className="px-6 py-3 bg-accent-green text-white font-semibold rounded-md hover:bg-green-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isProcessing}
+          >
+            {isProcessing ? 'Processing...' : confirmButtonText || 'Confirm'}
+          </button>
+          <button
+            onClick={onCancel}
+            className="px-6 py-3 bg-gray-400 text-white font-semibold rounded-md hover:bg-gray-500 transition duration-300"
+            disabled={isProcessing}
+          >
+            {cancelButtonText || 'Cancel'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 
 // --- DivviIntegration Component (Now uses depositGeneral) ---
 const DivviIntegration = ({ account, walletClient, publicClient, setNotification }) => {
   const [userUsdcBalance, setUserUsdcBalance] = useState(0);
   const [amountToDeposit, setAmountToDeposit] = useState('100');
   const [isProcessingTx, setIsProcessingTx] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false); // For confirmation modal
 
   // Fetch user's USDC balance
   useEffect(() => {
@@ -231,6 +263,11 @@ const DivviIntegration = ({ account, walletClient, publicClient, setNotification
     }
     // --- End Chain Mismatch Check ---
 
+    setShowConfirmModal(true); // Show confirmation modal
+  };
+
+  const confirmDeposit = async () => {
+    setShowConfirmModal(false); // Close modal
     setIsProcessingTx(true);
     setNotification('Initiating general USDC deposit with Divvi tracking...', 'info');
     try {
@@ -335,6 +372,16 @@ const DivviIntegration = ({ account, walletClient, publicClient, setNotification
       ) : (
         <p className="text-lg text-gray-600">Please connect your wallet in the header to deposit USDC.</p>
       )}
+
+      <ConfirmationModal
+        isOpen={showConfirmModal}
+        title="Confirm General Deposit"
+        message={`Are you sure you want to deposit ${amountToDeposit} USDC into the general escrow? You will be prompted to approve USDC and then confirm the deposit transaction in your wallet.`}
+        onConfirm={confirmDeposit}
+        onCancel={() => setShowConfirmModal(false)}
+        confirmButtonText="Yes, Deposit"
+        isProcessing={isProcessingTx}
+      />
     </section>
   );
 };
@@ -349,8 +396,8 @@ const Profile = ({ account }) => {
   const [portfolioInput, setPortfolioInput] = useState('');
   const [selectedRole, setSelectedRole] = useState('freelancer'); // State for role selection
   const [isLoading, setIsLoading] = useState(false);
-  const [statusMessage, setStatusMessage] = useState('');
-  const [isError, setIsError] = useState(false);
+  const [statusMessage, setStatusMessage] = useState(''); // Kept for Profile component's internal messages
+  const [isError, setIsError] = useState(false); // Kept for Profile component's internal error state
 
   const navigate = useNavigate();
 
@@ -496,7 +543,7 @@ const Profile = ({ account }) => {
             <label className="block text-lg font-medium text-gray-800 mb-1">Rating</label>
             <p className="text-xl font-semibold text-accent-green">
               {profile.rating !== undefined ? `${profile.rating}/5` : 'N/A'}
-              <span className="text-sm text-gray-500 ml-2">(based on completed jobs)</span>
+              <span className="text-sm text-gray-500 ml-2">(based on {profile.totalRatingsCount || 0} ratings)</span>
             </p>
           </div>
           <button
@@ -731,6 +778,8 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
   const messagesEndRef = useRef(null); // For scrolling messages into view
   const [ratingInput, setRatingInput] = useState(0); // For freelancer rating
   const [showRatingModal, setShowRatingModal] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false); // For general confirmations
+  const [modalAction, setModalAction] = useState(null); // To store which action the modal is confirming
 
 
   const navigate = useNavigate();
@@ -790,7 +839,7 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       return;
     }
     if (clientUsdcBalance < job.amount) {
-      setNotification('Insufficient USDC balance in your wallet to fund this job.', 'error'); // Enhanced message
+      setNotification('Insufficient USDC balance in your wallet for this job.', 'error'); // Enhanced message
       return;
     }
 
@@ -816,65 +865,69 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
     }
     // --- End Chain Mismatch Check ---
 
-    setIsProcessingTx(true);
-    setNotification('Initiating fund deposit for job escrow...', 'info');
+    setModalAction(() => async () => { // Set the action to be confirmed
+      setShowConfirmModal(false); // Close modal
+      setIsProcessingTx(true);
+      setNotification('Initiating fund deposit for job escrow...', 'info');
 
-    try {
-      const amountInSmallestUnit = parseUnits(job.amount.toString(), 6);
+      try {
+        const amountInSmallestUnit = parseUnits(job.amount.toString(), 6);
 
-      // 1. Approve USDC for the Escrow contract
-      const approveCallData = encodeFunctionData({
-        abi: usdcAbi,
-        functionName: 'approve',
-        args: [escrowContractAddress, amountInSmallestUnit],
-      });
+        // 1. Approve USDC for the Escrow contract
+        const approveCallData = encodeFunctionData({
+          abi: usdcAbi,
+          functionName: 'approve',
+          args: [escrowContractAddress, amountInSmallestUnit],
+        });
 
-      setNotification('Approving USDC for Escrow contract...', 'info');
-      const approveTxHash = await walletClient.sendTransaction({
-        account,
-        to: usdcContractAddress,
-        data: approveCallData,
-      });
+        setNotification('Approving USDC for Escrow contract...', 'info');
+        const approveTxHash = await walletClient.sendTransaction({
+          account,
+          to: usdcContractAddress,
+          data: approveCallData,
+        });
 
-      setNotification(`Approval transaction sent! Hash: ${truncateAddress(approveTxHash)}. Waiting for confirmation...`, 'info');
-      await publicClient.waitForTransactionReceipt({ hash: approveTxHash });
-      setNotification('USDC Approved. Now depositing funds to job escrow...', 'info');
+        setNotification(`Approval transaction sent! Hash: ${truncateAddress(approveTxHash)}. Waiting for confirmation...`, 'info');
+        await publicClient.waitForTransactionReceipt({ hash: approveTxHash });
+        setNotification('USDC Approved. Now depositing funds to job escrow...', 'info');
 
-      // 2. Deposit USDC into the job-specific escrow
-      const depositJobCallData = encodeFunctionData({
-        abi: escrowAbi,
-        functionName: 'depositJob',
-        args: [job._id, getAddress(job.client), getAddress(job.freelancer || '0x0000000000000000000000000000000000000000'), amountInSmallestUnit], // Pass client, freelancer, and amount
-      });
+        // 2. Deposit USDC into the job-specific escrow
+        const depositJobCallData = encodeFunctionData({
+          abi: escrowAbi,
+          functionName: 'depositJob',
+          args: [job._id, getAddress(job.client), getAddress(job.freelancer || '0x0000000000000000000000000000000000000000'), amountInSmallestUnit], // Pass client, freelancer, and amount
+        });
 
-      const depositTxHash = await walletClient.sendTransaction({
-        account,
-        to: escrowContractAddress,
-        data: depositJobCallData,
-        value: 0n,
-      });
+        const depositTxHash = await walletClient.sendTransaction({
+          account,
+          to: escrowContractAddress,
+          data: depositJobCallData,
+          value: 0n,
+        });
 
-      setNotification(`Deposit transaction sent! Hash: ${truncateAddress(depositTxHash)}. Waiting for confirmation...`, 'info');
-      await publicClient.waitForTransactionReceipt({ hash: depositTxHash });
-      setNotification('Job funds deposited successfully on-chain!', 'success');
+        setNotification(`Deposit transaction sent! Hash: ${truncateAddress(depositTxHash)}. Waiting for confirmation...`, 'info');
+        await publicClient.waitForTransactionReceipt({ hash: depositTxHash });
+        setNotification('Job funds deposited successfully on-chain!', 'success');
 
-      // 3. Update backend with deposit confirmation
-      await axios.put(`${API_BASE_URL}/api/jobs/${id}/deposit-confirmed`, {
-        clientAddress: account,
-        depositTxHash: depositTxHash,
-      });
+        // 3. Update backend with deposit confirmation
+        await axios.put(`${API_BASE_URL}/api/jobs/${id}/deposit-confirmed`, {
+          clientAddress: account,
+          depositTxHash: depositTxHash,
+        });
 
-      // Update local job state
-      setJob(prevJob => ({ ...prevJob, escrowStatus: 'deposited' }));
-      setNotification('Job funds confirmed and updated in backend!', 'success');
-      fetchJobAndBalance(); // Re-fetch to update balance and job state
+        // Update local job state
+        setJob(prevJob => ({ ...prevJob, escrowStatus: 'deposited' }));
+        setNotification('Job funds confirmed and updated in backend!', 'success');
+        fetchJobAndBalance(); // Re-fetch to update balance and job state
 
-    } catch (error) {
-      console.error("Error funding job escrow:", error);
-      setNotification(`Transaction failed or error funding job: ${error.message || 'Please try again.'}`, 'error');
-    } finally {
-      setIsProcessingTx(false);
-    }
+      } catch (error) {
+        console.error("Error funding job escrow:", error);
+        setNotification(`Transaction failed or error funding job: ${error.message || 'Please try again.'}`, 'error');
+      } finally {
+        setIsProcessingTx(false);
+      }
+    });
+    setShowConfirmModal(true); // Show confirmation modal
   };
 
   // --- Handle Freelancer Applying for Job ---
@@ -892,28 +945,32 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       return;
     }
     if (hasApplied) {
-      setNotification('You have already applied for this job.', 'error');
+      setNotification('You have already applied for this job.', 'info');
       return;
     }
 
-    setIsProcessingTx(true);
-    setNotification('Applying for job...', 'info');
-    try {
-      await axios.post(`${API_BASE_URL}/api/jobs/${id}/apply`, { applicantAddress: account });
+    setModalAction(() => async () => {
+      setShowConfirmModal(false);
+      setIsProcessingTx(true);
+      setNotification('Applying for job...', 'info');
+      try {
+        await axios.post(`${API_BASE_URL}/api/jobs/${id}/apply`, { applicantAddress: account });
 
-      // Update local job state to reflect application
-      setJob(prevJob => ({
-        ...prevJob,
-        applicants: [...(prevJob.applicants || []), { address: account, timestamp: new Date().toISOString() }]
-      }));
-      setNotification('Application submitted successfully! Client will review.', 'success');
+        // Update local job state to reflect application
+        setJob(prevJob => ({
+          ...prevJob,
+          applicants: [...(prevJob.applicants || []), { address: account, timestamp: new Date().toISOString() }]
+        }));
+        setNotification('Application submitted successfully! Client will review.', 'success');
 
-    } catch (error) {
-      console.error('Error applying for job:', error);
-      setNotification(`Error applying for job: ${error.message || 'Please try again.'}`, 'error');
-    } finally {
-      setIsProcessingTx(false);
-    }
+      } catch (error) {
+        console.error('Error applying for job:', error);
+        setNotification(`Error applying for job: ${error.message || 'Please try again.'}`, 'error');
+      } finally {
+        setIsProcessingTx(false);
+      }
+    });
+    setShowConfirmModal(true);
   };
 
   // --- Handle Client Approving an Applicant ---
@@ -922,39 +979,38 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       setNotification('Wallet not connected or you are not the client.', 'error');
       return;
     }
-    if (job.status !== 'open' || job.escrowStatus !== 'deposited') { // Job must be open and funded for client to approve
-      setNotification('Job is not open for applicant approval or not funded.', 'error');
+    if (job.status !== 'open' && job.status !== 'pending-client-approval') { // Allow approval if still open or if another freelancer was rejected
+      setNotification('Job is not in a state to approve applicants.', 'error');
       return;
     }
-    if (job.freelancer) {
-        setNotification('A freelancer is already assigned to this job. Reject them first if you wish to approve another.', 'error');
-        return;
-    }
 
+    setModalAction(() => async () => {
+      setShowConfirmModal(false);
+      setIsProcessingTx(true);
+      setNotification(`Approving applicant ${truncateAddress(applicantAddress)}...`, 'info');
+      try {
+        await axios.put(`${API_BASE_URL}/api/jobs/${id}/approve-applicant`, {
+          clientAddress: account,
+          freelancerAddress: applicantAddress
+        });
 
-    setIsProcessingTx(true);
-    setNotification(`Approving applicant ${truncateAddress(applicantAddress)}...`, 'info');
-    try {
-      await axios.put(`${API_BASE_URL}/api/jobs/${id}/approve-applicant`, {
-        clientAddress: account,
-        freelancerAddress: applicantAddress
-      });
+        // Update local job state
+        setJob(prevJob => ({
+          ...prevJob,
+          status: 'pending-client-approval',
+          freelancer: applicantAddress,
+          applicants: prevJob.applicants.filter(app => app.address.toLowerCase() !== applicantAddress.toLowerCase()) // Remove approved from applicants list
+        }));
+        setNotification(`Applicant ${truncateAddress(applicantAddress)} approved! Job is now pending freelancer acceptance.`, 'success');
 
-      // Update local job state
-      setJob(prevJob => ({
-        ...prevJob,
-        status: 'pending-client-approval',
-        freelancer: applicantAddress,
-        applicants: prevJob.applicants.filter(app => app.address.toLowerCase() !== applicantAddress.toLowerCase()) // Remove approved from applicants list
-      }));
-      setNotification(`Applicant ${truncateAddress(applicantAddress)} approved! Job is now pending freelancer acceptance.`, 'success');
-
-    } catch (error) {
-      console.error('Error approving applicant:', error);
-      setNotification(`Error approving applicant: ${error.message || 'Please try again.'}`, 'error');
-    } finally {
-      setIsProcessingTx(false);
-    }
+      } catch (error) {
+        console.error('Error approving applicant:', error);
+        setNotification(`Error approving applicant: ${error.message || 'Please try again.'}`, 'error');
+      } finally {
+        setIsProcessingTx(false);
+      }
+    });
+    setShowConfirmModal(true);
   };
 
   // --- Handle Client Rejecting an Applicant ---
@@ -963,32 +1019,36 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       setNotification('Wallet not connected or you are not the client.', 'error');
       return;
     }
-    if (job.status !== 'open' || job.escrowStatus !== 'deposited') { // Job must be open and funded for client to reject
-      setNotification('Job is not open for applicant rejection or not funded.', 'error');
+    if (job.status !== 'open' && job.status !== 'pending-client-approval') {
+      setNotification('Job is not in a state to reject applicants.', 'error');
       return;
     }
 
-    setIsProcessingTx(true);
-    setNotification(`Rejecting applicant ${truncateAddress(applicantAddress)}...`, 'info');
-    try {
-      await axios.put(`${API_BASE_URL}/api/jobs/${id}/reject-applicant`, {
-        clientAddress: account,
-        freelancerAddress: applicantAddress // This is the applicant to remove
-      });
+    setModalAction(() => async () => {
+      setShowConfirmModal(false);
+      setIsProcessingTx(true);
+      setNotification(`Rejecting applicant ${truncateAddress(applicantAddress)}...`, 'info');
+      try {
+        await axios.put(`${API_BASE_URL}/api/jobs/${id}/reject-applicant`, {
+          clientAddress: account,
+          freelancerAddress: applicantAddress // This is the applicant to remove
+        });
 
-      // Update local job state
-      setJob(prevJob => ({
-        ...prevJob,
-        applicants: prevJob.applicants.filter(app => app.address.toLowerCase() !== applicantAddress.toLowerCase())
-      }));
-      setNotification(`Applicant ${truncateAddress(applicantAddress)} rejected.`, 'info');
+        // Update local job state
+        setJob(prevJob => ({
+          ...prevJob,
+          applicants: prevJob.applicants.filter(app => app.address.toLowerCase() !== applicantAddress.toLowerCase())
+        }));
+        setNotification(`Applicant ${truncateAddress(applicantAddress)} rejected.`, 'success');
 
-    } catch (error) {
-      console.error('Error rejecting applicant:', error);
-      setNotification(`Error rejecting applicant: ${error.message || 'Please try again.'}`, 'error');
-    } finally {
-      setIsProcessingTx(false);
-    }
+      } catch (error) {
+        console.error('Error rejecting applicant:', error);
+        setNotification(`Error rejecting applicant: ${error.message || 'Please try again.'}`, 'error');
+      } finally {
+        setIsProcessingTx(false);
+      }
+    });
+    setShowConfirmModal(true);
   };
 
 
@@ -1025,24 +1085,28 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
     }
     // --- End Chain Mismatch Check ---
 
-    setIsProcessingTx(true);
-    setNotification('Accepting assigned job...', 'info');
-    try {
-      await axios.put(`${API_BASE_URL}/api/jobs/${id}/accept-assigned`, { freelancerAddress: account });
+    setModalAction(() => async () => {
+      setShowConfirmModal(false);
+      setIsProcessingTx(true);
+      setNotification('Accepting assigned job...', 'info');
+      try {
+        await axios.put(`${API_BASE_URL}/api/jobs/${id}/accept-assigned`, { freelancerAddress: account });
 
-      setJob(prevJob => ({ ...prevJob, status: 'in-progress' }));
-      setNotification('Job accepted! It is now in progress.', 'success');
+        setJob(prevJob => ({ ...prevJob, status: 'in-progress' }));
+        setNotification('Job accepted! It is now in progress.', 'success');
 
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 1500);
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 1500);
 
-    } catch (error) {
-      console.error('Error accepting assigned job:', error);
-      setNotification(`Error accepting assigned job: ${error.message || 'Please try again.'}`, 'error');
-    } finally {
-      setIsProcessingTx(false);
-    }
+      } catch (error) {
+        console.error('Error accepting assigned job:', error);
+        setNotification(`Error accepting assigned job: ${error.message || 'Please try again.'}`, 'error');
+      } finally {
+        setIsProcessingTx(false);
+      }
+    });
+    setShowConfirmModal(true);
   };
 
 
@@ -1079,24 +1143,28 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
     }
     // --- End Chain Mismatch Check ---
 
-    setIsProcessingTx(true);
-    setNotification('Marking job as completed...', 'info');
-    try {
-      await axios.put(`${API_BASE_URL}/api/jobs/${id}/mark-completed`, { freelancerAddress: account });
+    setModalAction(() => async () => {
+      setShowConfirmModal(false);
+      setIsProcessingTx(true);
+      setNotification('Marking job as completed...', 'info');
+      try {
+        await axios.put(`${API_BASE_URL}/api/jobs/${id}/mark-completed`, { freelancerAddress: account });
 
-      setJob(prevJob => ({ ...prevJob, status: 'completed' })); // Frontend status update
-      setNotification('Job marked as completed! Client can now release funds.', 'success');
+        setJob(prevJob => ({ ...prevJob, status: 'completed' })); // Frontend status update
+        setNotification('Job marked as completed! Client can now release funds.', 'success');
 
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 1500);
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 1500);
 
-    } catch (error) {
-      console.error('Error marking job as completed:', error);
-      setNotification(`Error marking job as completed: ${error.message || 'Please try again.'}`, 'error');
-    } finally {
-      setIsProcessingTx(false);
-    }
+      } catch (error) {
+        console.error('Error marking job as completed:', error);
+        setNotification(`Error marking job as completed: ${error.message || 'Please try again.'}`, 'error');
+      } finally {
+        setIsProcessingTx(false);
+      }
+    });
+    setShowConfirmModal(true);
   };
 
 
@@ -1111,7 +1179,7 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       return;
     }
     if (job.status !== 'completed' || job.escrowStatus !== 'deposited') { // Job must be marked completed by freelancer, escrow active
-      setNotification('Job is not in a state for fund release (must be completed and escrow deposited).', 'error');
+      setNotification('Job is not in a state for fund release (must be completed and funds deposited).', 'error');
       return;
     }
 
@@ -1137,48 +1205,46 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
     }
     // --- End Chain Mismatch Check ---
 
-    setIsProcessingTx(true);
-    setNotification('Initiating fund release on-chain...', 'info');
-    try {
-      const releaseCallData = encodeFunctionData({
-        abi: escrowAbi,
-        functionName: 'releaseJob', // Call job-specific release
-        args: [job._id], // Pass job ID
-      });
+    setModalAction(() => async () => {
+      setShowConfirmModal(false);
+      setIsProcessingTx(true);
+      setNotification('Initiating fund release on-chain...', 'info');
+      try {
+        const releaseCallData = encodeFunctionData({
+          abi: escrowAbi,
+          functionName: 'releaseJob', // Call job-specific release
+          args: [job._id], // Pass job ID
+        });
 
-      const txHash = await walletClient.sendTransaction({
-        account,
-        to: escrowContractAddress,
-        data: releaseCallData,
-      });
+        const txHash = await walletClient.sendTransaction({
+          account,
+          to: escrowContractAddress,
+          data: releaseCallData,
+        });
 
-      setNotification(`Transaction sent! Hash: ${truncateAddress(txHash)}. Waiting for confirmation...`, 'info');
-      await publicClient.waitForTransactionReceipt({ hash: txHash });
+        setNotification(`Transaction sent! Hash: ${truncateAddress(txHash)}. Waiting for confirmation...`, 'info');
+        await publicClient.waitForTransactionReceipt({ hash: txHash });
 
-      // Update backend after successful on-chain release
-      await axios.put(`${API_BASE_URL}/api/jobs/${id}/release-confirmed`, {
-        clientAddress: account,
-        completionTxHash: txHash,
-      });
+        // Update backend after successful on-chain release
+        await axios.put(`${API_BASE_URL}/api/jobs/${id}/release-confirmed`, {
+          clientAddress: account,
+          completionTxHash: txHash,
+        });
 
-      setJob(prevJob => ({ ...prevJob, escrowStatus: 'released' })); // Update local escrow status
-      setNotification('Funds released successfully, job marked as completed!', 'success');
+        setJob(prevJob => ({ ...prevJob, escrowStatus: 'released' })); // Update local escrow status
+        setNotification('Funds released successfully, job marked as completed!', 'success');
 
-      // Show rating modal after successful release
-      if (job.freelancer) {
-          setShowRatingModal(true);
+        // Show rating modal after successful release
+        setShowRatingModal(true);
+
+      } catch (error) {
+        console.error('Error releasing funds:', error);
+        setNotification(`Transaction failed or error releasing funds: ${error.message || 'Please try again.'}`, 'error');
+      } finally {
+        setIsProcessingTx(false);
       }
-
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 1500);
-
-    } catch (error) {
-      console.error('Error releasing funds:', error);
-      setNotification(`Transaction failed or error releasing funds: ${error.message || 'Please try again.'}`, 'error');
-    } finally {
-      setIsProcessingTx(false);
-    }
+    });
+    setShowConfirmModal(true);
   };
 
   // --- Handle Client Refunding Funds (On-chain) ---
@@ -1191,8 +1257,8 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       setNotification('Only the client can refund funds.', 'error');
       return;
     }
-    if (job.escrowStatus !== 'deposited' && job.escrowStatus !== 'disputed') {
-      setNotification('Job is not in a deposited or disputed state for refund.', 'error');
+    if (job.escrowStatus !== 'deposited' && job.escrowStatus !== 'disputed') { // Can refund if deposited (not yet released) or disputed
+      setNotification('Job is not in a state for refund (must be deposited or disputed).', 'error');
       return;
     }
 
@@ -1218,42 +1284,46 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
     }
     // --- End Chain Mismatch Check ---
 
-    setIsProcessingTx(true);
-    setNotification('Initiating fund refund on-chain...', 'info');
-    try {
-      const refundCallData = encodeFunctionData({
-        abi: escrowAbi,
-        functionName: 'refundJob', // Call job-specific refund
-        args: [job._id], // Pass job ID
-      });
+    setModalAction(() => async () => {
+      setShowConfirmModal(false);
+      setIsProcessingTx(true);
+      setNotification('Initiating fund refund on-chain...', 'info');
+      try {
+        const refundCallData = encodeFunctionData({
+          abi: escrowAbi,
+          functionName: 'refundJob', // Call job-specific refund
+          args: [job._id], // Pass job ID
+        });
 
-      const txHash = await walletClient.sendTransaction({
-        account,
-        to: escrowContractAddress,
-        data: refundCallData,
-      });
+        const txHash = await walletClient.sendTransaction({
+          account,
+          to: escrowContractAddress,
+          data: refundCallData,
+        });
 
-      setNotification(`Transaction sent! Hash: ${truncateAddress(txHash)}. Waiting for confirmation...`, 'info');
-      await publicClient.waitForTransactionReceipt({ hash: txHash });
+        setNotification(`Transaction sent! Hash: ${truncateAddress(txHash)}. Waiting for confirmation...`, 'info');
+        await publicClient.waitForTransactionReceipt({ hash: txHash });
 
-      // Update backend after successful on-chain refund
-      await axios.put(`${API_BASE_URL}/api/jobs/${id}/refund-confirmed`, {
-        clientAddress: account,
-      });
+        // Update backend after successful on-chain refund
+        await axios.put(`${API_BASE_URL}/api/jobs/${id}/refund-confirmed`, {
+          clientAddress: account,
+        });
 
-      setJob(prevJob => ({ ...prevJob, escrowStatus: 'refunded', status: 'cancelled' })); // Update local statuses
-      setNotification('Funds refunded successfully, job marked as cancelled!', 'success');
+        setJob(prevJob => ({ ...prevJob, escrowStatus: 'refunded', status: 'cancelled' })); // Update local statuses
+        setNotification('Funds refunded successfully, job marked as cancelled!', 'success');
 
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 1500);
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 1500);
 
-    } catch (error) {
-      console.error('Error refunding funds:', error);
-      setNotification(`Transaction failed or error refunding funds: ${error.message || 'Please try again.'}`, 'error');
-    } finally {
-      setIsProcessingTx(false);
-    }
+      } catch (error) {
+        console.error('Error refunding funds:', error);
+        setNotification(`Transaction failed or error refunding funds: ${error.message || 'Please try again.'}`, 'error');
+      } finally {
+        setIsProcessingTx(false);
+      }
+    });
+    setShowConfirmModal(true);
   };
 
   // --- Handle Sending a Message ---
@@ -1293,34 +1363,38 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
     }
   };
 
-  // --- Handle Submitting Freelancer Rating ---
-  const handleSubmitRating = async () => {
+  // --- Handle Rating Freelancer (from modal) ---
+  const handleRateFreelancer = async () => {
     if (!account || !job || !isClient || !job.freelancer) {
-      setNotification('Unauthorized or job data missing for rating.', 'error');
+      setNotification('Cannot rate: Wallet not connected, job data missing, or you are not the client.', 'error');
       return;
     }
     if (ratingInput < 1 || ratingInput > 5) {
-      setNotification('Please select a rating between 1 and 5.', 'error');
+      setNotification('Please provide a rating between 1 and 5.', 'error');
+      return;
+    }
+    if (job.rated) {
+      setNotification('Freelancer has already been rated for this job.', 'info');
+      setShowRatingModal(false); // Close modal if already rated
       return;
     }
 
+    setShowRatingModal(false); // Close rating modal
     setIsProcessingTx(true);
-    setNotification(`Submitting rating of ${ratingInput} for freelancer ${truncateAddress(job.freelancer)}...`, 'info');
+    setNotification('Submitting rating...', 'info');
     try {
       await axios.put(`${API_BASE_URL}/api/jobs/${id}/rate-freelancer`, {
         clientAddress: account,
         freelancerAddress: job.freelancer,
-        rating: ratingInput,
+        rating: parseInt(ratingInput),
       });
 
+      setJob(prevJob => ({ ...prevJob, rated: true })); // Mark job as rated
       setNotification('Freelancer rated successfully!', 'success');
-      setShowRatingModal(false); // Close modal
-      setRatingInput(0); // Reset rating input
-      // Optionally re-fetch job or profile to show updated rating, though not strictly necessary for this flow
 
     } catch (error) {
-      console.error('Error submitting rating:', error);
-      setNotification(`Error submitting rating: ${error.message || 'Please try again.'}`, 'error');
+      console.error('Error rating freelancer:', error);
+      setNotification(`Error rating freelancer: ${error.message || 'Please try again.'}`, 'error');
     } finally {
       setIsProcessingTx(false);
     }
@@ -1362,6 +1436,7 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
   const showMarkCompletedButton = isFreelancer && job.status === 'in-progress';
   const showReleaseFundsButton = isClient && job.status === 'completed' && job.escrowStatus === 'deposited'; // Client releases after freelancer marks completed
   const showRefundFundsButton = isClient && (job.escrowStatus === 'deposited' || job.escrowStatus === 'disputed'); // Client can refund if deposited or disputed
+  const showRateFreelancerButton = isClient && job.escrowStatus === 'released' && job.freelancer && !job.rated;
 
 
   return (
@@ -1371,21 +1446,26 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       <div className="space-y-3 text-gray-700 mb-6">
         <p className="text-lg">Description: {job.description}</p>
         <p className="text-lg">Amount: <span className="font-semibold text-accent-green">{job.amount} USDC</span></p>
-        <p className="text-lg">
-          Client: {job.client ? (
-            <Link to={`/profile/${job.client}`} className="font-mono text-primary-blue hover:underline">
+        <p className="text-lg">Client: <span className="font-mono text-secondary-purple">
+          {job.client ? (
+            <Link to={`/profile/${job.client}`} className="text-primary-blue hover:underline">
               {truncateAddress(job.client)}
             </Link>
           ) : 'N/A'}
-        </p>
-        <p className="text-lg">
-          Freelancer: {job.freelancer ? (
-            <Link to={`/profile/${job.freelancer}`} className="font-mono text-primary-blue hover:underline">
+        </span></p>
+        <p className="text-lg">Freelancer: <span className="font-mono text-secondary-purple">
+          {job.freelancer ? (
+            <Link to={`/profile/${job.freelancer}`} className="text-primary-blue hover:underline">
               {truncateAddress(job.freelancer)}
             </Link>
           ) : 'Not assigned'}
+        </span></p>
+        <p className="text-lg">
+          Current Status: <span className={`font-semibold ${job.status === 'open' ? 'text-blue-600' : job.status === 'pending-client-approval' ? 'text-orange-500' : job.status === 'in-progress' ? 'text-yellow-600' : job.status === 'completed' ? 'text-green-600' : job.status === 'disputed' ? 'text-red-600' : 'text-gray-600'}`}>
+            {job.status}
+            {job.status === 'disputed' && <span className="ml-2 text-red-700">(Disputed!)</span>}
+          </span>
         </p>
-        <p className="text-lg">Current Status: <span className={`font-semibold ${job.status === 'open' ? 'text-blue-600' : job.status === 'pending-client-approval' ? 'text-orange-500' : job.status === 'in-progress' ? 'text-yellow-600' : job.status === 'completed' ? 'text-green-600' : job.status === 'disputed' ? 'text-red-600' : 'text-gray-600'}`}>{job.status}</span></p>
         <p className="text-lg">Escrow Status: <span className={`font-semibold ${job.escrowStatus === 'pending-deposit' ? 'text-red-500' : job.escrowStatus === 'deposited' || job.escrowStatus === 'active' ? 'text-green-500' : 'text-gray-600'}`}>{job.escrowStatus}</span></p>
         {isClient && <p className="text-lg">Your USDC Balance: <span className="font-semibold text-primary-blue">{clientUsdcBalance} USDC</span></p>}
       </div>
@@ -1420,7 +1500,7 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
             onClick={handleAcceptAssignedJob}
             disabled={isProcessingTx || !account}
           >
-            {isProcessingTx ? 'Accept Assigned Job' : 'Accept Assigned Job'}
+            {isProcessingTx ? 'Accepting Job...' : 'Accept Assigned Job'}
           </button>
         )}
 
@@ -1454,6 +1534,17 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
             disabled={isProcessingTx || !account}
           >
             {isProcessingTx ? 'Refunding...' : 'Refund Funds'}
+          </button>
+        )}
+
+        {/* Client: Rate Freelancer Button */}
+        {showRateFreelancerButton && (
+          <button
+            className="px-6 py-3 bg-purple-600 text-white font-semibold rounded-md hover:bg-purple-700 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={() => setShowRatingModal(true)}
+            disabled={isProcessingTx || !account}
+          >
+            Rate Freelancer
           </button>
         )}
       </div>
@@ -1496,7 +1587,7 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       )}
 
       {/* In-App Messaging Section */}
-      {(isClient || (isFreelancer && job.freelancer)) && (job.status !== 'open' || job.freelancer) && ( // Only show messaging if job is assigned/in progress/completed
+      {(isClient || isFreelancer) && job.status !== 'open' && ( // Only show messaging if job is assigned/in progress/completed
         <div className="mt-8 p-4 bg-gray-50 rounded-lg shadow-inner">
           <h3 className="text-xl font-semibold text-primary-blue mb-4">Job Messages</h3>
           <div className="h-64 overflow-y-auto border border-gray-200 rounded-md p-3 mb-4 bg-white">
@@ -1510,11 +1601,7 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
                       : 'bg-gray-200 text-gray-800 mr-auto'
                   }`}
                 >
-                  <p className="font-semibold text-sm">
-                    <Link to={`/profile/${message.sender}`} className="text-blue-200 hover:underline">
-                      {truncateAddress(message.sender)}
-                    </Link>
-                  </p>
+                  <p className="font-semibold text-sm">{truncateAddress(message.sender)}</p>
                   <p className="text-base break-words">{message.text}</p>
                   <p className="text-xs text-right opacity-80 mt-1">{new Date(message.timestamp).toLocaleString()}</p>
                 </div>
@@ -1549,36 +1636,82 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
         <div className="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50">
           <div className="bg-white p-8 rounded-lg shadow-xl max-w-md w-full text-center">
             <h3 className="text-2xl font-bold text-primary-blue mb-4">Rate Freelancer</h3>
-            <p className="text-lg text-gray-700 mb-6">How would you rate {truncateAddress(job.freelancer)} for this job?</p>
-            <div className="flex justify-center space-x-2 mb-6">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                  key={star}
-                  onClick={() => setRatingInput(star)}
-                  className={`text-4xl ${ratingInput >= star ? 'text-yellow-500' : 'text-gray-300'} hover:text-yellow-400 transition-colors`}
-                >
-                  &#9733; {/* Unicode star character */}
-                </button>
-              ))}
+            <p className="text-lg text-gray-700 mb-6">How would you rate {job.freelancer ? truncateAddress(job.freelancer) : 'the freelancer'} for this job?</p>
+            <input
+              type="number"
+              min="1"
+              max="5"
+              value={ratingInput}
+              onChange={(e) => setRatingInput(parseInt(e.target.value))}
+              className="w-24 p-3 border border-gray-300 rounded-md text-center text-xl font-semibold mb-6"
+            />
+            <div className="flex justify-center space-x-4">
+              <button
+                onClick={handleRateFreelancer}
+                className="px-6 py-3 bg-accent-green text-white font-semibold rounded-md hover:bg-green-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isProcessingTx || ratingInput < 1 || ratingInput > 5}
+              >
+                Submit Rating
+              </button>
+              <button
+                onClick={() => setShowRatingModal(false)}
+                className="px-6 py-3 bg-gray-400 text-white font-semibold rounded-md hover:bg-gray-500 transition duration-300"
+                disabled={isProcessingTx}
+              >
+                Cancel
+              </button>
             </div>
-            <button
-              onClick={handleSubmitRating}
-              className="px-6 py-3 bg-accent-green text-white font-semibold rounded-md hover:bg-green-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={isProcessingTx || ratingInput === 0}
-            >
-              {isProcessingTx ? 'Submitting...' : 'Submit Rating'}
-            </button>
-            <button
-              onClick={() => setShowRatingModal(false)}
-              className="mt-4 px-6 py-3 bg-gray-400 text-white font-semibold rounded-md hover:bg-gray-500 transition duration-300 ml-2"
-              disabled={isProcessingTx}
-            >
-              Cancel
-            </button>
           </div>
         </div>
       )}
 
+      {/* General Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showConfirmModal}
+        title={
+          modalAction === handleFundEscrow ? "Confirm Fund Job Escrow" :
+          modalAction === handleApply ? "Confirm Job Application" :
+          modalAction === handleApproveApplicant ? "Confirm Applicant Approval" :
+          modalAction === handleRejectApplicant ? "Confirm Applicant Rejection" :
+          modalAction === handleAcceptAssignedJob ? "Confirm Job Acceptance" :
+          modalAction === handleMarkCompleted ? "Confirm Job Completion" :
+          modalAction === handleReleaseFunds ? "Confirm Fund Release" :
+          modalAction === handleRefundFunds ? "Confirm Fund Refund" :
+          "Confirm Action"
+        }
+        message={
+          modalAction === handleFundEscrow ? `Are you sure you want to fund this job with ${job?.amount} USDC? You will be prompted to approve USDC and then confirm the deposit transaction in your wallet.` :
+          modalAction === handleApply ? `Are you sure you want to apply for the job "${job?.title}"?` :
+          modalAction === handleApproveApplicant ? `Are you sure you want to approve this applicant? They will be assigned to the job.` :
+          modalAction === handleRejectApplicant ? `Are you sure you want to reject this applicant? They will be removed from the applicant list.` :
+          modalAction === handleAcceptAssignedJob ? `Are you sure you want to accept the assigned job "${job?.title}"? This will mark the job as 'in-progress'.` :
+          modalAction === handleMarkCompleted ? `Are you sure you want to mark the job "${job?.title}" as completed? The client will then be able to release funds.` :
+          modalAction === handleReleaseFunds ? `Are you sure you want to release ${job?.amount} USDC to ${truncateAddress(job?.freelancer)} for job "${job?.title}"? This action is irreversible on-chain.` :
+          modalAction === handleRefundFunds ? `Are you sure you want to refund ${job?.amount} USDC to yourself for job "${job?.title}"? This will cancel the job.` :
+          "Please confirm your action."
+        }
+        onConfirm={() => {
+          if (modalAction) {
+            modalAction();
+          }
+        }}
+        onCancel={() => {
+          setShowConfirmModal(false);
+          setModalAction(null);
+        }}
+        confirmButtonText={
+          modalAction === handleFundEscrow ? "Fund Escrow" :
+          modalAction === handleApply ? "Apply" :
+          modalAction === handleApproveApplicant ? "Approve" :
+          modalAction === handleRejectApplicant ? "Reject" :
+          modalAction === handleAcceptAssignedJob ? "Accept Job" :
+          modalAction === handleMarkCompleted ? "Mark Completed" :
+          modalAction === handleReleaseFunds ? "Release Funds" :
+          modalAction === handleRefundFunds ? "Refund Funds" :
+          "Confirm"
+        }
+        isProcessing={isProcessingTx}
+      />
 
       <button
         className="mt-8 px-6 py-3 bg-gray-600 text-white font-semibold rounded-md hover:bg-gray-700 transition duration-300"
@@ -1598,6 +1731,7 @@ const PostJob = ({ account, setNotification }) => {
   const [jobAmount, setJobAmount] = useState('');
   const [requiredSkillsInput, setRequiredSkillsInput] = useState(''); // New state for required skills
   const [isLoading, setIsLoading] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false); // For confirmation modal
 
   const handlePostJob = async (e) => {
     e.preventDefault();
@@ -1610,6 +1744,11 @@ const PostJob = ({ account, setNotification }) => {
       return;
     }
 
+    setShowConfirmModal(true); // Show confirmation modal
+  };
+
+  const confirmPostJob = async () => {
+    setShowConfirmModal(false); // Close modal
     setIsLoading(true);
     setNotification('Posting job...', 'info');
 
@@ -1643,6 +1782,7 @@ const PostJob = ({ account, setNotification }) => {
       setIsLoading(false);
     }
   };
+
 
   return (
     <div className="max-w-3xl mx-auto p-4 bg-white shadow-lg rounded-lg my-8">
@@ -1719,19 +1859,29 @@ const PostJob = ({ account, setNotification }) => {
           {isLoading ? 'Posting...' : 'Post Job'}
         </button>
       </form>
+
+      <ConfirmationModal
+        isOpen={showConfirmModal}
+        title="Confirm Job Posting"
+        message={`Are you sure you want to post the job "${jobTitle}" for ${jobAmount} USDC?`}
+        onConfirm={confirmPostJob}
+        onCancel={() => setShowConfirmModal(false)}
+        confirmButtonText="Yes, Post Job"
+        isProcessing={isLoading}
+      />
     </div>
   );
 };
 
 // --- BrowseJobs Component ---
-const BrowseJobs = () => {
+const BrowseJobs = ({ setNotification }) => {
   const [jobs, setJobs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
   const [filterSkills, setFilterSkills] = useState('');
-  const [minAmount, setMinAmount] = useState(''); // New state for min amount
-  const [maxAmount, setMaxAmount] = useState(''); // New state for max amount
-  const [sortBy, setSortBy] = useState('dateDesc'); // New state for sorting
+  const [minAmount, setMinAmount] = useState('');
+  const [maxAmount, setMaxAmount] = useState('');
+  const [sortBy, setSortBy] = useState('dateDesc'); // 'dateDesc', 'dateAsc', 'amountDesc', 'amountAsc'
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -1739,34 +1889,53 @@ const BrowseJobs = () => {
       setIsLoading(true);
       setErrorMessage('');
       try {
-        const params = {
-          status: 'open',
-          escrowStatus: 'deposited',
-        };
+        // Fetch jobs that are 'open' and 'deposited'
+        const response = await axios.get(`${API_BASE_URL}/api/jobs?status=open&escrowStatus=deposited`);
+        let fetchedJobs = response.data;
+
+        // Frontend Filtering by Skills
         if (filterSkills) {
-          params.skills = filterSkills;
-        }
-        if (minAmount) {
-          params.minAmount = parseFloat(minAmount);
-        }
-        if (maxAmount) {
-          params.maxAmount = parseFloat(maxAmount);
-        }
-        if (sortBy) {
-          params.sortBy = sortBy; // 'dateDesc', 'dateAsc', 'amountDesc', 'amountAsc'
+          const skillArray = filterSkills.toLowerCase().split(',').map(s => s.trim()).filter(s => s !== '');
+          fetchedJobs = fetchedJobs.filter(job =>
+            job.requiredSkills && skillArray.some(skill => job.requiredSkills.map(s => s.toLowerCase()).includes(skill))
+          );
         }
 
-        const response = await axios.get(`${API_BASE_URL}/api/jobs`, { params });
-        setJobs(response.data);
+        // Frontend Filtering by Amount Range
+        const min = parseFloat(minAmount);
+        const max = parseFloat(maxAmount);
+        if (!isNaN(min)) {
+          fetchedJobs = fetchedJobs.filter(job => job.amount >= min);
+        }
+        if (!isNaN(max)) {
+          fetchedJobs = fetchedJobs.filter(job => job.amount <= max);
+        }
+
+        // Frontend Sorting
+        fetchedJobs.sort((a, b) => {
+          if (sortBy === 'dateDesc') {
+            return new Date(b.createdAt) - new Date(a.createdAt);
+          } else if (sortBy === 'dateAsc') {
+            return new Date(a.createdAt) - new Date(b.createdAt);
+          } else if (sortBy === 'amountDesc') {
+            return b.amount - a.amount;
+          } else if (sortBy === 'amountAsc') {
+            return a.amount - b.amount;
+          }
+          return 0;
+        });
+
+        setJobs(fetchedJobs);
       } catch (error) {
         console.error('Error fetching jobs:', error);
         setErrorMessage(`Error loading jobs: ${error.message || 'Network error'}`);
+        setNotification(`Error loading jobs: ${error.message || 'Network error'}`, 'error');
       } finally {
         setIsLoading(false);
       }
     };
     fetchJobs();
-  }, [filterSkills, minAmount, maxAmount, sortBy]); // Re-fetch jobs when filters/sort change
+  }, [filterSkills, minAmount, maxAmount, sortBy, setNotification]); // Re-fetch when filters/sort change
 
   return (
     <div className="max-w-6xl mx-auto p-4 bg-white shadow-lg rounded-lg my-8">
@@ -1778,57 +1947,56 @@ const BrowseJobs = () => {
         </div>
       )}
 
-      {/* Filtering and Sorting Section */}
+      {/* Filtering and Sorting Controls */}
       <div className="mb-6 p-4 bg-gray-50 rounded-lg shadow-inner grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <div>
-          <label htmlFor="filterSkills" className="block text-lg font-medium text-gray-800 mb-2">Filter by Skills:</label>
+          <label htmlFor="filterSkills" className="block text-sm font-medium text-gray-800 mb-1">Filter by Skills (comma-separated):</label>
           <input
             type="text"
             id="filterSkills"
             value={filterSkills}
             onChange={(e) => setFilterSkills(e.target.value)}
             placeholder="e.g., React, Node.js"
-            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
+            className="w-full p-2 border border-gray-300 rounded-md text-sm"
           />
         </div>
         <div>
-          <label htmlFor="minAmount" className="block text-lg font-medium text-gray-800 mb-2">Min Amount (USDC):</label>
+          <label htmlFor="minAmount" className="block text-sm font-medium text-gray-800 mb-1">Min Amount (USDC):</label>
           <input
             type="number"
             id="minAmount"
             value={minAmount}
             onChange={(e) => setMinAmount(e.target.value)}
-            placeholder="e.g., 50"
-            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
+            placeholder="e.g., 100"
+            className="w-full p-2 border border-gray-300 rounded-md text-sm"
           />
         </div>
         <div>
-          <label htmlFor="maxAmount" className="block text-lg font-medium text-gray-800 mb-2">Max Amount (USDC):</label>
+          <label htmlFor="maxAmount" className="block text-sm font-medium text-gray-800 mb-1">Max Amount (USDC):</label>
           <input
             type="number"
             id="maxAmount"
             value={maxAmount}
             onChange={(e) => setMaxAmount(e.target.value)}
-            placeholder="e.g., 500"
-            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
+            placeholder="e.g., 1000"
+            className="w-full p-2 border border-gray-300 rounded-md text-sm"
           />
         </div>
-        <div className="lg:col-span-3"> {/* Span full width on larger screens */}
-          <label htmlFor="sortBy" className="block text-lg font-medium text-gray-800 mb-2">Sort By:</label>
+        <div className="md:col-span-2 lg:col-span-1">
+          <label htmlFor="sortBy" className="block text-sm font-medium text-gray-800 mb-1">Sort By:</label>
           <select
             id="sortBy"
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
+            className="w-full p-2 border border-gray-300 rounded-md text-sm"
           >
-            <option value="dateDesc">Date (Newest First)</option>
-            <option value="dateAsc">Date (Oldest First)</option>
+            <option value="dateDesc">Date Posted (Newest First)</option>
+            <option value="dateAsc">Date Posted (Oldest First)</option>
             <option value="amountDesc">Amount (High to Low)</option>
             <option value="amountAsc">Amount (Low to High)</option>
           </select>
         </div>
       </div>
-
 
       {isLoading ? (
         <div className="flex items-center justify-center py-8 text-primary-blue">
@@ -1869,7 +2037,7 @@ const BrowseJobs = () => {
             </ul>
           ) : (
             <div className="mt-4 p-4 bg-yellow-50 rounded-lg shadow-sm text-yellow-800 text-center">
-              <p className="text-base">No open jobs found at the moment. Check back later!</p>
+              <p className="text-base">No open jobs found at the moment. Adjust your filters or check back later!</p>
             </div>
           )}
         </>
@@ -1884,6 +2052,7 @@ const CrossChainIntegration = ({ account, walletClient, publicClient, setNotific
   const [destinationChain, setDestinationChain] = useState('Optimism/Base (Mock)');
   const [transferAmount, setTransferAmount] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false); // For confirmation modal
 
   const handleCrossChainTransfer = async () => {
     if (!account || !walletClient || !publicClient) {
@@ -1917,6 +2086,11 @@ const CrossChainIntegration = ({ account, walletClient, publicClient, setNotific
     }
     // --- End Chain Mismatch Check ---
 
+    setShowConfirmModal(true); // Show confirmation modal
+  };
+
+  const confirmCrossChainTransfer = async () => {
+    setShowConfirmModal(false); // Close modal
     setIsProcessing(true);
     setNotification(`Initiating cross-chain transfer of ${transferAmount} USDC from ${sourceChain} to ${destinationChain}...`, 'info');
 
@@ -1943,6 +2117,7 @@ const CrossChainIntegration = ({ account, walletClient, publicClient, setNotific
       setIsProcessing(false);
     }
   };
+
 
   return (
     <div className="max-w-3xl mx-auto p-6 bg-white shadow-lg rounded-lg my-8">
@@ -2002,6 +2177,16 @@ const CrossChainIntegration = ({ account, walletClient, publicClient, setNotific
           {isProcessing ? 'Transferring...' : 'Initiate Cross-Chain Transfer'}
         </button>
       </div>
+
+      <ConfirmationModal
+        isOpen={showConfirmModal}
+        title="Confirm Cross-Chain Transfer"
+        message={`Are you sure you want to transfer ${transferAmount} USDC from ${sourceChain} to ${destinationChain}? This is a simulated transaction.`}
+        onConfirm={confirmCrossChainTransfer}
+        onCancel={() => setShowConfirmModal(false)}
+        confirmButtonText="Yes, Transfer"
+        isProcessing={isProcessing}
+      />
     </div>
   );
 };
@@ -2011,6 +2196,7 @@ const DisputeResolution = ({ account, setNotification }) => {
   const [jobId, setJobId] = useState('');
   const [disputeReason, setDisputeReason] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false); // For confirmation modal
 
   const handleSubmitDispute = async (e) => {
     e.preventDefault();
@@ -2023,6 +2209,11 @@ const DisputeResolution = ({ account, setNotification }) => {
       return;
     }
 
+    setShowConfirmModal(true); // Show confirmation modal
+  };
+
+  const confirmSubmitDispute = async () => {
+    setShowConfirmModal(false); // Close modal
     setIsLoading(true);
     setNotification('Submitting dispute...', 'info');
 
@@ -2100,107 +2291,90 @@ const DisputeResolution = ({ account, setNotification }) => {
           {isLoading ? 'Submitting...' : 'Submit Dispute'}
         </button>
       </form>
+
+      <ConfirmationModal
+        isOpen={showConfirmModal}
+        title="Confirm Dispute Submission"
+        message={`Are you sure you want to submit a dispute for Job ID: ${jobId}? This will mark the job as 'disputed'.`}
+        onConfirm={confirmSubmitDispute}
+        onCancel={() => setShowConfirmModal(false)}
+        confirmButtonText="Yes, Submit Dispute"
+        isProcessing={isLoading}
+      />
     </div>
   );
 };
 
-// --- Withdrawal Component (Mock Fiat On/Off-Ramp) ---
+// --- Withdrawal Component (Enhanced for Mobile Money) ---
 const Withdrawal = ({ account, setNotification }) => {
   const [amount, setAmount] = useState('');
-  const [fiatCurrency, setFiatCurrency] = useState('KES');
-  const [bankDetails, setBankDetails] = useState('');
-  const [country, setCountry] = useState(''); // Added for mobile money
-  const [mobileMoneyNetwork, setMobileMoneyNetwork] = useState(''); // Added for mobile money
-  const [mobilePhoneNumber, setMobilePhoneNumber] = useState(''); // Added for mobile money
+  const [country, setCountry] = useState('KE'); // Default to Kenya
+  const [mobileMoneyNetwork, setMobileMoneyNetwork] = useState('M-Pesa');
+  const [mobilePhoneNumber, setMobilePhoneNumber] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [userGeneralDeposits, setUserGeneralDeposits] = useState(0); // For balance check
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
-  // Fetch user's general escrow balance
-  useEffect(() => {
-    const fetchGeneralDeposits = async () => {
-      if (account) {
-        try {
-          const response = await axios.get(`${API_BASE_URL}/api/deposits/total/${account}`);
-          setUserGeneralDeposits(parseFloat(response.data.totalDeposits || 0));
-        } catch (error) {
-          console.error("Error fetching general deposits for withdrawal:", error);
-          setNotification(`Error fetching your general deposit balance: ${error.message}`, 'error');
-          setUserGeneralDeposits(0);
-        }
-      } else {
-        setUserGeneralDeposits(0);
-      }
-    };
-    fetchGeneralDeposits();
-  }, [account, setNotification]);
-
+  // Define mobile money networks based on selected country
+  const getMobileMoneyNetworks = (selectedCountry) => {
+    switch (selectedCountry) {
+      case 'KE': return ['M-Pesa', 'Airtel Money', 'Telkom T-Kash'];
+      case 'NG': return ['MTN Mobile Money', 'Airtel Money', 'Glo Money'];
+      case 'ZA': return ['FNB eWallet', 'Standard Bank Instant Money'];
+      case 'GH': return ['MTN Mobile Money', 'Vodafone Cash', 'AirtelTigo Money'];
+      default: return ['Other'];
+    }
+  };
 
   const handleWithdrawal = async (e) => {
-    e.preventDefault();
+    e.e.preventDefault();
     if (!account) {
       setNotification('Please connect your wallet to initiate a withdrawal.', 'error');
       return;
     }
-    const withdrawalAmountNum = parseFloat(amount);
-    if (isNaN(withdrawalAmountNum) || withdrawalAmountNum <= 0) {
-      setNotification('Please enter a valid amount to withdraw.', 'error');
-      return;
-    }
-    if (withdrawalAmountNum > userGeneralDeposits) {
-      setNotification('Insufficient general escrow balance for this withdrawal.', 'error');
-      return;
-    }
-    if (!bankDetails && (!country || !mobileMoneyNetwork || !mobilePhoneNumber)) {
-      setNotification('Please provide either bank details or complete mobile money details.', 'error');
+    if (isNaN(parseFloat(amount)) || parseFloat(amount) <= 0 || !mobilePhoneNumber || !country || !mobileMoneyNetwork) {
+      setNotification('Please fill all withdrawal details correctly.', 'error');
       return;
     }
 
+    setShowConfirmModal(true);
+  };
+
+  const confirmWithdrawal = async () => {
+    setShowConfirmModal(false);
     setIsLoading(true);
-    setNotification(`Initiating withdrawal of ${amount} USDC to ${fiatCurrency} via ${bankDetails ? 'bank transfer' : 'mobile money'}...`, 'info');
+    setNotification(`Initiating withdrawal request for ${amount} USDC to ${mobileMoneyNetwork} in ${country} for ${mobilePhoneNumber}...`, 'info');
 
     try {
-      // Call backend to submit withdrawal request
       await axios.post(`${API_BASE_URL}/api/withdrawals`, {
         requestorAddress: account,
-        usdcAmount: withdrawalAmountNum,
-        fiatCurrency: fiatCurrency,
-        bankDetails: bankDetails,
-        country: country, // Added
-        mobileMoneyNetwork: mobileMoneyNetwork, // Added
-        mobilePhoneNumber: mobilePhoneNumber, // Added
+        usdcAmount: parseFloat(amount),
+        country: country,
+        mobileMoneyNetwork: mobileMoneyNetwork,
+        mobilePhoneNumber: mobilePhoneNumber,
       });
 
-      setNotification(`Withdrawal request submitted! Our team will process your ${amount} USDC to ${fiatCurrency}.`, 'success');
+      setNotification(`Withdrawal request submitted! Our team will process your ${amount} USDC to ${mobileMoneyNetwork}. This is an off-chain request.`, 'success');
       setAmount('');
-      setBankDetails('');
-      setCountry('');
-      setMobileMoneyNetwork('');
       setMobilePhoneNumber('');
-      // Optionally re-fetch general deposits to update balance
-      // fetchGeneralDeposits(); // Would need to pass setNotification to this component
 
     } catch (error) {
       console.error('Error during withdrawal:', error);
-      setNotification(`Withdrawal failed: ${error.message || 'Please try again.'}`, 'error');
+      setNotification(`Withdrawal request failed: ${error.message || 'Please try again.'}`, 'error');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const isWithdrawalButtonDisabled = isLoading || !account || parseFloat(amount) <= 0 || parseFloat(amount) > userGeneralDeposits || (!bankDetails && (!country || !mobileMoneyNetwork || !mobilePhoneNumber));
-
   return (
     <div className="max-w-3xl mx-auto p-6 bg-white shadow-lg rounded-lg my-8">
       <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">Withdraw Funds (Fiat On/Off-Ramp)</h2>
       <p className="text-lg text-gray-700 mb-6">
-        Convert your USDC earnings to local fiat currency and withdraw directly to your bank account or mobile money.
+        Convert your USDC earnings to local fiat currency and withdraw directly to your mobile money account.
+        <span className="font-semibold text-red-600 block mt-2">Note: This is an off-chain request. Actual processing will be handled by our team.</span>
       </p>
 
       <p className="text-lg text-gray-700 mb-4">
         Connected Wallet: <span className="font-mono text-secondary-purple">{account || 'Not connected'}</span>
-      </p>
-      <p className="text-lg text-gray-700 mb-6">
-        Available General Escrow Balance: <span className="font-semibold text-accent-green">{userGeneralDeposits} USDC</span>
       </p>
 
       {isLoading && (
@@ -2227,310 +2401,483 @@ const Withdrawal = ({ account, setNotification }) => {
           />
         </div>
         <div>
-          <label htmlFor="fiatCurrency" className="block text-lg font-medium text-gray-800 mb-1">Fiat Currency</label>
+          <label htmlFor="country" className="block text-lg font-medium text-gray-800 mb-1">Country</label>
           <select
-            id="fiatCurrency"
-            value={fiatCurrency}
-            onChange={(e) => setFiatCurrency(e.target.value)}
+            id="country"
+            value={country}
+            onChange={(e) => {
+              setCountry(e.target.value);
+              setMobileMoneyNetwork(getMobileMoneyNetworks(e.target.value)[0] || ''); // Reset network on country change
+            }}
             className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
             disabled={isLoading || !account}
           >
-            <option value="KES">Kenyan Shilling (KES)</option>
-            <option value="NGN">Nigerian Naira (NGN)</option>
-            <option value="ZAR">South African Rand (ZAR)</option>
-            <option value="USD">US Dollar (USD)</option>
-            {/* Add more currencies as needed */}
+            <option value="KE">Kenya</option>
+            <option value="NG">Nigeria</option>
+            <option value="ZA">South Africa</option>
+            <option value="GH">Ghana</option>
+            <option value="UG">Uganda</option>
+            <option value="TZ">Tanzania</option>
+            {/* Add more African countries as needed */}
           </select>
         </div>
-        <div className="border-t pt-4 mt-4 border-gray-200">
-          <h3 className="text-xl font-semibold text-gray-800 mb-3">Withdrawal Method:</h3>
-          <p className="text-sm text-gray-600 mb-4">Provide either Bank Details OR Mobile Money Details.</p>
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="bankDetails" className="block text-lg font-medium text-gray-800 mb-1">Bank Account Details (Mock)</label>
-              <textarea
-                id="bankDetails"
-                value={bankDetails}
-                onChange={(e) => setBankDetails(e.target.value)}
-                placeholder="Bank Name, Account Number, SWIFT/BIC, etc."
-                rows="3"
-                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
-                disabled={isLoading || !account}
-              ></textarea>
-            </div>
-            <div className="flex items-center justify-center text-gray-500 font-semibold">
-              — OR —
-            </div>
-            <div>
-              <label htmlFor="country" className="block text-lg font-medium text-gray-800 mb-1">Country (for Mobile Money)</label>
-              <input
-                type="text"
-                id="country"
-                value={country}
-                onChange={(e) => setCountry(e.target.value)}
-                placeholder="e.g., Kenya"
-                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
-                disabled={isLoading || !account}
-              />
-            </div>
-            <div>
-              <label htmlFor="mobileMoneyNetwork" className="block text-lg font-medium text-gray-800 mb-1">Mobile Money Network</label>
-              <input
-                type="text"
-                id="mobileMoneyNetwork"
-                value={mobileMoneyNetwork}
-                onChange={(e) => setMobileMoneyNetwork(e.target.value)}
-                placeholder="e.g., M-Pesa, MTN Mobile Money"
-                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
-                disabled={isLoading || !account}
-              />
-            </div>
-            <div>
-              <label htmlFor="mobilePhoneNumber" className="block text-lg font-medium text-gray-800 mb-1">Mobile Phone Number</label>
-              <input
-                type="text"
-                id="mobilePhoneNumber"
-                value={mobilePhoneNumber}
-                onChange={(e) => setMobilePhoneNumber(e.target.value)}
-                placeholder="e.g., +254712345678"
-                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
-                disabled={isLoading || !account}
-              />
-            </div>
-          </div>
+        <div>
+          <label htmlFor="mobileMoneyNetwork" className="block text-lg font-medium text-gray-800 mb-1">Mobile Money Network</label>
+          <select
+            id="mobileMoneyNetwork"
+            value={mobileMoneyNetwork}
+            onChange={(e) => setMobileMoneyNetwork(e.target.value)}
+            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
+            disabled={isLoading || !account}
+          >
+            {getMobileMoneyNetworks(country).map(network => (
+              <option key={network} value={network}>{network}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="mobilePhoneNumber" className="block text-lg font-medium text-gray-800 mb-1">Mobile Phone Number</label>
+          <input
+            type="text"
+            id="mobilePhoneNumber"
+            value={mobilePhoneNumber}
+            onChange={(e) => setMobilePhoneNumber(e.target.value)}
+            placeholder="e.g., +2547XXXXXXXX"
+            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
+            disabled={isLoading || !account}
+          />
         </div>
         <button
           type="submit"
           className="w-full px-6 py-3 bg-accent-green text-white font-semibold rounded-md hover:bg-green-600 transition duration-300 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={isWithdrawalButtonDisabled}
+          disabled={isLoading || !account}
         >
-          {isLoading ? 'Processing...' : 'Initiate Withdrawal'}
+          {isLoading ? 'Processing...' : 'Initiate Withdrawal Request'}
         </button>
       </form>
+
+      <ConfirmationModal
+        isOpen={showConfirmModal}
+        title="Confirm Withdrawal Request"
+        message={`Are you sure you want to request a withdrawal of ${amount} USDC to ${mobileMoneyNetwork} (${country}) at ${mobilePhoneNumber}? This is an off-chain request processed by our team.`}
+        onConfirm={confirmWithdrawal}
+        onCancel={() => setShowConfirmModal(false)}
+        confirmButtonText="Yes, Request Withdrawal"
+        isProcessing={isLoading}
+      />
     </div>
   );
 };
 
-// --- New: SearchPage Component ---
-const SearchPage = ({ account, setNotification }) => {
-  const [searchParams] = useSearchParams();
-  const query = searchParams.get('query') || '';
-  const [jobs, setJobs] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState('');
 
-  useEffect(() => {
-    const performSearch = async () => {
-      if (!query) {
-        setJobs([]);
-        setUsers([]);
-        setIsLoading(false);
-        setErrorMessage('Please enter a search query.');
-        return;
-      }
+// --- AdminDashboard Component ---
+const AdminDashboard = ({ setNotification }) => {
+  const [adminKey, setAdminKey] = useState('');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [disputes, setDisputes] = useState([]);
+  const [allJobs, setAllJobs] = useState([]); // To allow admin to manually update job status
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedJobId, setSelectedJobId] = useState('');
+  const [newJobStatus, setNewJobStatus] = useState('');
+  const [newEscrowStatus, setNewEscrowStatus] = useState('');
+  const [showResolveDisputeModal, setShowResolveDisputeModal] = useState(false);
+  const [currentDisputeToResolve, setCurrentDisputeToResolve] = useState(null);
+  const [resolveDetails, setResolveDetails] = useState('');
+  const [resolveJobStatus, setResolveJobStatus] = useState('');
+  const [resolveEscrowStatus, setResolveEscrowStatus] = useState('');
 
-      setIsLoading(true);
-      setErrorMessage('');
-      try {
-        // Assuming backend has /api/jobs?search= and /api/users?search= endpoints
-        const [jobsResponse, usersResponse] = await Promise.all([
-          axios.get(`${API_BASE_URL}/api/jobs?search=${encodeURIComponent(query)}`),
-          axios.get(`${API_BASE_URL}/api/users?search=${encodeURIComponent(query)}`)
-        ]);
 
-        setJobs(jobsResponse.data);
-        setUsers(usersResponse.data);
-        setNotification(`Search results for "${query}" loaded.`, 'info');
+  const fetchAdminData = async () => {
+    if (!adminKey) {
+      setNotification('Please enter the Admin Secret Key.', 'error');
+      setIsAuthenticated(false);
+      return;
+    }
+    setIsLoading(true);
+    setNotification('Fetching admin data...', 'info');
+    try {
+      const disputesResponse = await axios.get(`${API_BASE_URL}/api/admin/disputes`, {
+        headers: { 'X-Admin-Key': adminKey }
+      });
+      setDisputes(disputesResponse.data);
 
-      } catch (error) {
-        console.error('Error during search:', error);
-        setErrorMessage(`Error fetching search results: ${error.message || 'Network error'}`);
-        setNotification(`Error during search: ${error.message}`, 'error');
-      } finally {
-        setIsLoading(false);
-      }
-    };
+      const jobsResponse = await axios.get(`${API_BASE_URL}/api/jobs`, { // Fetch all jobs for manual update
+        headers: { 'X-Admin-Key': adminKey } // Admin can see all jobs
+      });
+      setAllJobs(jobsResponse.data);
 
-    performSearch();
-  }, [query, setNotification]);
+      setIsAuthenticated(true);
+      setNotification('Admin data loaded successfully!', 'success');
+    } catch (error) {
+      console.error('Error fetching admin data:', error);
+      setNotification(`Authentication failed or error fetching data: ${error.message || 'Please check your key.'}`, 'error');
+      setIsAuthenticated(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Fetch data on initial load if key is already set (e.g., from session storage if you implement it)
+  // For now, we'll rely on manual fetch after key input.
+  // useEffect(() => {
+  //   if (adminKey) {
+  //     fetchAdminData();
+  //   }
+  // }, [adminKey]); // Depend on adminKey for re-fetch
+
+  const handleResolveDispute = (dispute) => {
+    setCurrentDisputeToResolve(dispute);
+    setResolveDetails(''); // Clear previous details
+    setResolveJobStatus(dispute.jobId.status); // Pre-fill with current job status
+    setResolveEscrowStatus(dispute.jobId.escrowStatus); // Pre-fill with current escrow status
+    setShowResolveDisputeModal(true);
+  };
+
+  const confirmResolveDispute = async () => {
+    if (!currentDisputeToResolve) return;
+
+    setIsLoading(true);
+    setShowResolveDisputeModal(false);
+    setNotification('Resolving dispute...', 'info');
+    try {
+      await axios.put(`${API_BASE_URL}/api/admin/disputes/${currentDisputeToResolve._id}/resolve`,
+        {
+          resolutionDetails: resolveDetails,
+          jobStatus: resolveJobStatus,
+          escrowStatus: resolveEscrowStatus,
+        },
+        { headers: { 'X-Admin-Key': adminKey } }
+      );
+      setNotification('Dispute resolved successfully and job status updated!', 'success');
+      fetchAdminData(); // Re-fetch data to update lists
+    } catch (error) {
+      console.error('Error resolving dispute:', error);
+      setNotification(`Error resolving dispute: ${error.message || 'Please try again.'}`, 'error');
+    } finally {
+      setIsLoading(false);
+      setCurrentDisputeToResolve(null);
+    }
+  };
+
+  const handleCloseDispute = async (disputeId) => {
+    setIsLoading(true);
+    setNotification('Closing dispute...', 'info');
+    try {
+      await axios.put(`${API_BASE_URL}/api/admin/disputes/${disputeId}/close`,
+        { resolutionDetails: 'Closed by admin, no further action.' },
+        { headers: { 'X-Admin-Key': adminKey } }
+      );
+      setNotification('Dispute closed successfully!', 'success');
+      fetchAdminData();
+    } catch (error) {
+      console.error('Error closing dispute:', error);
+      setNotification(`Error closing dispute: ${error.message || 'Please try again.'}`, 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUpdateJobStatus = async () => {
+    if (!selectedJobId || (!newJobStatus && !newEscrowStatus)) {
+      setNotification('Please select a job and provide at least one new status.', 'error');
+      return;
+    }
+    setIsLoading(true);
+    setNotification('Updating job status...', 'info');
+    try {
+      await axios.put(`${API_BASE_URL}/api/admin/jobs/${selectedJobId}/update-status`,
+        {
+          status: newJobStatus || undefined, // Only send if not empty
+          escrowStatus: newEscrowStatus || undefined, // Only send if not empty
+        },
+        { headers: { 'X-Admin-Key': adminKey } }
+      );
+      setNotification('Job status updated successfully!', 'success');
+      setNewJobStatus('');
+      setNewEscrowStatus('');
+      fetchAdminData(); // Re-fetch data
+    } catch (error) {
+      console.error('Error updating job status:', error);
+      setNotification(`Error updating job status: ${error.message || 'Please try again.'}`, 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
 
   return (
     <div className="max-w-6xl mx-auto p-4 bg-white shadow-lg rounded-lg my-8">
-      <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">Search Results for "{query}"</h2>
+      <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">Admin Dashboard</h2>
 
-      {errorMessage && (
-        <div className="p-3 mb-4 rounded-md bg-red-100 text-red-700">
-          {errorMessage}
-        </div>
-      )}
-
-      {isLoading ? (
-        <div className="flex items-center justify-center py-8 text-primary-blue">
-          <svg className="animate-spin h-6 w-6 mr-3 text-primary-blue" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          Searching...
+      {!isAuthenticated ? (
+        <div className="text-center p-6 bg-gray-50 rounded-lg shadow-inner">
+          <p className="text-lg text-gray-700 mb-4">Enter Admin Secret Key to access this dashboard:</p>
+          <input
+            type="password"
+            value={adminKey}
+            onChange={(e) => setAdminKey(e.target.value)}
+            placeholder="Admin Secret Key"
+            className="w-full max-w-sm p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200 text-gray-800 mb-4"
+          />
+          <button
+            onClick={fetchAdminData}
+            className="px-8 py-3 bg-secondary-purple text-white font-semibold rounded-md hover:bg-purple-700 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isLoading}
+          >
+            {isLoading ? 'Authenticating...' : 'Authenticate'}
+          </button>
         </div>
       ) : (
         <>
-          <div className="mb-8">
-            <h3 className="text-2xl font-semibold text-secondary-purple mb-4 border-b pb-2">Jobs Found ({jobs.length})</h3>
-            {jobs.length > 0 ? (
-              <ul className="space-y-3">
-                {jobs.map(job => (
-                  <li key={job._id} className="bg-gray-50 p-3 rounded-lg shadow-sm flex justify-between items-center">
-                    <div>
-                      <p className="text-lg font-semibold text-gray-800">{job.title}</p>
-                      <p className="text-sm text-gray-600">{truncateAddress(job.client)} - {job.amount} USDC</p>
-                    </div>
-                    <Link to={`/job/${job._id}`} className="px-4 py-2 bg-primary-blue text-white rounded-md hover:bg-blue-700 transition duration-300">View Job</Link>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-gray-600">No jobs found matching your query.</p>
-            )}
-          </div>
+          {isLoading && (
+            <div className="flex items-center justify-center py-8 text-primary-blue">
+              <svg className="animate-spin h-6 w-6 mr-3 text-primary-blue" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Loading admin data...
+            </div>
+          )}
 
-          <div>
-            <h3 className="text-2xl font-semibold text-secondary-purple mb-4 border-b pb-2">Users Found ({users.length})</h3>
-            {users.length > 0 ? (
-              <ul className="space-y-3">
-                {users.map(user => (
-                  <li key={user.address} className="bg-gray-50 p-3 rounded-lg shadow-sm flex justify-between items-center">
-                    <div>
-                      <p className="text-lg font-semibold text-gray-800">{truncateAddress(user.address)}</p>
-                      <p className="text-sm text-gray-600">Role: {user.role || 'N/A'} | Skills: {user.skills?.join(', ') || 'N/A'}</p>
-                    </div>
-                    <Link to={`/profile/${user.address}`} className="px-4 py-2 bg-primary-blue text-white rounded-md hover:bg-blue-700 transition duration-300">View Profile</Link>
-                  </li>
+          <h3 className="text-xl font-semibold mt-8 text-primary-blue border-b pb-2">Disputes Overview</h3>
+          {disputes.length > 0 ? (
+            <ul className="mt-4 space-y-4">
+              {disputes.map((dispute) => (
+                <li key={dispute._id} className="bg-gray-50 p-4 rounded-lg shadow-md">
+                  <p className="text-lg font-semibold text-gray-800">Job ID: <Link to={`/job/${dispute.jobId._id}`} className="text-primary-blue hover:underline">{dispute.jobId._id}</Link></p>
+                  <p className="text-md text-gray-700">Reported by: {truncateAddress(dispute.reporterAddress)}</p>
+                  <p className="text-md text-gray-700">Reason: {dispute.reason}</p>
+                  <p className="text-md text-gray-700">Status: <span className={`font-semibold ${dispute.status === 'open' ? 'text-red-600' : 'text-green-600'}`}>{dispute.status}</span></p>
+                  <p className="text-sm text-gray-600">Reported At: {new Date(dispute.reportedAt).toLocaleString()}</p>
+                  {dispute.resolutionDetails && <p className="text-sm text-gray-600">Resolution: {dispute.resolutionDetails}</p>}
+                  <div className="mt-3 flex space-x-2">
+                    {dispute.status === 'open' || dispute.status === 'under-review' ? (
+                      <>
+                        <button
+                          onClick={() => handleResolveDispute(dispute)}
+                          className="px-4 py-2 bg-accent-green text-white rounded-md hover:bg-green-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                          disabled={isLoading}
+                        >
+                          Resolve
+                        </button>
+                        <button
+                          onClick={() => handleCloseDispute(dispute._id)}
+                          className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                          disabled={isLoading}
+                        >
+                          Close
+                        </button>
+                      </>
+                    ) : (
+                      <span className="text-gray-500 text-sm">Dispute already handled.</span>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="mt-4 p-4 bg-yellow-50 rounded-lg shadow-sm text-yellow-800">
+              <p className="text-base">No disputes found.</p>
+            </div>
+          )}
+
+          <h3 className="text-xl font-semibold mt-8 text-primary-blue border-b pb-2">Manually Update Job Status</h3>
+          <div className="mt-4 p-4 bg-gray-50 rounded-lg shadow-inner space-y-4">
+            <div>
+              <label htmlFor="selectJob" className="block text-lg font-medium text-gray-800 mb-1">Select Job:</label>
+              <select
+                id="selectJob"
+                value={selectedJobId}
+                onChange={(e) => {
+                  setSelectedJobId(e.target.value);
+                  const job = allJobs.find(j => j._id === e.target.value);
+                  if (job) {
+                    setNewJobStatus(job.status);
+                    setNewEscrowStatus(job.escrowStatus);
+                  } else {
+                    setNewJobStatus('');
+                    setNewEscrowStatus('');
+                  }
+                }}
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
+                disabled={isLoading}
+              >
+                <option value="">-- Select a Job --</option>
+                {allJobs.map(job => (
+                  <option key={job._id} value={job._id}>
+                    {job.title} (ID: {truncateAddress(job._id)}) - Status: {job.status} | Escrow: {job.escrowStatus}
+                  </option>
                 ))}
-              </ul>
-            ) : (
-              <p className="text-gray-600">No users found matching your query.</p>
-            )}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="newJobStatus" className="block text-lg font-medium text-gray-800 mb-1">New Job Status:</label>
+              <select
+                id="newJobStatus"
+                value={newJobStatus}
+                onChange={(e) => setNewJobStatus(e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
+                disabled={isLoading}
+              >
+                <option value="">-- Select Status --</option>
+                <option value="open">open</option>
+                <option value="pending-client-approval">pending-client-approval</option>
+                <option value="in-progress">in-progress</option>
+                <option value="completed">completed</option>
+                <option value="disputed">disputed</option>
+                <option value="cancelled">cancelled</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="newEscrowStatus" className="block text-lg font-medium text-gray-800 mb-1">New Escrow Status:</label>
+              <select
+                id="newEscrowStatus"
+                value={newEscrowStatus}
+                onChange={(e) => setNewEscrowStatus(e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
+                disabled={isLoading}
+              >
+                <option value="">-- Select Escrow Status --</option>
+                <option value="pending-deposit">pending-deposit</option>
+                <option value="deposited">deposited</option>
+                <option value="active">active</option>
+                <option value="released">released</option>
+                <option value="refunded">refunded</option>
+                <option value="disputed">disputed</option>
+              </select>
+            </div>
+            <button
+              onClick={handleUpdateJobStatus}
+              className="w-full px-6 py-3 bg-secondary-purple text-white font-semibold rounded-md hover:bg-purple-700 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isLoading || !selectedJobId || (!newJobStatus && !newEscrowStatus)}
+            >
+              {isLoading ? 'Updating...' : 'Update Job Status'}
+            </button>
           </div>
         </>
       )}
+
+      {/* Resolve Dispute Modal */}
+      <ConfirmationModal
+        isOpen={showResolveDisputeModal}
+        title="Resolve Dispute"
+        message={`Resolving dispute for Job ID: ${currentDisputeToResolve?.jobId?._id}. Please provide resolution details and set the final job statuses.`}
+        onConfirm={confirmResolveDispute}
+        onCancel={() => {
+          setShowResolveDisputeModal(false);
+          setCurrentDisputeToResolve(null);
+        }}
+        confirmButtonText="Confirm Resolution"
+        isProcessing={isLoading}
+      >
+        <div className="text-left mt-4">
+          <label htmlFor="resolveDetails" className="block text-lg font-medium text-gray-800 mb-1">Resolution Details:</label>
+          <textarea
+            id="resolveDetails"
+            value={resolveDetails}
+            onChange={(e) => setResolveDetails(e.target.value)}
+            placeholder="Details of how the dispute was resolved..."
+            rows="3"
+            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200 mb-4"
+            disabled={isLoading}
+          ></textarea>
+
+          <label htmlFor="resolveJobStatus" className="block text-lg font-medium text-gray-800 mb-1">Final Job Status:</label>
+          <select
+            id="resolveJobStatus"
+            value={resolveJobStatus}
+            onChange={(e) => setResolveJobStatus(e.target.value)}
+            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200 mb-4"
+            disabled={isLoading}
+          >
+            <option value="">-- Select Status --</option>
+            <option value="open">open</option>
+            <option value="pending-client-approval">pending-client-approval</option>
+            <option value="in-progress">in-progress</option>
+            <option value="completed">completed</option>
+            <option value="disputed">disputed</option>
+            <option value="cancelled">cancelled</option>
+          </select>
+
+          <label htmlFor="resolveEscrowStatus" className="block text-lg font-medium text-gray-800 mb-1">Final Escrow Status:</label>
+          <select
+            id="resolveEscrowStatus"
+            value={resolveEscrowStatus}
+            onChange={(e) => setResolveEscrowStatus(e.target.value)}
+            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
+            disabled={isLoading}
+          >
+            <option value="">-- Select Escrow Status --</option>
+            <option value="pending-deposit">pending-deposit</option>
+            <option value="deposited">deposited</option>
+            <option value="active">active</option>
+            <option value="released">released</option>
+            <option value="refunded">refunded</option>
+            <option value="disputed">disputed</option>
+          </select>
+        </div>
+      </ConfirmationModal>
     </div>
   );
 };
 
-// --- New: SettingsPage Component ---
-const SettingsPage = ({ account, setNotification }) => {
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const navigate = useNavigate();
-
-  const handleDeleteAccount = async () => {
-    if (!account) {
-      setNotification('Wallet not connected. Cannot delete account.', 'error');
-      return;
-    }
-    setNotification('Attempting to delete account (backend logic not implemented)...', 'info');
-    // In a real application, you would make an API call here:
-    // try {
-    //   await axios.delete(`${API_BASE_URL}/api/users/${account}`);
-    //   setNotification('Account deleted successfully.', 'success');
-    //   // Optionally redirect to home or logout
-    //   navigate('/');
-    // } catch (error) {
-    //   setNotification(`Error deleting account: ${error.message}`, 'error');
-    // }
-    setShowDeleteModal(false); // Close modal
-    setNotification('Account deletion is a placeholder. Backend logic needs implementation.', 'error', 7000);
-  };
-
+// --- CustomerSupport Component ---
+const CustomerSupport = () => {
   return (
-    <div className="max-w-4xl mx-auto p-6 bg-white shadow-lg rounded-lg my-8">
-      <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">Settings</h2>
+    <div className="max-w-3xl mx-auto p-6 bg-white shadow-lg rounded-lg my-8 text-center">
+      <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">Customer Support</h2>
+      <p className="text-lg text-gray-700 mb-6">
+        We're here to help! If you have any questions, feedback, or need assistance, please reach out to us through the channels below.
+      </p>
 
-      <div className="mb-6 p-4 bg-gray-50 rounded-lg shadow-inner">
-        <h3 className="text-xl font-semibold text-secondary-purple mb-2">Your Account</h3>
-        <p className="text-lg text-gray-700 mb-2">
-          Connected Wallet: <span className="font-mono text-primary-blue">{account ? truncateAddress(account) : 'Not connected'}</span>
-        </p>
-        {account && (
-          <Link
-            to="/profile"
-            className="inline-block px-4 py-2 bg-primary-blue text-white rounded-md hover:bg-blue-700 transition duration-300 mt-2"
+      <div className="space-y-6">
+        <div className="p-4 bg-blue-50 rounded-lg shadow-sm">
+          <h3 className="text-xl font-semibold text-primary-blue mb-2">Email Support</h3>
+          <p className="text-lg text-gray-700">For general inquiries and support:</p>
+          <a
+            href="mailto:nicodemuskiptoo88@gmail.com"
+            className="mt-2 inline-block px-6 py-2 bg-primary-blue text-white rounded-md hover:bg-blue-700 transition duration-300"
           >
-            View/Edit Profile
-          </Link>
-        )}
-      </div>
-
-      <div className="mb-6 p-4 bg-gray-50 rounded-lg shadow-inner">
-        <h3 className="text-xl font-semibold text-secondary-purple mb-2">Notification Preferences (Mock)</h3>
-        <p className="text-lg text-gray-700">
-          Control how you receive alerts and updates from FreelanceFlow.
-        </p>
-        <div className="mt-4 space-y-2">
-          <label className="flex items-center text-gray-700">
-            <input type="checkbox" className="form-checkbox h-5 w-5 text-primary-blue rounded" defaultChecked />
-            <span className="ml-2">Email Notifications (Mock)</span>
-          </label>
-          <label className="flex items-center text-gray-700">
-            <input type="checkbox" className="form-checkbox h-5 w-5 text-primary-blue rounded" defaultChecked />
-            <span className="ml-2">In-App Alerts (Mock)</span>
-          </label>
+            Email Us
+          </a>
         </div>
-      </div>
 
-      <div className="mb-6 p-4 bg-gray-50 rounded-lg shadow-inner">
-        <h3 className="text-xl font-semibold text-secondary-purple mb-2">Theme (Mock)</h3>
-        <p className="text-lg text-gray-700">
-          Personalize your FreelanceFlow experience.
-        </p>
-        <div className="mt-4 space-x-4">
-          <button className="px-5 py-2 bg-primary-blue text-white rounded-md hover:bg-blue-700 transition duration-300">Light Mode</button>
-          <button className="px-5 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-800 transition duration-300">Dark Mode</button>
+        <div className="p-4 bg-purple-50 rounded-lg shadow-sm">
+          <h3 className="text-xl font-semibold text-secondary-purple mb-2">Join Our Discord Community</h3>
+          <p className="text-lg text-gray-700">Connect with other users and get community support:</p>
+          <a
+            href="https://discord.gg/7TVd2ZdP9h"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 inline-block px-6 py-2 bg-secondary-purple text-white rounded-md hover:bg-purple-700 transition duration-300"
+          >
+            Join Discord
+          </a>
         </div>
-      </div>
 
-      <div className="p-4 bg-red-50 rounded-lg shadow-inner border border-red-200">
-        <h3 className="text-xl font-semibold text-red-700 mb-2">Danger Zone</h3>
-        <p className="text-lg text-red-600 mb-4">
-          Permanently delete your FreelanceFlow account and all associated data. This action cannot be undone.
-        </p>
-        <button
-          onClick={() => setShowDeleteModal(true)}
-          className="px-6 py-3 bg-red-600 text-white font-semibold rounded-md hover:bg-red-700 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={!account}
-        >
-          Delete Account
-        </button>
-      </div>
-
-      {/* Delete Confirmation Modal */}
-      {showDeleteModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50">
-          <div className="bg-white p-8 rounded-lg shadow-xl max-w-sm w-full text-center">
-            <h3 className="text-2xl font-bold text-red-600 mb-4">Confirm Account Deletion</h3>
-            <p className="text-lg text-gray-700 mb-6">
-              Are you sure you want to delete your account? This action is irreversible.
-            </p>
-            <p className="text-sm text-red-500 mb-6 font-semibold">
-              (Note: Backend deletion logic for this feature is not yet implemented.)
-            </p>
-            <div className="flex justify-center space-x-4">
-              <button
-                onClick={handleDeleteAccount}
-                className="px-6 py-3 bg-red-600 text-white font-semibold rounded-md hover:bg-red-700 transition duration-300"
-              >
-                Confirm Delete
-              </button>
-              <button
-                onClick={() => setShowDeleteModal(false)}
-                className="px-6 py-3 bg-gray-400 text-white font-semibold rounded-md hover:bg-gray-500 transition duration-300"
-              >
-                Cancel
-              </button>
-            </div>
+        <div className="p-4 bg-green-50 rounded-lg shadow-sm">
+          <h3 className="text-xl font-semibold text-accent-green mb-2">Check Our Documentation</h3>
+          <p className="text-lg text-gray-700">Find answers to common questions in our whitepaper and GitHub:</p>
+          <div className="flex justify-center space-x-4 mt-2">
+            <a
+              href="/WHITEPAPER.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-6 py-2 bg-accent-green text-white rounded-md hover:bg-green-600 transition duration-300"
+            >
+              Whitepaper
+            </a>
+            <a
+              href="https://github.com/TarusNicky8/FreelanceFlow/blob/main/README.md"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-6 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition duration-300"
+            >
+              GitHub Readme
+            </a>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };
@@ -2540,30 +2887,17 @@ function App() {
   const [walletClient, setWalletClient] = useState(null);
   const [publicClient, setPublicClient] = useState(null);
   const [account, setAccount] = useState(null);
-  const [notificationMessage, setNotificationMessage] = useState('');
-  const [notificationType, setNotificationType] = useState('info'); // 'info', 'success', 'error'
-  const notificationTimeoutRef = useRef(null);
-  const navigate = useNavigate(); // Hook for navigation
-
-  // State for mobile menu and info menu
+  const [notification, setNotification] = useState({ message: '', type: '' });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isInfoMenuOpen, setIsInfoMenuOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState(''); // State for global search input
-
 
   // Function to set a notification
-  const setNotification = (message, type = 'info', duration = 5000) => {
-    // Clear any existing timeout
-    if (notificationTimeoutRef.current) {
-      clearTimeout(notificationTimeoutRef.current);
-    }
-    setNotificationMessage(message);
-    setNotificationType(type);
-    notificationTimeoutRef.current = setTimeout(() => {
-      setNotificationMessage('');
-    }, duration);
+  const showNotification = (message, type) => {
+    setNotification({ message, type });
+    setTimeout(() => {
+      setNotification({ message: '', type: '' }); // Clear after 5 seconds
+    }, 5000);
   };
-
 
   const initializeWeb3Clients = async (connectedAddress) => {
     try {
@@ -2578,10 +2912,10 @@ function App() {
       setWalletClient(client);
       setPublicClient(publicClientInstance);
       setAccount(connectedAddress);
-      setNotification(`Wallet connected: ${truncateAddress(connectedAddress)}`, 'success');
+      showNotification(`Wallet connected: ${truncateAddress(connectedAddress)}`, 'success');
     } catch (error) {
       console.error("Error initializing Web3 clients:", error);
-      setNotification(`Error initializing wallet: ${error.message}`, 'error');
+      showNotification(`Error initializing wallet: ${error.message}`, 'error');
       setAccount(null);
       setWalletClient(null);
       setPublicClient(null);
@@ -2589,10 +2923,10 @@ function App() {
   };
 
   const connectWallet = async () => {
-    setNotification('Connecting wallet...', 'info');
+    showNotification('Connecting wallet...', 'info');
     try {
       if (typeof window.ethereum === 'undefined') {
-        setNotification('MetaMask or similar wallet not detected! Please install a Web3 wallet.', 'error');
+        showNotification('MetaMask or similar wallet not detected! Please install a Web3 wallet.', 'error');
         return;
       }
 
@@ -2602,9 +2936,9 @@ function App() {
     } catch (error) {
       console.error("Error connecting wallet:", error);
       if (error.code === 4001) {
-        setNotification('Wallet connection rejected by user.', 'error');
+        showNotification('Wallet connection rejected by user.', 'error');
       } else {
-        setNotification(`Error connecting wallet: ${error.message}`, 'error');
+        showNotification(`Error connecting wallet: ${error.message}`, 'error');
       }
       setAccount(null);
       setWalletClient(null);
@@ -2622,7 +2956,7 @@ function App() {
           setAccount(null);
           setWalletClient(null);
           setPublicClient(null);
-          setNotification('Wallet disconnected.', 'info');
+          showNotification('Wallet disconnected.', 'info');
         }
       };
 
@@ -2632,7 +2966,7 @@ function App() {
           if (accounts.length > 0) {
             await initializeWeb3Clients(accounts[0]);
           } else {
-            setNotification('No wallet connected initially.', 'info');
+            showNotification('No wallet connected initially.', 'info');
           }
         })
         .catch(error => console.error("Error checking initial accounts:", error));
@@ -2644,12 +2978,12 @@ function App() {
         window.ethereum.request({ method: 'eth_accounts' })
           .then(async (accounts) => {
             if (accounts.length > 0) {
-              initializeWeb3Clients(accounts[0]); // Don't await, let it run in background
+              await initializeWeb3Clients(accounts[0]);
             } else {
               setAccount(null);
               setWalletClient(null);
               setPublicClient(null);
-              setNotification('Wallet disconnected or chain changed to unknown network.', 'info');
+              showNotification('Wallet disconnected or chain changed to unknown network.', 'info');
             }
           })
           .catch(error => console.error("Error on chainChanged accounts check:", error));
@@ -2667,18 +3001,6 @@ function App() {
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
     if (isInfoMenuOpen) setIsInfoMenuOpen(false);
-  };
-
-  const handleSearchSubmit = (e) => {
-    if (e.key === 'Enter' || e.type === 'click') {
-      if (searchQuery.trim()) {
-        navigate(`/search?query=${encodeURIComponent(searchQuery.trim())}`);
-        setSearchQuery(''); // Clear search input after navigation
-        setIsMobileMenuOpen(false); // Close mobile menu on search
-      } else {
-        setNotification('Please enter a search query.', 'error');
-      }
-    }
   };
 
   return (
@@ -2699,26 +3021,6 @@ function App() {
                 <Link to="/post-job" className="hover:text-blue-200 transition duration-300 ease-in-out">Post Job</Link>
                 <Link to="/browse-jobs" className="hover:text-blue-200 transition duration-300 ease-in-out">Browse Jobs</Link>
               </div>
-              {/* Global Search Bar */}
-              <div className="relative flex items-center mx-4">
-                <input
-                  type="text"
-                  placeholder="Search jobs or users..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={handleSearchSubmit}
-                  className="p-2 pl-4 pr-10 rounded-full text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-accent-green transition duration-200"
-                />
-                <button
-                  onClick={handleSearchSubmit}
-                  className="absolute right-0 top-0 mt-2 mr-2 text-gray-600 hover:text-primary-blue transition duration-200"
-                  aria-label="Search"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </button>
-              </div>
               <div className="flex items-center gap-x-4">
                 <div className="relative">
                   <button
@@ -2736,7 +3038,8 @@ function App() {
                       <Link to="/cross-chain-transfer" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Cross-Chain Transfer</Link>
                       <Link to="/dispute-resolution" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Dispute Resolution</Link>
                       <Link to="/withdraw" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Withdraw Funds</Link>
-                      <Link to="/settings" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Settings</Link> {/* New Settings Link */}
+                      {/* Admin Dashboard link removed from public navigation */}
+                      <Link to="/support" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Customer Support</Link>
                       <a href="#about" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">About</a>
                       <a href="#vision" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Vision</a>
                       <a href="#mission" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Mission</a>
@@ -2767,26 +3070,6 @@ function App() {
           </div>
           {isMobileMenuOpen && (
             <nav className="md:hidden bg-primary-blue pb-2 pt-1 overflow-y-auto max-h-screen">
-              {/* Mobile Search Bar */}
-              <div className="px-4 py-2 flex items-center">
-                <input
-                  type="text"
-                  placeholder="Search jobs or users..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={handleSearchSubmit}
-                  className="flex-1 p-2 pl-4 pr-10 rounded-full text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-accent-green transition duration-200"
-                />
-                <button
-                  onClick={handleSearchSubmit}
-                  className="absolute right-6 text-gray-600 hover:text-primary-blue transition duration-200"
-                  aria-label="Search"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </button>
-              </div>
               <ul className="flex flex-col items-center space-y-3 text-lg py-2">
                 <li><Link to="/" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Home</Link></li>
                 <li><Link to="/dashboard" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Dashboard</Link></li>
@@ -2798,7 +3081,8 @@ function App() {
                 <li><Link to="/cross-chain-transfer" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Cross-Chain Transfer</Link></li>
                 <li><Link to="/dispute-resolution" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Dispute Resolution</Link></li>
                 <li><Link to="/withdraw" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Withdraw Funds</Link></li>
-                <li><Link to="/settings" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Settings</Link></li> {/* New Settings Link */}
+                {/* Admin Dashboard link removed from public navigation */}
+                <li><Link to="/support" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Customer Support</Link></li>
                 <li><a href="#about" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">About</a></li>
                 <li><a href="#vision" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Vision</a></li>
                 <li><a href="#mission" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Mission</a></li>
@@ -2849,6 +3133,33 @@ function App() {
                   </a>
                 </div>
               </section>
+
+              <section id="how-it-works" className="py-16 sm:py-20 bg-white text-center shadow-inner">
+                <div className="max-w-6xl mx-auto px-4">
+                  <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-8">How FreelanceFlow Works</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-10">
+                    <div className="p-6 bg-gray-50 rounded-lg shadow-md text-center">
+                      <div className="text-5xl text-accent-green mb-4">1</div>
+                      <h3 className="text-xl font-semibold text-secondary-purple mb-2">Client Posts Job & Funds Escrow</h3>
+                      <p className="text-base text-gray-700">A client posts a job with a clear description and a set USDC amount. They then deposit the full job amount into a secure smart contract escrow.</p>
+                    </div>
+                    <div className="p-6 bg-gray-50 rounded-lg shadow-md text-center">
+                      <div className="text-5xl text-accent-green mb-4">2</div>
+                      <h3 className="text-xl font-semibold text-secondary-purple mb-2">Freelancer Applies & Works</h3>
+                      <p className="text-base text-gray-700">Interested freelancers apply. The client selects a freelancer, who then accepts the assignment and begins working on the task.</p>
+                    </div>
+                    <div className="p-6 bg-gray-50 rounded-lg shadow-md text-center">
+                      <div className="text-5xl text-accent-green mb-4">3</div>
+                      <h3 className="text-xl font-semibold text-secondary-purple mb-2">Funds Released or Disputed</h3>
+                      <p className="text-base text-gray-700">Once the job is completed, the freelancer marks it as done. The client verifies the work and releases the USDC from escrow to the freelancer. In case of disagreement, a dispute can be initiated.</p>
+                    </div>
+                  </div>
+                  <p className="text-lg text-gray-700 mt-8 max-w-3xl mx-auto">
+                    This ensures fair and transparent transactions, protecting both clients and freelancers.
+                  </p>
+                </div>
+              </section>
+
 
               <section id="vision" className="py-16 sm:py-20 bg-gray-100 text-center shadow-inner">
                 <div className="max-w-5xl mx-auto px-4">
@@ -3074,32 +3385,25 @@ function App() {
             </>
           } />
           <Route path="/dashboard" element={<Dashboard account={account} />} />
-          <Route path="/profile" element={<Profile account={account} />} />
-          <Route path="/profile/:address" element={<Profile account={account} />} /> {/* New route for public profiles */}
-          <Route path="/job/:id" element={<JobDetails account={account} publicClient={publicClient} walletClient={walletClient} setNotification={setNotification} />} />
+          <Route path="/profile/:address?" element={<Profile account={account} />} /> {/* Added optional :address param */}
+          <Route path="/job/:id" element={<JobDetails account={account} publicClient={publicClient} walletClient={walletClient} setNotification={showNotification} />} />
           <Route path="/deposit-funds" element={
             <DivviIntegration
               account={account}
               walletClient={walletClient}
               publicClient={publicClient}
-              setNotification={setNotification}
+              setNotification={showNotification}
             />
           } />
-          <Route path="/post-job" element={<PostJob account={account} setNotification={setNotification} />} />
-          <Route path="/browse-jobs" element={<BrowseJobs />} />
-          <Route path="/cross-chain-transfer" element={<CrossChainIntegration account={account} publicClient={publicClient} walletClient={walletClient} setNotification={setNotification} />} />
-          <Route path="/dispute-resolution" element={<DisputeResolution account={account} setNotification={setNotification} />} />
-          <Route path="/withdraw" element={<Withdrawal account={account} setNotification={setNotification} />} />
-          <Route path="/search" element={<SearchPage account={account} setNotification={setNotification} />} /> {/* New Search Route */}
-          <Route path="/settings" element={<SettingsPage account={account} setNotification={setNotification} />} /> {/* New Settings Route */}
+          <Route path="/post-job" element={<PostJob account={account} setNotification={showNotification} />} />
+          <Route path="/browse-jobs" element={<BrowseJobs setNotification={showNotification} />} />
+          <Route path="/cross-chain-transfer" element={<CrossChainIntegration account={account} publicClient={publicClient} walletClient={walletClient} setNotification={showNotification} />} />
+          <Route path="/dispute-resolution" element={<DisputeResolution account={account} setNotification={showNotification} />} />
+          <Route path="/withdraw" element={<Withdrawal account={account} setNotification={showNotification} />} />
+          <Route path="/admin" element={<AdminDashboard setNotification={showNotification} />} /> {/* ADMIN ROUTE (no public link) */}
+          <Route path="/support" element={<CustomerSupport />} /> {/* CUSTOMER SUPPORT ROUTE */}
         </Routes>
-
-        {/* Global Notification Component */}
-        <Notification
-          message={notificationMessage}
-          type={notificationType}
-          onClose={() => setNotificationMessage('')}
-        />
+        <Notification message={notification.message} type={notification.type} onClose={() => setNotification({ message: '', type: '' })} />
       </div>
     </BrowserRouter>
   );
