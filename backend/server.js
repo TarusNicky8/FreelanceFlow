@@ -172,16 +172,20 @@ const disputeSchema = new mongoose.Schema({
     resolutionDetails: { type: String, default: null },
 });
 
-// Withdrawal Schema: Records withdrawal requests
+// Withdrawal Schema: Records withdrawal requests (UPDATED FOR MOBILE MONEY)
 const withdrawalSchema = new mongoose.Schema({
     requestorAddress: { type: String, required: true, lowercase: true },
     usdcAmount: { type: Number, required: true, min: 0 }, // Amount of USDC to withdraw
-    fiatCurrency: { type: String, required: true }, // e.g., KES, NGN, USD
-    bankDetails: { type: String, required: true }, // Mocked for now, in real app would be structured
+    
+    // New fields for mobile money / fiat off-ramp
+    country: { type: String, required: true }, // e.g., 'KE', 'NG', 'ZA'
+    mobileMoneyNetwork: { type: String, required: true }, // e.g., 'M-Pesa', 'MTN Mobile Money'
+    mobilePhoneNumber: { type: String, required: true }, // User's mobile phone number
+    
     status: { type: String, enum: ['pending', 'processing', 'completed', 'failed'], default: 'pending' },
     requestedAt: { type: Date, default: Date.now },
     processedAt: { type: Date, default: null },
-    txId: { type: String, default: null }, // Transaction ID from fiat on/off-ramp provider
+    txId: { type: String, default: null }, // Transaction ID from fiat on/off-ramp provider (if applicable)
 });
 
 
@@ -635,10 +639,17 @@ app.post('/api/disputes', async (req, res) => {
     }
 });
 
-// Withdrawals
+// Withdrawals (UPDATED TO ACCEPT NEW FIELDS)
 app.post('/api/withdrawals', async (req, res) => {
     try {
-        const withdrawalData = { ...req.body, requestorAddress: req.body.requestorAddress.toLowerCase() };
+        const withdrawalData = {
+            requestorAddress: req.body.requestorAddress.toLowerCase(),
+            usdcAmount: req.body.usdcAmount,
+            country: req.body.country, // New field
+            mobileMoneyNetwork: req.body.mobileMoneyNetwork, // New field
+            mobilePhoneNumber: req.body.mobilePhoneNumber, // New field
+            status: 'pending', // Default status
+        };
         const withdrawal = new Withdrawal(withdrawalData);
         await withdrawal.save();
         res.status(201).json(withdrawal);

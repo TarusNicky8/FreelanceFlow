@@ -163,7 +163,7 @@ const Notification = ({ message, type, onClose }) => {
 };
 
 // --- Confirmation Modal Component ---
-const ConfirmationModal = ({ isOpen, title, message, onConfirm, onCancel, confirmButtonText, cancelButtonText, isProcessing }) => {
+const ConfirmationModal = ({ isOpen, title, message, onConfirm, onCancel, confirmButtonText, cancelButtonText, isProcessing, children }) => {
   if (!isOpen) return null;
 
   return (
@@ -171,7 +171,8 @@ const ConfirmationModal = ({ isOpen, title, message, onConfirm, onCancel, confir
       <div className="bg-white p-8 rounded-lg shadow-xl max-w-md w-full text-center">
         <h3 className="text-2xl font-bold text-primary-blue mb-4">{title}</h3>
         <p className="text-lg text-gray-700 mb-6">{message}</p>
-        <div className="flex justify-center space-x-4">
+        {children} {/* Render children (e.g., additional form elements) here */}
+        <div className="flex justify-center space-x-4 mt-6">
           <button
             onClick={onConfirm}
             className="px-6 py-3 bg-accent-green text-white font-semibold rounded-md hover:bg-green-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -838,7 +839,7 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       return;
     }
     if (clientUsdcBalance < job.amount) {
-      setNotification('Insufficient USDC balance in your wallet to fund this job.', 'error'); // Enhanced message
+      setNotification('Insufficient USDC balance in your wallet for this job.', 'error'); // Enhanced message
       return;
     }
 
@@ -1877,7 +1878,10 @@ const BrowseJobs = ({ setNotification }) => {
   const [jobs, setJobs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
-  const [filterSkills, setFilterSkills] = useState(''); // New state for skill filtering
+  const [filterSkills, setFilterSkills] = useState('');
+  const [minAmount, setMinAmount] = useState('');
+  const [maxAmount, setMaxAmount] = useState('');
+  const [sortBy, setSortBy] = useState('dateDesc'); // 'dateDesc', 'dateAsc', 'amountDesc', 'amountAsc'
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -1886,9 +1890,42 @@ const BrowseJobs = ({ setNotification }) => {
       setErrorMessage('');
       try {
         // Fetch jobs that are 'open' and 'deposited'
-        // Pass filterSkills as a query parameter
-        const response = await axios.get(`${API_BASE_URL}/api/jobs?status=open&escrowStatus=deposited&skills=${filterSkills}`);
-        setJobs(response.data);
+        const response = await axios.get(`${API_BASE_URL}/api/jobs?status=open&escrowStatus=deposited`);
+        let fetchedJobs = response.data;
+
+        // Frontend Filtering by Skills
+        if (filterSkills) {
+          const skillArray = filterSkills.toLowerCase().split(',').map(s => s.trim()).filter(s => s !== '');
+          fetchedJobs = fetchedJobs.filter(job =>
+            job.requiredSkills && skillArray.some(skill => job.requiredSkills.map(s => s.toLowerCase()).includes(skill))
+          );
+        }
+
+        // Frontend Filtering by Amount Range
+        const min = parseFloat(minAmount);
+        const max = parseFloat(maxAmount);
+        if (!isNaN(min)) {
+          fetchedJobs = fetchedJobs.filter(job => job.amount >= min);
+        }
+        if (!isNaN(max)) {
+          fetchedJobs = fetchedJobs.filter(job => job.amount <= max);
+        }
+
+        // Frontend Sorting
+        fetchedJobs.sort((a, b) => {
+          if (sortBy === 'dateDesc') {
+            return new Date(b.createdAt) - new Date(a.createdAt);
+          } else if (sortBy === 'dateAsc') {
+            return new Date(a.createdAt) - new Date(b.createdAt);
+          } else if (sortBy === 'amountDesc') {
+            return b.amount - a.amount;
+          } else if (sortBy === 'amountAsc') {
+            return a.amount - b.amount;
+          }
+          return 0;
+        });
+
+        setJobs(fetchedJobs);
       } catch (error) {
         console.error('Error fetching jobs:', error);
         setErrorMessage(`Error loading jobs: ${error.message || 'Network error'}`);
@@ -1898,7 +1935,7 @@ const BrowseJobs = ({ setNotification }) => {
       }
     };
     fetchJobs();
-  }, [filterSkills, setNotification]); // Re-fetch jobs when filterSkills changes
+  }, [filterSkills, minAmount, maxAmount, sortBy, setNotification]); // Re-fetch when filters/sort change
 
   return (
     <div className="max-w-6xl mx-auto p-4 bg-white shadow-lg rounded-lg my-8">
@@ -1910,17 +1947,55 @@ const BrowseJobs = ({ setNotification }) => {
         </div>
       )}
 
-      {/* Skill Filtering Input */}
-      <div className="mb-6">
-        <label htmlFor="filterSkills" className="block text-lg font-medium text-gray-800 mb-2">Filter by Skills (comma-separated):</label>
-        <input
-          type="text"
-          id="filterSkills"
-          value={filterSkills}
-          onChange={(e) => setFilterSkills(e.target.value)}
-          placeholder="e.g., React, Node.js, Solidity"
-          className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
-        />
+      {/* Filtering and Sorting Controls */}
+      <div className="mb-6 p-4 bg-gray-50 rounded-lg shadow-inner grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div>
+          <label htmlFor="filterSkills" className="block text-sm font-medium text-gray-800 mb-1">Filter by Skills (comma-separated):</label>
+          <input
+            type="text"
+            id="filterSkills"
+            value={filterSkills}
+            onChange={(e) => setFilterSkills(e.target.value)}
+            placeholder="e.g., React, Node.js"
+            className="w-full p-2 border border-gray-300 rounded-md text-sm"
+          />
+        </div>
+        <div>
+          <label htmlFor="minAmount" className="block text-sm font-medium text-gray-800 mb-1">Min Amount (USDC):</label>
+          <input
+            type="number"
+            id="minAmount"
+            value={minAmount}
+            onChange={(e) => setMinAmount(e.target.value)}
+            placeholder="e.g., 100"
+            className="w-full p-2 border border-gray-300 rounded-md text-sm"
+          />
+        </div>
+        <div>
+          <label htmlFor="maxAmount" className="block text-sm font-medium text-gray-800 mb-1">Max Amount (USDC):</label>
+          <input
+            type="number"
+            id="maxAmount"
+            value={maxAmount}
+            onChange={(e) => setMaxAmount(e.target.value)}
+            placeholder="e.g., 1000"
+            className="w-full p-2 border border-gray-300 rounded-md text-sm"
+          />
+        </div>
+        <div className="md:col-span-2 lg:col-span-1">
+          <label htmlFor="sortBy" className="block text-sm font-medium text-gray-800 mb-1">Sort By:</label>
+          <select
+            id="sortBy"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="w-full p-2 border border-gray-300 rounded-md text-sm"
+          >
+            <option value="dateDesc">Date Posted (Newest First)</option>
+            <option value="dateAsc">Date Posted (Oldest First)</option>
+            <option value="amountDesc">Amount (High to Low)</option>
+            <option value="amountAsc">Amount (Low to High)</option>
+          </select>
+        </div>
       </div>
 
       {isLoading ? (
@@ -1962,7 +2037,7 @@ const BrowseJobs = ({ setNotification }) => {
             </ul>
           ) : (
             <div className="mt-4 p-4 bg-yellow-50 rounded-lg shadow-sm text-yellow-800 text-center">
-              <p className="text-base">No open jobs found at the moment. Check back later!</p>
+              <p className="text-base">No open jobs found at the moment. Adjust your filters or check back later!</p>
             </div>
           )}
         </>
@@ -2230,49 +2305,61 @@ const DisputeResolution = ({ account, setNotification }) => {
   );
 };
 
-// --- Withdrawal Component (Mock Fiat On/Off-Ramp) ---
+// --- Withdrawal Component (Enhanced for Mobile Money) ---
 const Withdrawal = ({ account, setNotification }) => {
   const [amount, setAmount] = useState('');
-  const [fiatCurrency, setFiatCurrency] = useState('KES');
-  const [bankDetails, setBankDetails] = useState('');
+  const [country, setCountry] = useState('KE'); // Default to Kenya
+  const [mobileMoneyNetwork, setMobileMoneyNetwork] = useState('M-Pesa');
+  const [mobilePhoneNumber, setMobilePhoneNumber] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [showConfirmModal, setShowConfirmModal] = useState(false); // For confirmation modal
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+
+  // Define mobile money networks based on selected country
+  const getMobileMoneyNetworks = (selectedCountry) => {
+    switch (selectedCountry) {
+      case 'KE': return ['M-Pesa', 'Airtel Money', 'Telkom T-Kash'];
+      case 'NG': return ['MTN Mobile Money', 'Airtel Money', 'Glo Money'];
+      case 'ZA': return ['FNB eWallet', 'Standard Bank Instant Money'];
+      case 'GH': return ['MTN Mobile Money', 'Vodafone Cash', 'AirtelTigo Money'];
+      default: return ['Other'];
+    }
+  };
 
   const handleWithdrawal = async (e) => {
-    e.preventDefault();
+    e.e.preventDefault();
     if (!account) {
       setNotification('Please connect your wallet to initiate a withdrawal.', 'error');
       return;
     }
-    if (isNaN(parseFloat(amount)) || parseFloat(amount) <= 0 || !bankDetails) {
-      setNotification('Please enter a valid amount and bank details.', 'error');
+    if (isNaN(parseFloat(amount)) || parseFloat(amount) <= 0 || !mobilePhoneNumber || !country || !mobileMoneyNetwork) {
+      setNotification('Please fill all withdrawal details correctly.', 'error');
       return;
     }
 
-    setShowConfirmModal(true); // Show confirmation modal
+    setShowConfirmModal(true);
   };
 
   const confirmWithdrawal = async () => {
-    setShowConfirmModal(false); // Close modal
+    setShowConfirmModal(false);
     setIsLoading(true);
-    setNotification(`Initiating withdrawal of ${amount} USDC to ${fiatCurrency} via bank transfer...`, 'info');
+    setNotification(`Initiating withdrawal request for ${amount} USDC to ${mobileMoneyNetwork} in ${country} for ${mobilePhoneNumber}...`, 'info');
 
     try {
-      // Call backend to submit withdrawal request
       await axios.post(`${API_BASE_URL}/api/withdrawals`, {
         requestorAddress: account,
         usdcAmount: parseFloat(amount),
-        fiatCurrency: fiatCurrency,
-        bankDetails: bankDetails, // In a real app, this would be structured data
+        country: country,
+        mobileMoneyNetwork: mobileMoneyNetwork,
+        mobilePhoneNumber: mobilePhoneNumber,
       });
 
-      setNotification(`Withdrawal request submitted! Our team will process your ${amount} USDC to ${fiatCurrency}.`, 'success');
+      setNotification(`Withdrawal request submitted! Our team will process your ${amount} USDC to ${mobileMoneyNetwork}. This is an off-chain request.`, 'success');
       setAmount('');
-      setBankDetails('');
+      setMobilePhoneNumber('');
 
     } catch (error) {
       console.error('Error during withdrawal:', error);
-      setNotification(`Withdrawal failed: ${error.message || 'Please try again.'}`, 'error');
+      setNotification(`Withdrawal request failed: ${error.message || 'Please try again.'}`, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -2282,7 +2369,8 @@ const Withdrawal = ({ account, setNotification }) => {
     <div className="max-w-3xl mx-auto p-6 bg-white shadow-lg rounded-lg my-8">
       <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">Withdraw Funds (Fiat On/Off-Ramp)</h2>
       <p className="text-lg text-gray-700 mb-6">
-        Convert your USDC earnings to local fiat currency and withdraw directly to your bank account.
+        Convert your USDC earnings to local fiat currency and withdraw directly to your mobile money account.
+        <span className="font-semibold text-red-600 block mt-2">Note: This is an off-chain request. Actual processing will be handled by our team.</span>
       </p>
 
       <p className="text-lg text-gray-700 mb-4">
@@ -2313,54 +2401,74 @@ const Withdrawal = ({ account, setNotification }) => {
           />
         </div>
         <div>
-          <label htmlFor="fiatCurrency" className="block text-lg font-medium text-gray-800 mb-1">Fiat Currency</label>
+          <label htmlFor="country" className="block text-lg font-medium text-gray-800 mb-1">Country</label>
           <select
-            id="fiatCurrency"
-            value={fiatCurrency}
-            onChange={(e) => setFiatCurrency(e.target.value)}
+            id="country"
+            value={country}
+            onChange={(e) => {
+              setCountry(e.target.value);
+              setMobileMoneyNetwork(getMobileMoneyNetworks(e.target.value)[0] || ''); // Reset network on country change
+            }}
             className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
             disabled={isLoading || !account}
           >
-            <option value="KES">Kenyan Shilling (KES)</option>
-            <option value="NGN">Nigerian Naira (NGN)</option>
-            <option value="ZAR">South African Rand (ZAR)</option>
-            <option value="USD">US Dollar (USD)</option>
-            {/* Add more currencies as needed */}
+            <option value="KE">Kenya</option>
+            <option value="NG">Nigeria</option>
+            <option value="ZA">South Africa</option>
+            <option value="GH">Ghana</option>
+            <option value="UG">Uganda</option>
+            <option value="TZ">Tanzania</option>
+            {/* Add more African countries as needed */}
           </select>
         </div>
         <div>
-          <label htmlFor="bankDetails" className="block text-lg font-medium text-gray-800 mb-1">Bank Account Details (Mock)</label>
-          <textarea
-            id="bankDetails"
-            value={bankDetails}
-            onChange={(e) => setBankDetails(e.target.value)}
-            placeholder="Bank Name, Account Number, SWIFT/BIC, etc."
-            rows="3"
+          <label htmlFor="mobileMoneyNetwork" className="block text-lg font-medium text-gray-800 mb-1">Mobile Money Network</label>
+          <select
+            id="mobileMoneyNetwork"
+            value={mobileMoneyNetwork}
+            onChange={(e) => setMobileMoneyNetwork(e.target.value)}
             className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
             disabled={isLoading || !account}
-          ></textarea>
+          >
+            {getMobileMoneyNetworks(country).map(network => (
+              <option key={network} value={network}>{network}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="mobilePhoneNumber" className="block text-lg font-medium text-gray-800 mb-1">Mobile Phone Number</label>
+          <input
+            type="text"
+            id="mobilePhoneNumber"
+            value={mobilePhoneNumber}
+            onChange={(e) => setMobilePhoneNumber(e.target.value)}
+            placeholder="e.g., +2547XXXXXXXX"
+            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
+            disabled={isLoading || !account}
+          />
         </div>
         <button
           type="submit"
           className="w-full px-6 py-3 bg-accent-green text-white font-semibold rounded-md hover:bg-green-600 transition duration-300 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
           disabled={isLoading || !account}
         >
-          {isLoading ? 'Processing...' : 'Initiate Withdrawal'}
+          {isLoading ? 'Processing...' : 'Initiate Withdrawal Request'}
         </button>
       </form>
 
       <ConfirmationModal
         isOpen={showConfirmModal}
         title="Confirm Withdrawal Request"
-        message={`Are you sure you want to request a withdrawal of ${amount} USDC to your bank account for ${fiatCurrency}?`}
+        message={`Are you sure you want to request a withdrawal of ${amount} USDC to ${mobileMoneyNetwork} (${country}) at ${mobilePhoneNumber}? This is an off-chain request processed by our team.`}
         onConfirm={confirmWithdrawal}
         onCancel={() => setShowConfirmModal(false)}
-        confirmButtonText="Yes, Withdraw"
+        confirmButtonText="Yes, Request Withdrawal"
         isProcessing={isLoading}
       />
     </div>
   );
 };
+
 
 // --- AdminDashboard Component ---
 const AdminDashboard = ({ setNotification }) => {
@@ -2930,8 +3038,8 @@ function App() {
                       <Link to="/cross-chain-transfer" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Cross-Chain Transfer</Link>
                       <Link to="/dispute-resolution" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Dispute Resolution</Link>
                       <Link to="/withdraw" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Withdraw Funds</Link>
-                      <Link to="/admin" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Admin Dashboard</Link> {/* NEW */}
-                      <Link to="/support" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Customer Support</Link> {/* NEW */}
+                      {/* Admin Dashboard link removed from public navigation */}
+                      <Link to="/support" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Customer Support</Link>
                       <a href="#about" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">About</a>
                       <a href="#vision" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Vision</a>
                       <a href="#mission" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Mission</a>
@@ -2973,8 +3081,8 @@ function App() {
                 <li><Link to="/cross-chain-transfer" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Cross-Chain Transfer</Link></li>
                 <li><Link to="/dispute-resolution" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Dispute Resolution</Link></li>
                 <li><Link to="/withdraw" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Withdraw Funds</Link></li>
-                <li><Link to="/admin" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Admin Dashboard</Link></li> {/* NEW */}
-                <li><Link to="/support" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Customer Support</Link></li> {/* NEW */}
+                {/* Admin Dashboard link removed from public navigation */}
+                <li><Link to="/support" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Customer Support</Link></li>
                 <li><a href="#about" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">About</a></li>
                 <li><a href="#vision" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Vision</a></li>
                 <li><a href="#mission" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Mission</a></li>
@@ -3025,6 +3133,33 @@ function App() {
                   </a>
                 </div>
               </section>
+
+              <section id="how-it-works" className="py-16 sm:py-20 bg-white text-center shadow-inner">
+                <div className="max-w-6xl mx-auto px-4">
+                  <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-8">How FreelanceFlow Works</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-10">
+                    <div className="p-6 bg-gray-50 rounded-lg shadow-md text-center">
+                      <div className="text-5xl text-accent-green mb-4">1</div>
+                      <h3 className="text-xl font-semibold text-secondary-purple mb-2">Client Posts Job & Funds Escrow</h3>
+                      <p className="text-base text-gray-700">A client posts a job with a clear description and a set USDC amount. They then deposit the full job amount into a secure smart contract escrow.</p>
+                    </div>
+                    <div className="p-6 bg-gray-50 rounded-lg shadow-md text-center">
+                      <div className="text-5xl text-accent-green mb-4">2</div>
+                      <h3 className="text-xl font-semibold text-secondary-purple mb-2">Freelancer Applies & Works</h3>
+                      <p className="text-base text-gray-700">Interested freelancers apply. The client selects a freelancer, who then accepts the assignment and begins working on the task.</p>
+                    </div>
+                    <div className="p-6 bg-gray-50 rounded-lg shadow-md text-center">
+                      <div className="text-5xl text-accent-green mb-4">3</div>
+                      <h3 className="text-xl font-semibold text-secondary-purple mb-2">Funds Released or Disputed</h3>
+                      <p className="text-base text-gray-700">Once the job is completed, the freelancer marks it as done. The client verifies the work and releases the USDC from escrow to the freelancer. In case of disagreement, a dispute can be initiated.</p>
+                    </div>
+                  </div>
+                  <p className="text-lg text-gray-700 mt-8 max-w-3xl mx-auto">
+                    This ensures fair and transparent transactions, protecting both clients and freelancers.
+                  </p>
+                </div>
+              </section>
+
 
               <section id="vision" className="py-16 sm:py-20 bg-gray-100 text-center shadow-inner">
                 <div className="max-w-5xl mx-auto px-4">
@@ -3265,8 +3400,8 @@ function App() {
           <Route path="/cross-chain-transfer" element={<CrossChainIntegration account={account} publicClient={publicClient} walletClient={walletClient} setNotification={showNotification} />} />
           <Route path="/dispute-resolution" element={<DisputeResolution account={account} setNotification={showNotification} />} />
           <Route path="/withdraw" element={<Withdrawal account={account} setNotification={showNotification} />} />
-          <Route path="/admin" element={<AdminDashboard setNotification={showNotification} />} /> {/* NEW ADMIN ROUTE */}
-          <Route path="/support" element={<CustomerSupport />} /> {/* NEW CUSTOMER SUPPORT ROUTE */}
+          <Route path="/admin" element={<AdminDashboard setNotification={showNotification} />} /> {/* ADMIN ROUTE (no public link) */}
+          <Route path="/support" element={<CustomerSupport />} /> {/* CUSTOMER SUPPORT ROUTE */}
         </Routes>
         <Notification message={notification.message} type={notification.type} onClose={() => setNotification({ message: '', type: '' })} />
       </div>
