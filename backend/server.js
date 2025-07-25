@@ -175,7 +175,7 @@ const disputeSchema = new mongoose.Schema({
 // Withdrawal Schema: Records withdrawal requests (UPDATED FOR MOBILE MONEY)
 const withdrawalSchema = new mongoose.Schema({
     requestorAddress: { type: String, required: true, lowercase: true },
-    usdcAmount: { type: Number, required: true, min: 0 }, // Amount of USDC to withdraw
+    usdcAmount: { type: Number, required: true, min: 0 },
     
     // New fields for mobile money / fiat off-ramp
     country: { type: String, required: true }, // e.g., 'KE', 'NG', 'ZA'
@@ -762,6 +762,51 @@ app.put('/api/jobs/:id/rate-freelancer', async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 });
+
+// --- NEW SEARCH ENDPOINTS ---
+app.get('/api/search/jobs', async (req, res) => {
+    try {
+        const searchTerm = req.query.query;
+        if (!searchTerm) {
+            return res.status(400).json({ error: 'Search query is required.' });
+        }
+        const regex = new RegExp(searchTerm, 'i'); // Case-insensitive search
+
+        const jobs = await Job.find({
+            $or: [
+                { title: { $regex: regex } },
+                { description: { $regex: regex } }
+            ]
+        });
+        res.json(jobs);
+    } catch (error) {
+        console.error('Error searching jobs:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/search/users', async (req, res) => {
+    try {
+        const searchTerm = req.query.query;
+        if (!searchTerm) {
+            return res.status(400).json({ error: 'Search query is required.' });
+        }
+        const regex = new RegExp(searchTerm, 'i'); // Case-insensitive search
+
+        const users = await User.find({
+            $or: [
+                { address: { $regex: regex } },
+                { skills: { $regex: regex } },
+                { portfolio: { $regex: regex } }
+            ]
+        });
+        res.json(users);
+    } catch (error) {
+        console.error('Error searching users:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 
 // --- ADMIN ROUTES ---
 // All admin routes should be protected by the authenticateAdmin middleware
