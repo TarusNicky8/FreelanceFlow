@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Link, useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { createWalletClient, custom, parseUnits, encodeFunctionData, createPublicClient, http, formatUnits } from 'viem';
-import { isAddress }  from 'viem'; // Import isAddress for validation
+import { isAddress } from 'viem'; // Import isAddress for validation
 import { getAddress } from 'viem'; // Import getAddress for checksumming
 
 import logo from './App icon.svg';
@@ -2362,6 +2362,418 @@ const Withdrawal = ({ account, setNotification }) => {
   );
 };
 
+// --- AdminDashboard Component ---
+const AdminDashboard = ({ setNotification }) => {
+  const [adminKey, setAdminKey] = useState('');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [disputes, setDisputes] = useState([]);
+  const [allJobs, setAllJobs] = useState([]); // To allow admin to manually update job status
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedJobId, setSelectedJobId] = useState('');
+  const [newJobStatus, setNewJobStatus] = useState('');
+  const [newEscrowStatus, setNewEscrowStatus] = useState('');
+  const [showResolveDisputeModal, setShowResolveDisputeModal] = useState(false);
+  const [currentDisputeToResolve, setCurrentDisputeToResolve] = useState(null);
+  const [resolveDetails, setResolveDetails] = useState('');
+  const [resolveJobStatus, setResolveJobStatus] = useState('');
+  const [resolveEscrowStatus, setResolveEscrowStatus] = useState('');
+
+
+  const fetchAdminData = async () => {
+    if (!adminKey) {
+      setNotification('Please enter the Admin Secret Key.', 'error');
+      setIsAuthenticated(false);
+      return;
+    }
+    setIsLoading(true);
+    setNotification('Fetching admin data...', 'info');
+    try {
+      const disputesResponse = await axios.get(`${API_BASE_URL}/api/admin/disputes`, {
+        headers: { 'X-Admin-Key': adminKey }
+      });
+      setDisputes(disputesResponse.data);
+
+      const jobsResponse = await axios.get(`${API_BASE_URL}/api/jobs`, { // Fetch all jobs for manual update
+        headers: { 'X-Admin-Key': adminKey } // Admin can see all jobs
+      });
+      setAllJobs(jobsResponse.data);
+
+      setIsAuthenticated(true);
+      setNotification('Admin data loaded successfully!', 'success');
+    } catch (error) {
+      console.error('Error fetching admin data:', error);
+      setNotification(`Authentication failed or error fetching data: ${error.message || 'Please check your key.'}`, 'error');
+      setIsAuthenticated(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Fetch data on initial load if key is already set (e.g., from session storage if you implement it)
+  // For now, we'll rely on manual fetch after key input.
+  // useEffect(() => {
+  //   if (adminKey) {
+  //     fetchAdminData();
+  //   }
+  // }, [adminKey]); // Depend on adminKey for re-fetch
+
+  const handleResolveDispute = (dispute) => {
+    setCurrentDisputeToResolve(dispute);
+    setResolveDetails(''); // Clear previous details
+    setResolveJobStatus(dispute.jobId.status); // Pre-fill with current job status
+    setResolveEscrowStatus(dispute.jobId.escrowStatus); // Pre-fill with current escrow status
+    setShowResolveDisputeModal(true);
+  };
+
+  const confirmResolveDispute = async () => {
+    if (!currentDisputeToResolve) return;
+
+    setIsLoading(true);
+    setShowResolveDisputeModal(false);
+    setNotification('Resolving dispute...', 'info');
+    try {
+      await axios.put(`${API_BASE_URL}/api/admin/disputes/${currentDisputeToResolve._id}/resolve`,
+        {
+          resolutionDetails: resolveDetails,
+          jobStatus: resolveJobStatus,
+          escrowStatus: resolveEscrowStatus,
+        },
+        { headers: { 'X-Admin-Key': adminKey } }
+      );
+      setNotification('Dispute resolved successfully and job status updated!', 'success');
+      fetchAdminData(); // Re-fetch data to update lists
+    } catch (error) {
+      console.error('Error resolving dispute:', error);
+      setNotification(`Error resolving dispute: ${error.message || 'Please try again.'}`, 'error');
+    } finally {
+      setIsLoading(false);
+      setCurrentDisputeToResolve(null);
+    }
+  };
+
+  const handleCloseDispute = async (disputeId) => {
+    setIsLoading(true);
+    setNotification('Closing dispute...', 'info');
+    try {
+      await axios.put(`${API_BASE_URL}/api/admin/disputes/${disputeId}/close`,
+        { resolutionDetails: 'Closed by admin, no further action.' },
+        { headers: { 'X-Admin-Key': adminKey } }
+      );
+      setNotification('Dispute closed successfully!', 'success');
+      fetchAdminData();
+    } catch (error) {
+      console.error('Error closing dispute:', error);
+      setNotification(`Error closing dispute: ${error.message || 'Please try again.'}`, 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUpdateJobStatus = async () => {
+    if (!selectedJobId || (!newJobStatus && !newEscrowStatus)) {
+      setNotification('Please select a job and provide at least one new status.', 'error');
+      return;
+    }
+    setIsLoading(true);
+    setNotification('Updating job status...', 'info');
+    try {
+      await axios.put(`${API_BASE_URL}/api/admin/jobs/${selectedJobId}/update-status`,
+        {
+          status: newJobStatus || undefined, // Only send if not empty
+          escrowStatus: newEscrowStatus || undefined, // Only send if not empty
+        },
+        { headers: { 'X-Admin-Key': adminKey } }
+      );
+      setNotification('Job status updated successfully!', 'success');
+      setNewJobStatus('');
+      setNewEscrowStatus('');
+      fetchAdminData(); // Re-fetch data
+    } catch (error) {
+      console.error('Error updating job status:', error);
+      setNotification(`Error updating job status: ${error.message || 'Please try again.'}`, 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+
+  return (
+    <div className="max-w-6xl mx-auto p-4 bg-white shadow-lg rounded-lg my-8">
+      <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">Admin Dashboard</h2>
+
+      {!isAuthenticated ? (
+        <div className="text-center p-6 bg-gray-50 rounded-lg shadow-inner">
+          <p className="text-lg text-gray-700 mb-4">Enter Admin Secret Key to access this dashboard:</p>
+          <input
+            type="password"
+            value={adminKey}
+            onChange={(e) => setAdminKey(e.target.value)}
+            placeholder="Admin Secret Key"
+            className="w-full max-w-sm p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200 text-gray-800 mb-4"
+          />
+          <button
+            onClick={fetchAdminData}
+            className="px-8 py-3 bg-secondary-purple text-white font-semibold rounded-md hover:bg-purple-700 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isLoading}
+          >
+            {isLoading ? 'Authenticating...' : 'Authenticate'}
+          </button>
+        </div>
+      ) : (
+        <>
+          {isLoading && (
+            <div className="flex items-center justify-center py-8 text-primary-blue">
+              <svg className="animate-spin h-6 w-6 mr-3 text-primary-blue" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Loading admin data...
+            </div>
+          )}
+
+          <h3 className="text-xl font-semibold mt-8 text-primary-blue border-b pb-2">Disputes Overview</h3>
+          {disputes.length > 0 ? (
+            <ul className="mt-4 space-y-4">
+              {disputes.map((dispute) => (
+                <li key={dispute._id} className="bg-gray-50 p-4 rounded-lg shadow-md">
+                  <p className="text-lg font-semibold text-gray-800">Job ID: <Link to={`/job/${dispute.jobId._id}`} className="text-primary-blue hover:underline">{dispute.jobId._id}</Link></p>
+                  <p className="text-md text-gray-700">Reported by: {truncateAddress(dispute.reporterAddress)}</p>
+                  <p className="text-md text-gray-700">Reason: {dispute.reason}</p>
+                  <p className="text-md text-gray-700">Status: <span className={`font-semibold ${dispute.status === 'open' ? 'text-red-600' : 'text-green-600'}`}>{dispute.status}</span></p>
+                  <p className="text-sm text-gray-600">Reported At: {new Date(dispute.reportedAt).toLocaleString()}</p>
+                  {dispute.resolutionDetails && <p className="text-sm text-gray-600">Resolution: {dispute.resolutionDetails}</p>}
+                  <div className="mt-3 flex space-x-2">
+                    {dispute.status === 'open' || dispute.status === 'under-review' ? (
+                      <>
+                        <button
+                          onClick={() => handleResolveDispute(dispute)}
+                          className="px-4 py-2 bg-accent-green text-white rounded-md hover:bg-green-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                          disabled={isLoading}
+                        >
+                          Resolve
+                        </button>
+                        <button
+                          onClick={() => handleCloseDispute(dispute._id)}
+                          className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                          disabled={isLoading}
+                        >
+                          Close
+                        </button>
+                      </>
+                    ) : (
+                      <span className="text-gray-500 text-sm">Dispute already handled.</span>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="mt-4 p-4 bg-yellow-50 rounded-lg shadow-sm text-yellow-800">
+              <p className="text-base">No disputes found.</p>
+            </div>
+          )}
+
+          <h3 className="text-xl font-semibold mt-8 text-primary-blue border-b pb-2">Manually Update Job Status</h3>
+          <div className="mt-4 p-4 bg-gray-50 rounded-lg shadow-inner space-y-4">
+            <div>
+              <label htmlFor="selectJob" className="block text-lg font-medium text-gray-800 mb-1">Select Job:</label>
+              <select
+                id="selectJob"
+                value={selectedJobId}
+                onChange={(e) => {
+                  setSelectedJobId(e.target.value);
+                  const job = allJobs.find(j => j._id === e.target.value);
+                  if (job) {
+                    setNewJobStatus(job.status);
+                    setNewEscrowStatus(job.escrowStatus);
+                  } else {
+                    setNewJobStatus('');
+                    setNewEscrowStatus('');
+                  }
+                }}
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
+                disabled={isLoading}
+              >
+                <option value="">-- Select a Job --</option>
+                {allJobs.map(job => (
+                  <option key={job._id} value={job._id}>
+                    {job.title} (ID: {truncateAddress(job._id)}) - Status: {job.status} | Escrow: {job.escrowStatus}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="newJobStatus" className="block text-lg font-medium text-gray-800 mb-1">New Job Status:</label>
+              <select
+                id="newJobStatus"
+                value={newJobStatus}
+                onChange={(e) => setNewJobStatus(e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
+                disabled={isLoading}
+              >
+                <option value="">-- Select Status --</option>
+                <option value="open">open</option>
+                <option value="pending-client-approval">pending-client-approval</option>
+                <option value="in-progress">in-progress</option>
+                <option value="completed">completed</option>
+                <option value="disputed">disputed</option>
+                <option value="cancelled">cancelled</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="newEscrowStatus" className="block text-lg font-medium text-gray-800 mb-1">New Escrow Status:</label>
+              <select
+                id="newEscrowStatus"
+                value={newEscrowStatus}
+                onChange={(e) => setNewEscrowStatus(e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
+                disabled={isLoading}
+              >
+                <option value="">-- Select Escrow Status --</option>
+                <option value="pending-deposit">pending-deposit</option>
+                <option value="deposited">deposited</option>
+                <option value="active">active</option>
+                <option value="released">released</option>
+                <option value="refunded">refunded</option>
+                <option value="disputed">disputed</option>
+              </select>
+            </div>
+            <button
+              onClick={handleUpdateJobStatus}
+              className="w-full px-6 py-3 bg-secondary-purple text-white font-semibold rounded-md hover:bg-purple-700 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isLoading || !selectedJobId || (!newJobStatus && !newEscrowStatus)}
+            >
+              {isLoading ? 'Updating...' : 'Update Job Status'}
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* Resolve Dispute Modal */}
+      <ConfirmationModal
+        isOpen={showResolveDisputeModal}
+        title="Resolve Dispute"
+        message={`Resolving dispute for Job ID: ${currentDisputeToResolve?.jobId?._id}. Please provide resolution details and set the final job statuses.`}
+        onConfirm={confirmResolveDispute}
+        onCancel={() => {
+          setShowResolveDisputeModal(false);
+          setCurrentDisputeToResolve(null);
+        }}
+        confirmButtonText="Confirm Resolution"
+        isProcessing={isLoading}
+      >
+        <div className="text-left mt-4">
+          <label htmlFor="resolveDetails" className="block text-lg font-medium text-gray-800 mb-1">Resolution Details:</label>
+          <textarea
+            id="resolveDetails"
+            value={resolveDetails}
+            onChange={(e) => setResolveDetails(e.target.value)}
+            placeholder="Details of how the dispute was resolved..."
+            rows="3"
+            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200 mb-4"
+            disabled={isLoading}
+          ></textarea>
+
+          <label htmlFor="resolveJobStatus" className="block text-lg font-medium text-gray-800 mb-1">Final Job Status:</label>
+          <select
+            id="resolveJobStatus"
+            value={resolveJobStatus}
+            onChange={(e) => setResolveJobStatus(e.target.value)}
+            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200 mb-4"
+            disabled={isLoading}
+          >
+            <option value="">-- Select Status --</option>
+            <option value="open">open</option>
+            <option value="pending-client-approval">pending-client-approval</option>
+            <option value="in-progress">in-progress</option>
+            <option value="completed">completed</option>
+            <option value="disputed">disputed</option>
+            <option value="cancelled">cancelled</option>
+          </select>
+
+          <label htmlFor="resolveEscrowStatus" className="block text-lg font-medium text-gray-800 mb-1">Final Escrow Status:</label>
+          <select
+            id="resolveEscrowStatus"
+            value={resolveEscrowStatus}
+            onChange={(e) => setResolveEscrowStatus(e.target.value)}
+            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
+            disabled={isLoading}
+          >
+            <option value="">-- Select Escrow Status --</option>
+            <option value="pending-deposit">pending-deposit</option>
+            <option value="deposited">deposited</option>
+            <option value="active">active</option>
+            <option value="released">released</option>
+            <option value="refunded">refunded</option>
+            <option value="disputed">disputed</option>
+          </select>
+        </div>
+      </ConfirmationModal>
+    </div>
+  );
+};
+
+// --- CustomerSupport Component ---
+const CustomerSupport = () => {
+  return (
+    <div className="max-w-3xl mx-auto p-6 bg-white shadow-lg rounded-lg my-8 text-center">
+      <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">Customer Support</h2>
+      <p className="text-lg text-gray-700 mb-6">
+        We're here to help! If you have any questions, feedback, or need assistance, please reach out to us through the channels below.
+      </p>
+
+      <div className="space-y-6">
+        <div className="p-4 bg-blue-50 rounded-lg shadow-sm">
+          <h3 className="text-xl font-semibold text-primary-blue mb-2">Email Support</h3>
+          <p className="text-lg text-gray-700">For general inquiries and support:</p>
+          <a
+            href="mailto:nicodemuskiptoo88@gmail.com"
+            className="mt-2 inline-block px-6 py-2 bg-primary-blue text-white rounded-md hover:bg-blue-700 transition duration-300"
+          >
+            Email Us
+          </a>
+        </div>
+
+        <div className="p-4 bg-purple-50 rounded-lg shadow-sm">
+          <h3 className="text-xl font-semibold text-secondary-purple mb-2">Join Our Discord Community</h3>
+          <p className="text-lg text-gray-700">Connect with other users and get community support:</p>
+          <a
+            href="https://discord.gg/7TVd2ZdP9h"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 inline-block px-6 py-2 bg-secondary-purple text-white rounded-md hover:bg-purple-700 transition duration-300"
+          >
+            Join Discord
+          </a>
+        </div>
+
+        <div className="p-4 bg-green-50 rounded-lg shadow-sm">
+          <h3 className="text-xl font-semibold text-accent-green mb-2">Check Our Documentation</h3>
+          <p className="text-lg text-gray-700">Find answers to common questions in our whitepaper and GitHub:</p>
+          <div className="flex justify-center space-x-4 mt-2">
+            <a
+              href="/WHITEPAPER.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-6 py-2 bg-accent-green text-white rounded-md hover:bg-green-600 transition duration-300"
+            >
+              Whitepaper
+            </a>
+            <a
+              href="https://github.com/TarusNicky8/FreelanceFlow/blob/main/README.md"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-6 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition duration-300"
+            >
+              GitHub Readme
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 
 function App() {
   const [walletClient, setWalletClient] = useState(null);
@@ -2518,6 +2930,8 @@ function App() {
                       <Link to="/cross-chain-transfer" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Cross-Chain Transfer</Link>
                       <Link to="/dispute-resolution" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Dispute Resolution</Link>
                       <Link to="/withdraw" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Withdraw Funds</Link>
+                      <Link to="/admin" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Admin Dashboard</Link> {/* NEW */}
+                      <Link to="/support" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Customer Support</Link> {/* NEW */}
                       <a href="#about" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">About</a>
                       <a href="#vision" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Vision</a>
                       <a href="#mission" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Mission</a>
@@ -2559,6 +2973,8 @@ function App() {
                 <li><Link to="/cross-chain-transfer" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Cross-Chain Transfer</Link></li>
                 <li><Link to="/dispute-resolution" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Dispute Resolution</Link></li>
                 <li><Link to="/withdraw" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Withdraw Funds</Link></li>
+                <li><Link to="/admin" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Admin Dashboard</Link></li> {/* NEW */}
+                <li><Link to="/support" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Customer Support</Link></li> {/* NEW */}
                 <li><a href="#about" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">About</a></li>
                 <li><a href="#vision" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Vision</a></li>
                 <li><a href="#mission" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Mission</a></li>
@@ -2849,6 +3265,8 @@ function App() {
           <Route path="/cross-chain-transfer" element={<CrossChainIntegration account={account} publicClient={publicClient} walletClient={walletClient} setNotification={showNotification} />} />
           <Route path="/dispute-resolution" element={<DisputeResolution account={account} setNotification={showNotification} />} />
           <Route path="/withdraw" element={<Withdrawal account={account} setNotification={showNotification} />} />
+          <Route path="/admin" element={<AdminDashboard setNotification={showNotification} />} /> {/* NEW ADMIN ROUTE */}
+          <Route path="/support" element={<CustomerSupport />} /> {/* NEW CUSTOMER SUPPORT ROUTE */}
         </Routes>
         <Notification message={notification.message} type={notification.type} onClose={() => setNotification({ message: '', type: '' })} />
       </div>
