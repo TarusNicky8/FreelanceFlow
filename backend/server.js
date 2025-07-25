@@ -36,7 +36,7 @@ app.use(cors({
         return callback(new Error(msg), false);
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'], // Ensure PATCH is included if used
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Admin-Key'], // Added X-Admin-Key
     credentials: true // Allow cookies/auth headers to be sent
 }));
 
@@ -189,6 +189,20 @@ const User = mongoose.model('User', userSchema);
 const Job = mongoose.model('Job', jobSchema);
 const Dispute = mongoose.model('Dispute', disputeSchema);
 const Withdrawal = mongoose.model('Withdrawal', withdrawalSchema);
+
+// --- Admin Authentication Middleware (Placeholder) ---
+// IMPORTANT: Replace this with a robust authentication and authorization mechanism for production.
+// This is a simple check for an X-Admin-Key header.
+const authenticateAdmin = (req, res, next) => {
+    const adminKey = req.headers['x-admin-key'];
+    // In a real app, you would compare this to a securely stored environment variable
+    // or validate a JWT token, or check against a whitelist of admin addresses.
+    if (adminKey === process.env.ADMIN_SECRET_KEY) { // Replace with your actual admin key in .env
+        next();
+    } else {
+        res.status(403).json({ error: 'Forbidden: Admin access required.' });
+    }
+};
 
 // --- API Routes ---
 
@@ -688,54 +702,195 @@ app.get('/api/jobs/:id/messages', async (req, res) => {
 
 // NEW: PUT /api/jobs/:id/rate-freelancer - Client rates the freelancer for a job
 app.put('/api/jobs/:id/rate-freelancer', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { clientAddress, freelancerAddress, rating } = req.body;
+    try {
+        const { id } = req.params;
+        const { clientAddress, freelancerAddress, rating } = req.body;
 
-    if (!clientAddress || !freelancerAddress || rating === undefined || rating < 1 || rating > 5 || !mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: 'Invalid request: missing client/freelancer address, or invalid rating (1-5).' });
-    }
+        if (!clientAddress || !freelancerAddress || rating === undefined || rating < 1 || rating > 5 || !mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ message: 'Invalid request: missing client/freelancer address, or invalid rating (1-5).' });
+        }
 
-    const job = await Job.findById(id);
-    if (!job) {
-      return res.status(404).json({ message: 'Job not found.' });
-    }
-    if (job.client.toLowerCase() !== clientAddress.toLowerCase()) {
-      return res.status(403).json({ message: 'Unauthorized: Only the client can rate for this job.' });
-    }
-    if (!job.freelancer || job.freelancer.toLowerCase() !== freelancerAddress.toLowerCase()) {
-      return res.status(400).json({ message: 'Freelancer not assigned or mismatch for this job.' });
-    }
-    if (job.escrowStatus !== 'released') {
-      return res.status(400).json({ message: 'Funds must be released for this job before rating.' });
-    }
-    if (job.rated) {
-        return res.status(400).json({ message: 'Freelancer has already been rated for this job.' });
-    }
+        const job = await Job.findById(id);
+        if (!job) {
+            return res.status(404).json({ message: 'Job not found.' });
+        }
+        if (job.client.toLowerCase() !== clientAddress.toLowerCase()) {
+            return res.status(403).json({ message: 'Unauthorized: Only the client can rate for this job.' });
+        }
+        if (!job.freelancer || job.freelancer.toLowerCase() !== freelancerAddress.toLowerCase()) {
+            return res.status(400).json({ message: 'Freelancer not assigned or mismatch for this job.' });
+        }
+        if (job.escrowStatus !== 'released') {
+            return res.status(400).json({ message: 'Funds must be released for this job before rating.' });
+        }
+        if (job.rated) {
+            return res.status(400).json({ message: 'Freelancer has already been rated for this job.' });
+        }
 
-    // Update the job to mark it as rated
-    job.rated = true;
-    await job.save();
+        // Update the job to mark it as rated
+        job.rated = true;
+        await job.save();
 
-    // Find the freelancer's user profile
-    const freelancerUser = await User.findOne({ address: freelancerAddress.toLowerCase() });
-    if (!freelancerUser) {
-      console.warn(`Freelancer user profile not found for address: ${freelancerAddress}. Cannot update rating.`);
-      return res.status(404).json({ message: 'Freelancer profile not found to update rating.' });
+        // Find the freelancer's user profile
+        const freelancerUser = await User.findOne({ address: freelancerAddress.toLowerCase() });
+        if (!freelancerUser) {
+            console.warn(`Freelancer user profile not found for address: ${freelancerAddress}. Cannot update rating.`);
+            return res.status(404).json({ message: 'Freelancer profile not found to update rating.' });
+        }
+
+        // Update totalRatingSum and totalRatingsCount
+        freelancerUser.totalRatingSum += rating;
+        freelancerUser.totalRatingsCount += 1;
+        freelancerUser.rating = (freelancerUser.totalRatingSum / freelancerUser.totalRatingsCount).toFixed(1); // Calculate new average
+
+        await freelancerUser.save();
+
+        res.status(200).json({ message: 'Rating submitted successfully.', job, freelancerUser });
+    } catch (error) {
+        console.error('Error rating freelancer:', error);
+        res.status(500).json({ message: error.message });
     }
+});
 
-    // Update totalRatingSum and totalRatingsCount
-    freelancerUser.totalRatingSum += rating;
-    freelancerUser.totalRatingsCount += 1;
-    freelancerUser.rating = (freelancerUser.totalRatingSum / freelancerUser.totalRatingsCount).toFixed(1); // Calculate new average
+// --- ADMIN ROUTES ---
+// All admin routes should be protected by the authenticateAdmin middleware
+// You will need to set process.env.ADMIN_SECRET_KEY in your .env file for this to work.
+// Example: ADMIN_SECRET_KEY=your_super_secret_admin_key_here
 
-    await freelancerUser.save();
+// Get all disputes (for admin review)
+app.get('/api/admin/disputes', authenticateAdmin, async (req, res) => {
+    try {
+        const disputes = await Dispute.find({}).populate('jobId'); // Populate job details
+        res.json(disputes);
+    } catch (error) {
+        console.error('Error fetching disputes for admin:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
 
-    res.status(200).json({ message: 'Rating submitted successfully.', job, freelancerUser });
-  } catch (error) {
-    console.error('Error rating freelancer:', error);
-    res.status(500).json({ message: error.message });
-  }
+// Admin resolves a dispute
+app.put('/api/admin/disputes/:id/resolve', authenticateAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { resolutionDetails, jobStatus, escrowStatus } = req.body; // Admin can specify outcome
+
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ message: 'Invalid dispute ID.' });
+        }
+
+        const dispute = await Dispute.findById(id);
+        if (!dispute) {
+            return res.status(404).json({ message: 'Dispute not found.' });
+        }
+
+        if (dispute.status !== 'open' && dispute.status !== 'under-review') {
+            return res.status(400).json({ message: `Dispute is already ${dispute.status}.` });
+        }
+
+        const updatedDispute = await Dispute.findByIdAndUpdate(
+            id,
+            {
+                status: 'resolved',
+                resolvedAt: Date.now(),
+                resolutionDetails: resolutionDetails || 'Resolved by admin.',
+            },
+            { new: true, runValidators: true }
+        );
+
+        // Optionally update the associated job's status and escrow status based on resolution
+        if (jobStatus || escrowStatus) {
+            const jobUpdate = {};
+            if (jobStatus) jobUpdate.status = jobStatus;
+            if (escrowStatus) jobUpdate.escrowStatus = escrowStatus;
+            await Job.findByIdAndUpdate(dispute.jobId, jobUpdate);
+        }
+
+        res.json(updatedDispute);
+    } catch (error) {
+        console.error('Error resolving dispute:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Admin closes a dispute (e.g., no action needed, or invalid)
+app.put('/api/admin/disputes/:id/close', authenticateAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { resolutionDetails } = req.body; // Optional details for closing
+
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ message: 'Invalid dispute ID.' });
+        }
+
+        const dispute = await Dispute.findById(id);
+        if (!dispute) {
+            return res.status(404).json({ message: 'Dispute not found.' });
+        }
+
+        if (dispute.status !== 'open' && dispute.status !== 'under-review') {
+            return res.status(400).json({ message: `Dispute is already ${dispute.status}.` });
+        }
+
+        const updatedDispute = await Dispute.findByIdAndUpdate(
+            id,
+            {
+                status: 'closed',
+                resolvedAt: Date.now(),
+                resolutionDetails: resolutionDetails || 'Dispute closed by admin.',
+            },
+            { new: true, runValidators: true }
+        );
+
+        res.json(updatedDispute);
+    } catch (error) {
+        console.error('Error closing dispute:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Admin can manually update a job's status and escrow status (for dispute outcomes, etc.)
+app.put('/api/admin/jobs/:id/update-status', authenticateAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status, escrowStatus } = req.body;
+
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ message: 'Invalid job ID.' });
+        }
+        if (!status && !escrowStatus) {
+            return res.status(400).json({ message: 'Please provide at least one status to update (status or escrowStatus).' });
+        }
+
+        const job = await Job.findById(id);
+        if (!job) {
+            return res.status(404).json({ message: 'Job not found.' });
+        }
+
+        const updateFields = {};
+        if (status) {
+            if (!Job.schema.path('status').enumValues.includes(status)) {
+                return res.status(400).json({ message: `Invalid job status: ${status}.` });
+            }
+            updateFields.status = status;
+        }
+        if (escrowStatus) {
+            if (!Job.schema.path('escrowStatus').enumValues.includes(escrowStatus)) {
+                return res.status(400).json({ message: `Invalid escrow status: ${escrowStatus}.` });
+            }
+            updateFields.escrowStatus = escrowStatus;
+        }
+
+        const updatedJob = await Job.findByIdAndUpdate(
+            id,
+            { $set: updateFields },
+            { new: true, runValidators: true }
+        );
+
+        res.json(updatedJob);
+    } catch (error) {
+        console.error('Error updating job status by admin:', error);
+        res.status(500).json({ error: error.message });
+    }
 });
 
 

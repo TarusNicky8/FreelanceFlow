@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Link, useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { createWalletClient, custom, parseUnits, encodeFunctionData, createPublicClient, http, formatUnits } from 'viem';
-import { isAddress } from 'viem'; // Import isAddress for validation
+import { isAddress }  from 'viem'; // Import isAddress for validation
 import { getAddress } from 'viem'; // Import getAddress for checksumming
 
 import logo from './App icon.svg';
@@ -162,12 +162,43 @@ const Notification = ({ message, type, onClose }) => {
   );
 };
 
+// --- Confirmation Modal Component ---
+const ConfirmationModal = ({ isOpen, title, message, onConfirm, onCancel, confirmButtonText, cancelButtonText, isProcessing }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50">
+      <div className="bg-white p-8 rounded-lg shadow-xl max-w-md w-full text-center">
+        <h3 className="text-2xl font-bold text-primary-blue mb-4">{title}</h3>
+        <p className="text-lg text-gray-700 mb-6">{message}</p>
+        <div className="flex justify-center space-x-4">
+          <button
+            onClick={onConfirm}
+            className="px-6 py-3 bg-accent-green text-white font-semibold rounded-md hover:bg-green-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isProcessing}
+          >
+            {isProcessing ? 'Processing...' : confirmButtonText || 'Confirm'}
+          </button>
+          <button
+            onClick={onCancel}
+            className="px-6 py-3 bg-gray-400 text-white font-semibold rounded-md hover:bg-gray-500 transition duration-300"
+            disabled={isProcessing}
+          >
+            {cancelButtonText || 'Cancel'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 
 // --- DivviIntegration Component (Now uses depositGeneral) ---
 const DivviIntegration = ({ account, walletClient, publicClient, setNotification }) => {
   const [userUsdcBalance, setUserUsdcBalance] = useState(0);
   const [amountToDeposit, setAmountToDeposit] = useState('100');
   const [isProcessingTx, setIsProcessingTx] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false); // For confirmation modal
 
   // Fetch user's USDC balance
   useEffect(() => {
@@ -231,7 +262,11 @@ const DivviIntegration = ({ account, walletClient, publicClient, setNotification
     }
     // --- End Chain Mismatch Check ---
 
+    setShowConfirmModal(true); // Show confirmation modal
+  };
 
+  const confirmDeposit = async () => {
+    setShowConfirmModal(false); // Close modal
     setIsProcessingTx(true);
     setNotification('Initiating general USDC deposit with Divvi tracking...', 'info');
     try {
@@ -336,6 +371,16 @@ const DivviIntegration = ({ account, walletClient, publicClient, setNotification
       ) : (
         <p className="text-lg text-gray-600">Please connect your wallet in the header to deposit USDC.</p>
       )}
+
+      <ConfirmationModal
+        isOpen={showConfirmModal}
+        title="Confirm General Deposit"
+        message={`Are you sure you want to deposit ${amountToDeposit} USDC into the general escrow? You will be prompted to approve USDC and then confirm the deposit transaction in your wallet.`}
+        onConfirm={confirmDeposit}
+        onCancel={() => setShowConfirmModal(false)}
+        confirmButtonText="Yes, Deposit"
+        isProcessing={isProcessingTx}
+      />
     </section>
   );
 };
@@ -350,8 +395,8 @@ const Profile = ({ account }) => {
   const [portfolioInput, setPortfolioInput] = useState('');
   const [selectedRole, setSelectedRole] = useState('freelancer'); // State for role selection
   const [isLoading, setIsLoading] = useState(false);
-  const [statusMessage, setStatusMessage] = useState('');
-  const [isError, setIsError] = useState(false);
+  const [statusMessage, setStatusMessage] = useState(''); // Kept for Profile component's internal messages
+  const [isError, setIsError] = useState(false); // Kept for Profile component's internal error state
 
   const navigate = useNavigate();
 
@@ -732,6 +777,8 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
   const messagesEndRef = useRef(null); // For scrolling messages into view
   const [ratingInput, setRatingInput] = useState(0); // For freelancer rating
   const [showRatingModal, setShowRatingModal] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false); // For general confirmations
+  const [modalAction, setModalAction] = useState(null); // To store which action the modal is confirming
 
 
   const navigate = useNavigate();
@@ -817,65 +864,69 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
     }
     // --- End Chain Mismatch Check ---
 
-    setIsProcessingTx(true);
-    setNotification('Initiating fund deposit for job escrow...', 'info');
+    setModalAction(() => async () => { // Set the action to be confirmed
+      setShowConfirmModal(false); // Close modal
+      setIsProcessingTx(true);
+      setNotification('Initiating fund deposit for job escrow...', 'info');
 
-    try {
-      const amountInSmallestUnit = parseUnits(job.amount.toString(), 6);
+      try {
+        const amountInSmallestUnit = parseUnits(job.amount.toString(), 6);
 
-      // 1. Approve USDC for the Escrow contract
-      const approveCallData = encodeFunctionData({
-        abi: usdcAbi,
-        functionName: 'approve',
-        args: [escrowContractAddress, amountInSmallestUnit],
-      });
+        // 1. Approve USDC for the Escrow contract
+        const approveCallData = encodeFunctionData({
+          abi: usdcAbi,
+          functionName: 'approve',
+          args: [escrowContractAddress, amountInSmallestUnit],
+        });
 
-      setNotification('Approving USDC for Escrow contract...', 'info');
-      const approveTxHash = await walletClient.sendTransaction({
-        account,
-        to: usdcContractAddress,
-        data: approveCallData,
-      });
+        setNotification('Approving USDC for Escrow contract...', 'info');
+        const approveTxHash = await walletClient.sendTransaction({
+          account,
+          to: usdcContractAddress,
+          data: approveCallData,
+        });
 
-      setNotification(`Approval transaction sent! Hash: ${truncateAddress(approveTxHash)}. Waiting for confirmation...`, 'info');
-      await publicClient.waitForTransactionReceipt({ hash: approveTxHash });
-      setNotification('USDC Approved. Now depositing funds to job escrow...', 'info');
+        setNotification(`Approval transaction sent! Hash: ${truncateAddress(approveTxHash)}. Waiting for confirmation...`, 'info');
+        await publicClient.waitForTransactionReceipt({ hash: approveTxHash });
+        setNotification('USDC Approved. Now depositing funds to job escrow...', 'info');
 
-      // 2. Deposit USDC into the job-specific escrow
-      const depositJobCallData = encodeFunctionData({
-        abi: escrowAbi,
-        functionName: 'depositJob',
-        args: [job._id, getAddress(job.client), getAddress(job.freelancer || '0x0000000000000000000000000000000000000000'), amountInSmallestUnit], // Pass client, freelancer, and amount
-      });
+        // 2. Deposit USDC into the job-specific escrow
+        const depositJobCallData = encodeFunctionData({
+          abi: escrowAbi,
+          functionName: 'depositJob',
+          args: [job._id, getAddress(job.client), getAddress(job.freelancer || '0x0000000000000000000000000000000000000000'), amountInSmallestUnit], // Pass client, freelancer, and amount
+        });
 
-      const depositTxHash = await walletClient.sendTransaction({
-        account,
-        to: escrowContractAddress,
-        data: depositJobCallData,
-        value: 0n,
-      });
+        const depositTxHash = await walletClient.sendTransaction({
+          account,
+          to: escrowContractAddress,
+          data: depositJobCallData,
+          value: 0n,
+        });
 
-      setNotification(`Deposit transaction sent! Hash: ${truncateAddress(depositTxHash)}. Waiting for confirmation...`, 'info');
-      await publicClient.waitForTransactionReceipt({ hash: depositTxHash });
-      setNotification('Job funds deposited successfully on-chain!', 'success');
+        setNotification(`Deposit transaction sent! Hash: ${truncateAddress(depositTxHash)}. Waiting for confirmation...`, 'info');
+        await publicClient.waitForTransactionReceipt({ hash: depositTxHash });
+        setNotification('Job funds deposited successfully on-chain!', 'success');
 
-      // 3. Update backend with deposit confirmation
-      await axios.put(`${API_BASE_URL}/api/jobs/${id}/deposit-confirmed`, {
-        clientAddress: account,
-        depositTxHash: depositTxHash,
-      });
+        // 3. Update backend with deposit confirmation
+        await axios.put(`${API_BASE_URL}/api/jobs/${id}/deposit-confirmed`, {
+          clientAddress: account,
+          depositTxHash: depositTxHash,
+        });
 
-      // Update local job state
-      setJob(prevJob => ({ ...prevJob, escrowStatus: 'deposited' }));
-      setNotification('Job funds confirmed and updated in backend!', 'success');
-      fetchJobAndBalance(); // Re-fetch to update balance and job state
+        // Update local job state
+        setJob(prevJob => ({ ...prevJob, escrowStatus: 'deposited' }));
+        setNotification('Job funds confirmed and updated in backend!', 'success');
+        fetchJobAndBalance(); // Re-fetch to update balance and job state
 
-    } catch (error) {
-      console.error("Error funding job escrow:", error);
-      setNotification(`Transaction failed or error funding job: ${error.message || 'Please try again.'}`, 'error');
-    } finally {
-      setIsProcessingTx(false);
-    }
+      } catch (error) {
+        console.error("Error funding job escrow:", error);
+        setNotification(`Transaction failed or error funding job: ${error.message || 'Please try again.'}`, 'error');
+      } finally {
+        setIsProcessingTx(false);
+      }
+    });
+    setShowConfirmModal(true); // Show confirmation modal
   };
 
   // --- Handle Freelancer Applying for Job ---
@@ -897,24 +948,28 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       return;
     }
 
-    setIsProcessingTx(true);
-    setNotification('Applying for job...', 'info');
-    try {
-      await axios.post(`${API_BASE_URL}/api/jobs/${id}/apply`, { applicantAddress: account });
+    setModalAction(() => async () => {
+      setShowConfirmModal(false);
+      setIsProcessingTx(true);
+      setNotification('Applying for job...', 'info');
+      try {
+        await axios.post(`${API_BASE_URL}/api/jobs/${id}/apply`, { applicantAddress: account });
 
-      // Update local job state to reflect application
-      setJob(prevJob => ({
-        ...prevJob,
-        applicants: [...(prevJob.applicants || []), { address: account, timestamp: new Date().toISOString() }]
-      }));
-      setNotification('Application submitted successfully! Client will review.', 'success');
+        // Update local job state to reflect application
+        setJob(prevJob => ({
+          ...prevJob,
+          applicants: [...(prevJob.applicants || []), { address: account, timestamp: new Date().toISOString() }]
+        }));
+        setNotification('Application submitted successfully! Client will review.', 'success');
 
-    } catch (error) {
-      console.error('Error applying for job:', error);
-      setNotification(`Error applying for job: ${error.message || 'Please try again.'}`, 'error');
-    } finally {
-      setIsProcessingTx(false);
-    }
+      } catch (error) {
+        console.error('Error applying for job:', error);
+        setNotification(`Error applying for job: ${error.message || 'Please try again.'}`, 'error');
+      } finally {
+        setIsProcessingTx(false);
+      }
+    });
+    setShowConfirmModal(true);
   };
 
   // --- Handle Client Approving an Applicant ---
@@ -928,29 +983,33 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       return;
     }
 
-    setIsProcessingTx(true);
-    setNotification(`Approving applicant ${truncateAddress(applicantAddress)}...`, 'info');
-    try {
-      await axios.put(`${API_BASE_URL}/api/jobs/${id}/approve-applicant`, {
-        clientAddress: account,
-        freelancerAddress: applicantAddress
-      });
+    setModalAction(() => async () => {
+      setShowConfirmModal(false);
+      setIsProcessingTx(true);
+      setNotification(`Approving applicant ${truncateAddress(applicantAddress)}...`, 'info');
+      try {
+        await axios.put(`${API_BASE_URL}/api/jobs/${id}/approve-applicant`, {
+          clientAddress: account,
+          freelancerAddress: applicantAddress
+        });
 
-      // Update local job state
-      setJob(prevJob => ({
-        ...prevJob,
-        status: 'pending-client-approval',
-        freelancer: applicantAddress,
-        applicants: prevJob.applicants.filter(app => app.address.toLowerCase() !== applicantAddress.toLowerCase()) // Remove approved from applicants list
-      }));
-      setNotification(`Applicant ${truncateAddress(applicantAddress)} approved! Job is now pending freelancer acceptance.`, 'success');
+        // Update local job state
+        setJob(prevJob => ({
+          ...prevJob,
+          status: 'pending-client-approval',
+          freelancer: applicantAddress,
+          applicants: prevJob.applicants.filter(app => app.address.toLowerCase() !== applicantAddress.toLowerCase()) // Remove approved from applicants list
+        }));
+        setNotification(`Applicant ${truncateAddress(applicantAddress)} approved! Job is now pending freelancer acceptance.`, 'success');
 
-    } catch (error) {
-      console.error('Error approving applicant:', error);
-      setNotification(`Error approving applicant: ${error.message || 'Please try again.'}`, 'error');
-    } finally {
-      setIsProcessingTx(false);
-    }
+      } catch (error) {
+        console.error('Error approving applicant:', error);
+        setNotification(`Error approving applicant: ${error.message || 'Please try again.'}`, 'error');
+      } finally {
+        setIsProcessingTx(false);
+      }
+    });
+    setShowConfirmModal(true);
   };
 
   // --- Handle Client Rejecting an Applicant ---
@@ -964,27 +1023,31 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       return;
     }
 
-    setIsProcessingTx(true);
-    setNotification(`Rejecting applicant ${truncateAddress(applicantAddress)}...`, 'info');
-    try {
-      await axios.put(`${API_BASE_URL}/api/jobs/${id}/reject-applicant`, {
-        clientAddress: account,
-        freelancerAddress: applicantAddress // This is the applicant to remove
-      });
+    setModalAction(() => async () => {
+      setShowConfirmModal(false);
+      setIsProcessingTx(true);
+      setNotification(`Rejecting applicant ${truncateAddress(applicantAddress)}...`, 'info');
+      try {
+        await axios.put(`${API_BASE_URL}/api/jobs/${id}/reject-applicant`, {
+          clientAddress: account,
+          freelancerAddress: applicantAddress // This is the applicant to remove
+        });
 
-      // Update local job state
-      setJob(prevJob => ({
-        ...prevJob,
-        applicants: prevJob.applicants.filter(app => app.address.toLowerCase() !== applicantAddress.toLowerCase())
-      }));
-      setNotification(`Applicant ${truncateAddress(applicantAddress)} rejected.`, 'success');
+        // Update local job state
+        setJob(prevJob => ({
+          ...prevJob,
+          applicants: prevJob.applicants.filter(app => app.address.toLowerCase() !== applicantAddress.toLowerCase())
+        }));
+        setNotification(`Applicant ${truncateAddress(applicantAddress)} rejected.`, 'success');
 
-    } catch (error) {
-      console.error('Error rejecting applicant:', error);
-      setNotification(`Error rejecting applicant: ${error.message || 'Please try again.'}`, 'error');
-    } finally {
-      setIsProcessingTx(false);
-    }
+      } catch (error) {
+        console.error('Error rejecting applicant:', error);
+        setNotification(`Error rejecting applicant: ${error.message || 'Please try again.'}`, 'error');
+      } finally {
+        setIsProcessingTx(false);
+      }
+    });
+    setShowConfirmModal(true);
   };
 
 
@@ -1021,24 +1084,28 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
     }
     // --- End Chain Mismatch Check ---
 
-    setIsProcessingTx(true);
-    setNotification('Accepting assigned job...', 'info');
-    try {
-      await axios.put(`${API_BASE_URL}/api/jobs/${id}/accept-assigned`, { freelancerAddress: account });
+    setModalAction(() => async () => {
+      setShowConfirmModal(false);
+      setIsProcessingTx(true);
+      setNotification('Accepting assigned job...', 'info');
+      try {
+        await axios.put(`${API_BASE_URL}/api/jobs/${id}/accept-assigned`, { freelancerAddress: account });
 
-      setJob(prevJob => ({ ...prevJob, status: 'in-progress' }));
-      setNotification('Job accepted! It is now in progress.', 'success');
+        setJob(prevJob => ({ ...prevJob, status: 'in-progress' }));
+        setNotification('Job accepted! It is now in progress.', 'success');
 
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 1500);
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 1500);
 
-    } catch (error) {
-      console.error('Error accepting assigned job:', error);
-      setNotification(`Error accepting assigned job: ${error.message || 'Please try again.'}`, 'error');
-    } finally {
-      setIsProcessingTx(false);
-    }
+      } catch (error) {
+        console.error('Error accepting assigned job:', error);
+        setNotification(`Error accepting assigned job: ${error.message || 'Please try again.'}`, 'error');
+      } finally {
+        setIsProcessingTx(false);
+      }
+    });
+    setShowConfirmModal(true);
   };
 
 
@@ -1075,24 +1142,28 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
     }
     // --- End Chain Mismatch Check ---
 
-    setIsProcessingTx(true);
-    setNotification('Marking job as completed...', 'info');
-    try {
-      await axios.put(`${API_BASE_URL}/api/jobs/${id}/mark-completed`, { freelancerAddress: account });
+    setModalAction(() => async () => {
+      setShowConfirmModal(false);
+      setIsProcessingTx(true);
+      setNotification('Marking job as completed...', 'info');
+      try {
+        await axios.put(`${API_BASE_URL}/api/jobs/${id}/mark-completed`, { freelancerAddress: account });
 
-      setJob(prevJob => ({ ...prevJob, status: 'completed' })); // Frontend status update
-      setNotification('Job marked as completed! Client can now release funds.', 'success');
+        setJob(prevJob => ({ ...prevJob, status: 'completed' })); // Frontend status update
+        setNotification('Job marked as completed! Client can now release funds.', 'success');
 
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 1500);
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 1500);
 
-    } catch (error) {
-      console.error('Error marking job as completed:', error);
-      setNotification(`Error marking job as completed: ${error.message || 'Please try again.'}`, 'error');
-    } finally {
-      setIsProcessingTx(false);
-    }
+      } catch (error) {
+        console.error('Error marking job as completed:', error);
+        setNotification(`Error marking job as completed: ${error.message || 'Please try again.'}`, 'error');
+      } finally {
+        setIsProcessingTx(false);
+      }
+    });
+    setShowConfirmModal(true);
   };
 
 
@@ -1133,42 +1204,46 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
     }
     // --- End Chain Mismatch Check ---
 
-    setIsProcessingTx(true);
-    setNotification('Initiating fund release on-chain...', 'info');
-    try {
-      const releaseCallData = encodeFunctionData({
-        abi: escrowAbi,
-        functionName: 'releaseJob', // Call job-specific release
-        args: [job._id], // Pass job ID
-      });
+    setModalAction(() => async () => {
+      setShowConfirmModal(false);
+      setIsProcessingTx(true);
+      setNotification('Initiating fund release on-chain...', 'info');
+      try {
+        const releaseCallData = encodeFunctionData({
+          abi: escrowAbi,
+          functionName: 'releaseJob', // Call job-specific release
+          args: [job._id], // Pass job ID
+        });
 
-      const txHash = await walletClient.sendTransaction({
-        account,
-        to: escrowContractAddress,
-        data: releaseCallData,
-      });
+        const txHash = await walletClient.sendTransaction({
+          account,
+          to: escrowContractAddress,
+          data: releaseCallData,
+        });
 
-      setNotification(`Transaction sent! Hash: ${truncateAddress(txHash)}. Waiting for confirmation...`, 'info');
-      await publicClient.waitForTransactionReceipt({ hash: txHash });
+        setNotification(`Transaction sent! Hash: ${truncateAddress(txHash)}. Waiting for confirmation...`, 'info');
+        await publicClient.waitForTransactionReceipt({ hash: txHash });
 
-      // Update backend after successful on-chain release
-      await axios.put(`${API_BASE_URL}/api/jobs/${id}/release-confirmed`, {
-        clientAddress: account,
-        completionTxHash: txHash,
-      });
+        // Update backend after successful on-chain release
+        await axios.put(`${API_BASE_URL}/api/jobs/${id}/release-confirmed`, {
+          clientAddress: account,
+          completionTxHash: txHash,
+        });
 
-      setJob(prevJob => ({ ...prevJob, escrowStatus: 'released' })); // Update local escrow status
-      setNotification('Funds released successfully, job marked as completed!', 'success');
+        setJob(prevJob => ({ ...prevJob, escrowStatus: 'released' })); // Update local escrow status
+        setNotification('Funds released successfully, job marked as completed!', 'success');
 
-      // Show rating modal after successful release
-      setShowRatingModal(true);
+        // Show rating modal after successful release
+        setShowRatingModal(true);
 
-    } catch (error) {
-      console.error('Error releasing funds:', error);
-      setNotification(`Transaction failed or error releasing funds: ${error.message || 'Please try again.'}`, 'error');
-    } finally {
-      setIsProcessingTx(false);
-    }
+      } catch (error) {
+        console.error('Error releasing funds:', error);
+        setNotification(`Transaction failed or error releasing funds: ${error.message || 'Please try again.'}`, 'error');
+      } finally {
+        setIsProcessingTx(false);
+      }
+    });
+    setShowConfirmModal(true);
   };
 
   // --- Handle Client Refunding Funds (On-chain) ---
@@ -1208,42 +1283,46 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
     }
     // --- End Chain Mismatch Check ---
 
-    setIsProcessingTx(true);
-    setNotification('Initiating fund refund on-chain...', 'info');
-    try {
-      const refundCallData = encodeFunctionData({
-        abi: escrowAbi,
-        functionName: 'refundJob', // Call job-specific refund
-        args: [job._id], // Pass job ID
-      });
+    setModalAction(() => async () => {
+      setShowConfirmModal(false);
+      setIsProcessingTx(true);
+      setNotification('Initiating fund refund on-chain...', 'info');
+      try {
+        const refundCallData = encodeFunctionData({
+          abi: escrowAbi,
+          functionName: 'refundJob', // Call job-specific refund
+          args: [job._id], // Pass job ID
+        });
 
-      const txHash = await walletClient.sendTransaction({
-        account,
-        to: escrowContractAddress,
-        data: refundCallData,
-      });
+        const txHash = await walletClient.sendTransaction({
+          account,
+          to: escrowContractAddress,
+          data: refundCallData,
+        });
 
-      setNotification(`Transaction sent! Hash: ${truncateAddress(txHash)}. Waiting for confirmation...`, 'info');
-      await publicClient.waitForTransactionReceipt({ hash: txHash });
+        setNotification(`Transaction sent! Hash: ${truncateAddress(txHash)}. Waiting for confirmation...`, 'info');
+        await publicClient.waitForTransactionReceipt({ hash: txHash });
 
-      // Update backend after successful on-chain refund
-      await axios.put(`${API_BASE_URL}/api/jobs/${id}/refund-confirmed`, {
-        clientAddress: account,
-      });
+        // Update backend after successful on-chain refund
+        await axios.put(`${API_BASE_URL}/api/jobs/${id}/refund-confirmed`, {
+          clientAddress: account,
+        });
 
-      setJob(prevJob => ({ ...prevJob, escrowStatus: 'refunded', status: 'cancelled' })); // Update local statuses
-      setNotification('Funds refunded successfully, job marked as cancelled!', 'success');
+        setJob(prevJob => ({ ...prevJob, escrowStatus: 'refunded', status: 'cancelled' })); // Update local statuses
+        setNotification('Funds refunded successfully, job marked as cancelled!', 'success');
 
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 1500);
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 1500);
 
-    } catch (error) {
-      console.error('Error refunding funds:', error);
-      setNotification(`Transaction failed or error refunding funds: ${error.message || 'Please try again.'}`, 'error');
-    } finally {
-      setIsProcessingTx(false);
-    }
+      } catch (error) {
+        console.error('Error refunding funds:', error);
+        setNotification(`Transaction failed or error refunding funds: ${error.message || 'Please try again.'}`, 'error');
+      } finally {
+        setIsProcessingTx(false);
+      }
+    });
+    setShowConfirmModal(true);
   };
 
   // --- Handle Sending a Message ---
@@ -1283,7 +1362,7 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
     }
   };
 
-  // --- Handle Rating Freelancer ---
+  // --- Handle Rating Freelancer (from modal) ---
   const handleRateFreelancer = async () => {
     if (!account || !job || !isClient || !job.freelancer) {
       setNotification('Cannot rate: Wallet not connected, job data missing, or you are not the client.', 'error');
@@ -1299,6 +1378,7 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       return;
     }
 
+    setShowRatingModal(false); // Close rating modal
     setIsProcessingTx(true);
     setNotification('Submitting rating...', 'info');
     try {
@@ -1310,7 +1390,6 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
 
       setJob(prevJob => ({ ...prevJob, rated: true })); // Mark job as rated
       setNotification('Freelancer rated successfully!', 'success');
-      setShowRatingModal(false); // Close modal
 
     } catch (error) {
       console.error('Error rating freelancer:', error);
@@ -1585,6 +1664,54 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
         </div>
       )}
 
+      {/* General Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showConfirmModal}
+        title={
+          modalAction === handleFundEscrow ? "Confirm Fund Job Escrow" :
+          modalAction === handleApply ? "Confirm Job Application" :
+          modalAction === handleApproveApplicant ? "Confirm Applicant Approval" :
+          modalAction === handleRejectApplicant ? "Confirm Applicant Rejection" :
+          modalAction === handleAcceptAssignedJob ? "Confirm Job Acceptance" :
+          modalAction === handleMarkCompleted ? "Confirm Job Completion" :
+          modalAction === handleReleaseFunds ? "Confirm Fund Release" :
+          modalAction === handleRefundFunds ? "Confirm Fund Refund" :
+          "Confirm Action"
+        }
+        message={
+          modalAction === handleFundEscrow ? `Are you sure you want to fund this job with ${job?.amount} USDC? You will be prompted to approve USDC and then confirm the deposit transaction in your wallet.` :
+          modalAction === handleApply ? `Are you sure you want to apply for the job "${job?.title}"?` :
+          modalAction === handleApproveApplicant ? `Are you sure you want to approve this applicant? They will be assigned to the job.` :
+          modalAction === handleRejectApplicant ? `Are you sure you want to reject this applicant? They will be removed from the applicant list.` :
+          modalAction === handleAcceptAssignedJob ? `Are you sure you want to accept the assigned job "${job?.title}"? This will mark the job as 'in-progress'.` :
+          modalAction === handleMarkCompleted ? `Are you sure you want to mark the job "${job?.title}" as completed? The client will then be able to release funds.` :
+          modalAction === handleReleaseFunds ? `Are you sure you want to release ${job?.amount} USDC to ${truncateAddress(job?.freelancer)} for job "${job?.title}"? This action is irreversible on-chain.` :
+          modalAction === handleRefundFunds ? `Are you sure you want to refund ${job?.amount} USDC to yourself for job "${job?.title}"? This will cancel the job.` :
+          "Please confirm your action."
+        }
+        onConfirm={() => {
+          if (modalAction) {
+            modalAction();
+          }
+        }}
+        onCancel={() => {
+          setShowConfirmModal(false);
+          setModalAction(null);
+        }}
+        confirmButtonText={
+          modalAction === handleFundEscrow ? "Fund Escrow" :
+          modalAction === handleApply ? "Apply" :
+          modalAction === handleApproveApplicant ? "Approve" :
+          modalAction === handleRejectApplicant ? "Reject" :
+          modalAction === handleAcceptAssignedJob ? "Accept Job" :
+          modalAction === handleMarkCompleted ? "Mark Completed" :
+          modalAction === handleReleaseFunds ? "Release Funds" :
+          modalAction === handleRefundFunds ? "Refund Funds" :
+          "Confirm"
+        }
+        isProcessing={isProcessingTx}
+      />
+
       <button
         className="mt-8 px-6 py-3 bg-gray-600 text-white font-semibold rounded-md hover:bg-gray-700 transition duration-300"
         onClick={() => navigate('/dashboard')}
@@ -1603,6 +1730,7 @@ const PostJob = ({ account, setNotification }) => {
   const [jobAmount, setJobAmount] = useState('');
   const [requiredSkillsInput, setRequiredSkillsInput] = useState(''); // New state for required skills
   const [isLoading, setIsLoading] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false); // For confirmation modal
 
   const handlePostJob = async (e) => {
     e.preventDefault();
@@ -1615,6 +1743,11 @@ const PostJob = ({ account, setNotification }) => {
       return;
     }
 
+    setShowConfirmModal(true); // Show confirmation modal
+  };
+
+  const confirmPostJob = async () => {
+    setShowConfirmModal(false); // Close modal
     setIsLoading(true);
     setNotification('Posting job...', 'info');
 
@@ -1648,6 +1781,7 @@ const PostJob = ({ account, setNotification }) => {
       setIsLoading(false);
     }
   };
+
 
   return (
     <div className="max-w-3xl mx-auto p-4 bg-white shadow-lg rounded-lg my-8">
@@ -1724,6 +1858,16 @@ const PostJob = ({ account, setNotification }) => {
           {isLoading ? 'Posting...' : 'Post Job'}
         </button>
       </form>
+
+      <ConfirmationModal
+        isOpen={showConfirmModal}
+        title="Confirm Job Posting"
+        message={`Are you sure you want to post the job "${jobTitle}" for ${jobAmount} USDC?`}
+        onConfirm={confirmPostJob}
+        onCancel={() => setShowConfirmModal(false)}
+        confirmButtonText="Yes, Post Job"
+        isProcessing={isLoading}
+      />
     </div>
   );
 };
@@ -1833,6 +1977,7 @@ const CrossChainIntegration = ({ account, walletClient, publicClient, setNotific
   const [destinationChain, setDestinationChain] = useState('Optimism/Base (Mock)');
   const [transferAmount, setTransferAmount] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false); // For confirmation modal
 
   const handleCrossChainTransfer = async () => {
     if (!account || !walletClient || !publicClient) {
@@ -1866,6 +2011,11 @@ const CrossChainIntegration = ({ account, walletClient, publicClient, setNotific
     }
     // --- End Chain Mismatch Check ---
 
+    setShowConfirmModal(true); // Show confirmation modal
+  };
+
+  const confirmCrossChainTransfer = async () => {
+    setShowConfirmModal(false); // Close modal
     setIsProcessing(true);
     setNotification(`Initiating cross-chain transfer of ${transferAmount} USDC from ${sourceChain} to ${destinationChain}...`, 'info');
 
@@ -1892,6 +2042,7 @@ const CrossChainIntegration = ({ account, walletClient, publicClient, setNotific
       setIsProcessing(false);
     }
   };
+
 
   return (
     <div className="max-w-3xl mx-auto p-6 bg-white shadow-lg rounded-lg my-8">
@@ -1951,6 +2102,16 @@ const CrossChainIntegration = ({ account, walletClient, publicClient, setNotific
           {isProcessing ? 'Transferring...' : 'Initiate Cross-Chain Transfer'}
         </button>
       </div>
+
+      <ConfirmationModal
+        isOpen={showConfirmModal}
+        title="Confirm Cross-Chain Transfer"
+        message={`Are you sure you want to transfer ${transferAmount} USDC from ${sourceChain} to ${destinationChain}? This is a simulated transaction.`}
+        onConfirm={confirmCrossChainTransfer}
+        onCancel={() => setShowConfirmModal(false)}
+        confirmButtonText="Yes, Transfer"
+        isProcessing={isProcessing}
+      />
     </div>
   );
 };
@@ -1960,6 +2121,7 @@ const DisputeResolution = ({ account, setNotification }) => {
   const [jobId, setJobId] = useState('');
   const [disputeReason, setDisputeReason] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false); // For confirmation modal
 
   const handleSubmitDispute = async (e) => {
     e.preventDefault();
@@ -1972,6 +2134,11 @@ const DisputeResolution = ({ account, setNotification }) => {
       return;
     }
 
+    setShowConfirmModal(true); // Show confirmation modal
+  };
+
+  const confirmSubmitDispute = async () => {
+    setShowConfirmModal(false); // Close modal
     setIsLoading(true);
     setNotification('Submitting dispute...', 'info');
 
@@ -2049,6 +2216,16 @@ const DisputeResolution = ({ account, setNotification }) => {
           {isLoading ? 'Submitting...' : 'Submit Dispute'}
         </button>
       </form>
+
+      <ConfirmationModal
+        isOpen={showConfirmModal}
+        title="Confirm Dispute Submission"
+        message={`Are you sure you want to submit a dispute for Job ID: ${jobId}? This will mark the job as 'disputed'.`}
+        onConfirm={confirmSubmitDispute}
+        onCancel={() => setShowConfirmModal(false)}
+        confirmButtonText="Yes, Submit Dispute"
+        isProcessing={isLoading}
+      />
     </div>
   );
 };
@@ -2059,6 +2236,7 @@ const Withdrawal = ({ account, setNotification }) => {
   const [fiatCurrency, setFiatCurrency] = useState('KES');
   const [bankDetails, setBankDetails] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false); // For confirmation modal
 
   const handleWithdrawal = async (e) => {
     e.preventDefault();
@@ -2071,6 +2249,11 @@ const Withdrawal = ({ account, setNotification }) => {
       return;
     }
 
+    setShowConfirmModal(true); // Show confirmation modal
+  };
+
+  const confirmWithdrawal = async () => {
+    setShowConfirmModal(false); // Close modal
     setIsLoading(true);
     setNotification(`Initiating withdrawal of ${amount} USDC to ${fiatCurrency} via bank transfer...`, 'info');
 
@@ -2165,6 +2348,16 @@ const Withdrawal = ({ account, setNotification }) => {
           {isLoading ? 'Processing...' : 'Initiate Withdrawal'}
         </button>
       </form>
+
+      <ConfirmationModal
+        isOpen={showConfirmModal}
+        title="Confirm Withdrawal Request"
+        message={`Are you sure you want to request a withdrawal of ${amount} USDC to your bank account for ${fiatCurrency}?`}
+        onConfirm={confirmWithdrawal}
+        onCancel={() => setShowConfirmModal(false)}
+        confirmButtonText="Yes, Withdraw"
+        isProcessing={isLoading}
+      />
     </div>
   );
 };
