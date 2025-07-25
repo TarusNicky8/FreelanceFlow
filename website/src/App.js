@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { BrowserRouter, Routes, Route, Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'; // Added useSearchParams
+import { BrowserRouter, Routes, Route, Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { createWalletClient, custom, parseUnits, encodeFunctionData, createPublicClient, http, formatUnits } from 'viem';
-import { isAddress } from 'viem'; // Import isAddress for validation
-import { getAddress } from 'viem'; // Import getAddress for checksumming
+import { isAddress } from 'viem';
+import { getAddress } from 'viem';
 
 import logo from './App icon.svg';
 
-// Function to truncate address for display - MOVED TO GLOBAL SCOPE
+// Function to truncate address for display
 const truncateAddress = (address) => {
   if (!address) return '';
   return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
@@ -23,8 +23,8 @@ const liskSepolia = {
     symbol: 'ETH',
   },
   rpcUrls: {
-    default: { http: ['https://rpc.sepolia-api.lisk.com'] }, // Corrected Lisk Sepolia RPC URL
-    public: { http: ['https://rpc.sepolia-api.lisk.com'] }, // Corrected Lisk Sepolia RPC URL
+    default: { http: ['https://rpc.sepolia-api.lisk.com'] },
+    public: { http: ['https://rpc.sepolia-api.lisk.com'] },
   },
   blockExplorers: {
     default: { name: 'Lisk Blockscout', url: 'https://sepolia-blockscout.lisk.com/' },
@@ -2349,7 +2349,7 @@ const Withdrawal = ({ account, setNotification }) => {
   };
 
   const handleWithdrawal = async (e) => {
-    e.preventDefault(); // Corrected from e.e.preventDefault()
+    e.preventDefault();
     if (!account) {
       setNotification('Please connect your wallet to initiate a withdrawal.', 'error');
       return;
@@ -3147,16 +3147,16 @@ const SettingsPage = ({ account, setNotification }) => {
   );
 };
 
-
-function App() {
+// New wrapper component for the main application content
+function MainAppContent() {
   const [walletClient, setWalletClient] = useState(null);
   const [publicClient, setPublicClient] = useState(null);
   const [account, setAccount] = useState(null);
   const [notification, setNotification] = useState({ message: '', type: '' });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isInfoMenuOpen, setIsInfoMenuOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState(''); // State for search input
-  const navigate = useNavigate(); // Hook for navigation
+  const [searchQuery, setSearchQuery] = useState('');
+  const navigate = useNavigate(); // Now this hook is called inside a component within BrowserRouter
 
   // Function to set a notification
   const showNotification = (message, type) => {
@@ -3281,32 +3281,97 @@ function App() {
   };
 
   return (
-    <BrowserRouter>
-      <div className="bg-gradient-to-br from-gray-50 to-gray-200 min-h-screen font-sans text-gray-800">
+    <div className="bg-gradient-to-br from-gray-50 to-gray-200 min-h-screen font-sans text-gray-800">
 
-        <header className="bg-primary-blue text-white p-4 shadow-lg sticky top-0 z-50 transition duration-300 ease-in-out">
-          <div className="max-w-6xl mx-auto flex items-center justify-between">
-            <Link to="/" className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
-              <img src={logo} alt="FreelanceFlow Logo" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 border-white" />
-              <span className="text-lg sm:text-2xl font-bold whitespace-nowrap">FreelanceFlow</span>
-            </Link>
-            <nav className="hidden md:flex flex-1 justify-between items-center ml-8">
-              <div className="flex items-center gap-x-6 text-lg">
-                <Link to="/" className="hover:text-blue-200 transition duration-300 ease-in-out">Home</Link>
-                <Link to="/dashboard" className="hover:text-blue-200 transition duration-300 ease-in-out">Dashboard</Link>
-                <Link to="/profile" className="hover:text-blue-200 transition duration-300 ease-in-out">Profile</Link>
-                <Link to="/post-job" className="hover:text-blue-200 transition duration-300 ease-in-out">Post Job</Link>
-                <Link to="/browse-jobs" className="hover:text-blue-200 transition duration-300 ease-in-out">Browse Jobs</Link>
+      <header className="bg-primary-blue text-white p-4 shadow-lg sticky top-0 z-50 transition duration-300 ease-in-out">
+        <div className="max-w-6xl mx-auto flex items-center justify-between">
+          <Link to="/" className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
+            <img src={logo} alt="FreelanceFlow Logo" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 border-white" />
+            <span className="text-lg sm:text-2xl font-bold whitespace-nowrap">FreelanceFlow</span>
+          </Link>
+          <nav className="hidden md:flex flex-1 justify-between items-center ml-8">
+            <div className="flex items-center gap-x-6 text-lg">
+              <Link to="/" className="hover:text-blue-200 transition duration-300 ease-in-out">Home</Link>
+              <Link to="/dashboard" className="hover:text-blue-200 transition duration-300 ease-in-out">Dashboard</Link>
+              <Link to="/profile" className="hover:text-blue-200 transition duration-300 ease-in-out">Profile</Link>
+              <Link to="/post-job" className="hover:text-blue-200 transition duration-300 ease-in-out">Post Job</Link>
+              <Link to="/browse-jobs" className="hover:text-blue-200 transition duration-300 ease-in-out">Browse Jobs</Link>
+            </div>
+            <div className="flex items-center gap-x-4">
+              {/* Search Input in Header */}
+              <form onSubmit={handleSearchSubmit} className="relative flex items-center">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search jobs or users..."
+                  className="pl-4 pr-10 py-2 rounded-full bg-blue-700 text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-white focus:bg-blue-600 transition duration-300 text-sm w-48"
+                />
+                <button type="submit" className="absolute right-0 top-0 h-full w-10 flex items-center justify-center text-blue-200 hover:text-white">
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </button>
+              </form>
+
+              <div className="relative">
+                <button
+                  onClick={() => setIsInfoMenuOpen(!isInfoMenuOpen)}
+                  className="px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700 transition duration-300 ease-in-out flex items-center"
+                >
+                  More Info
+                  <svg className={`ml-2 h-4 w-4 transform transition-transform ${isInfoMenuOpen ? 'rotate-180' : 'rotate-0'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {isInfoMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
+                    <Link to="/deposit-funds" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Deposit Funds</Link>
+                    <Link to="/cross-chain-transfer" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Cross-Chain Transfer</Link>
+                    <Link to="/dispute-resolution" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Dispute Resolution</Link>
+                    <Link to="/withdraw" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Withdraw Funds</Link>
+                    <Link to="/settings" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Settings</Link>
+                    <Link to="/support" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Customer Support</Link>
+                    <a href="#about" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">About</a>
+                    <a href="#vision" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Vision</a>
+                    <a href="#mission" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Mission</a>
+                    <a href="#features" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Features</a>
+                    <a href="#team" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Team</a>
+                    <a href="#roadmap" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Roadmap</a>
+                    <a href="/WHITEPAPER.pdf" target="_blank" rel="noopener noreferrer" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Whitepaper</a>
+                    <a href="#contact" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Contact</a>
+                  </div>
+                )}
               </div>
-              <div className="flex items-center gap-x-4">
-                {/* Search Input in Header */}
-                <form onSubmit={handleSearchSubmit} className="relative flex items-center">
+              {/* Wallet Connect Button in Header */}
+              <button
+                onClick={connectWallet}
+                className="px-4 py-2 bg-accent-green text-white font-semibold rounded-md shadow-lg hover:bg-green-600 transition duration-300 transform hover:scale-105 ml-4"
+              >
+                {account ? truncateAddress(account) : 'Connect Wallet'}
+              </button>
+            </div>
+          </nav>
+          <button
+            onClick={toggleMobileMenu}
+            className="md:hidden text-white text-2xl focus:outline-none p-2 -mr-2"
+            aria-label="Toggle navigation"
+          >
+            &#9776;
+          </button>
+        </div>
+        {isMobileMenuOpen && (
+          <nav className="md:hidden bg-primary-blue pb-2 pt-1 overflow-y-auto max-h-screen">
+            <ul className="flex flex-col items-center space-y-3 text-lg py-2">
+              {/* Search Input for Mobile */}
+              <li className="w-full px-4 mb-3">
+                <form onSubmit={handleSearchSubmit} className="relative flex items-center w-full">
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search jobs or users..."
-                    className="pl-4 pr-10 py-2 rounded-full bg-blue-700 text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-white focus:bg-blue-600 transition duration-300 text-sm w-48"
+                    className="pl-4 pr-10 py-2 rounded-full bg-blue-700 text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-white focus:bg-blue-600 transition duration-300 text-sm w-full"
                   />
                   <button type="submit" className="absolute right-0 top-0 h-full w-10 flex items-center justify-center text-blue-200 hover:text-white">
                     <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -3314,272 +3379,206 @@ function App() {
                     </svg>
                   </button>
                 </form>
-
-                <div className="relative">
-                  <button
-                    onClick={() => setIsInfoMenuOpen(!isInfoMenuOpen)}
-                    className="px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700 transition duration-300 ease-in-out flex items-center"
-                  >
-                    More Info
-                    <svg className={`ml-2 h-4 w-4 transform transition-transform ${isInfoMenuOpen ? 'rotate-180' : 'rotate-0'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
-                  {isInfoMenuOpen && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
-                      <Link to="/deposit-funds" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Deposit Funds</Link>
-                      <Link to="/cross-chain-transfer" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Cross-Chain Transfer</Link>
-                      <Link to="/dispute-resolution" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Dispute Resolution</Link>
-                      <Link to="/withdraw" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Withdraw Funds</Link>
-                      <Link to="/settings" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Settings</Link> {/* New Settings Link */}
-                      <Link to="/support" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Customer Support</Link>
-                      <a href="#about" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">About</a>
-                      <a href="#vision" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Vision</a>
-                      <a href="#mission" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Mission</a>
-                      <a href="#features" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Features</a>
-                      <a href="#team" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Team</a>
-                      <a href="#roadmap" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Roadmap</a>
-                      <a href="/WHITEPAPER.pdf" target="_blank" rel="noopener noreferrer" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Whitepaper</a>
-                      <a href="#contact" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Contact</a>
-                    </div>
-                  )}
-                </div>
-                {/* Wallet Connect Button in Header */}
+              </li>
+              <li><Link to="/" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Home</Link></li>
+              <li><Link to="/dashboard" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Dashboard</Link></li>
+              <li><Link to="/profile" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Profile</Link></li>
+              <li><Link to="/post-job" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Post Job</Link></li>
+              <li><Link to="/browse-jobs" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Browse Jobs</Link></li>
+              <li className="text-gray-300 text-sm mt-4 mb-2">--- Information & Demos ---</li>
+              <li><Link to="/deposit-funds" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Deposit Funds</Link></li>
+              <li><Link to="/cross-chain-transfer" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Cross-Chain Transfer</Link></li>
+              <li><Link to="/dispute-resolution" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Dispute Resolution</Link></li>
+              <li><Link to="/withdraw" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Withdraw Funds</Link></li>
+              <li><Link to="/settings" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Settings</Link></li>
+              <li><Link to="/support" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Customer Support</Link></li>
+              <li><a href="#about" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">About</a></li>
+              <li><a href="#vision" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Vision</a></li>
+              <li><a href="#mission" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Mission</a></li>
+              <li><a href="#features" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Features</a></li>
+              <li><a href="#team" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Team</a></li>
+              <li><a href="#roadmap" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Roadmap</a></li>
+              <li><a href="/WHITEPAPER.pdf" target="_blank" rel="noopener noreferrer" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Whitepaper</a></li>
+              <li><a href="#contact" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Contact</a></li>
+              {/* Wallet Connect Button for Mobile Menu */}
+              <li className="w-full px-4 pt-4">
                 <button
                   onClick={connectWallet}
-                  className="px-4 py-2 bg-accent-green text-white font-semibold rounded-md shadow-lg hover:bg-green-600 transition duration-300 transform hover:scale-105 ml-4"
+                  className="w-full px-6 py-3 bg-accent-green text-white font-semibold rounded-md shadow-lg hover:bg-green-600 transition duration-300 transform hover:scale-105"
                 >
                   {account ? truncateAddress(account) : 'Connect Wallet'}
                 </button>
+              </li>
+            </ul>
+          </nav>
+        )}
+      </header>
+
+      <Routes>
+        <Route path="/" element={
+          <>
+            <section className="relative bg-gradient-to-br from-primary-blue to-secondary-purple text-white py-24 text-center overflow-hidden animate-gradient">
+              <div className="absolute inset-0 z-0 overflow-hidden">
+                <div className="absolute top-0 left-1/4 h-full w-px bg-white/20 animate-line-flow"></div>
+                <div className="absolute top-0 left-3/4 h-full w-px bg-white/20 animate-line-flow-delay-2"></div>
+                <div className="absolute top-0 left-1/6 h-full w-px bg-white/20 animate-line-flow-delay-1"></div>
+                <div className="absolute top-0 left-5/6 h-full w-px bg-white/20 animate-line-flow-delay-2"></div>
               </div>
-            </nav>
-            <button
-              onClick={toggleMobileMenu}
-              className="md:hidden text-white text-2xl focus:outline-none p-2 -mr-2"
-              aria-label="Toggle navigation"
-            >
-              &#9776;
-            </button>
-          </div>
-          {isMobileMenuOpen && (
-            <nav className="md:hidden bg-primary-blue pb-2 pt-1 overflow-y-auto max-h-screen">
-              <ul className="flex flex-col items-center space-y-3 text-lg py-2">
-                {/* Search Input for Mobile */}
-                <li className="w-full px-4 mb-3">
-                  <form onSubmit={handleSearchSubmit} className="relative flex items-center w-full">
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Search jobs or users..."
-                      className="pl-4 pr-10 py-2 rounded-full bg-blue-700 text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-white focus:bg-blue-600 transition duration-300 text-sm w-full"
+
+              <div className="max-w-5xl mx-auto relative z-10 px-4">
+                <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold mb-6 animate-fade-in-down tracking-tight animate-text-glow">
+                  FreelanceFlow
+                </h1>
+                <p className="text-xl md:text-2xl lg:text-3xl font-light mb-8 animate-fade-in-up">
+                  Your gateway to secure, low-cost USDC payments, empowering African freelancers to thrive globally.
+                </p>
+                <a
+                  href="https://discord.gg/7TVd2ZdP9h"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block px-10 py-4 bg-white text-secondary-purple font-bold rounded-full shadow-lg hover:bg-gray-100 hover:scale-105 transition duration-300 ease-in-out transform animate-pulse-slow animate-glowing-border"
+                >
+                  Join Our Community
+                </a>
+              </div>
+            </section>
+
+            <section id="how-it-works" className="py-16 sm:py-20 bg-white text-center shadow-inner">
+              <div className="max-w-6xl mx-auto px-4">
+                <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-8">How FreelanceFlow Works</h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-10">
+                  <div className="p-6 bg-gray-50 rounded-lg shadow-md text-center">
+                    <div className="text-5xl text-accent-green mb-4">1</div>
+                    <h3 className="text-xl font-semibold text-secondary-purple mb-2">Client Posts Job & Funds Escrow</h3>
+                    <p className="text-base text-gray-700">A client posts a job with a clear description and a set USDC amount. They then deposit the full job amount into a secure smart contract escrow.</p>
+                  </div>
+                  <div className="p-6 bg-gray-50 rounded-lg shadow-md text-center">
+                    <div className="text-5xl text-accent-green mb-4">2</div>
+                    <h3 className="text-xl font-semibold text-secondary-purple mb-2">Freelancer Applies & Works</h3>
+                    <p className="text-base text-gray-700">Interested freelancers apply. The client selects a freelancer, who then accepts the assignment and begins working on the task.</p>
+                  </div>
+                  <div className="p-6 bg-gray-50 rounded-lg shadow-md text-center">
+                    <div className="text-5xl text-accent-green mb-4">3</div>
+                    <h3 className="text-xl font-semibold text-secondary-purple mb-2">Funds Released or Disputed</h3>
+                    <p className="text-base text-gray-700">Once the job is completed, the freelancer marks it as done. The client verifies the work and releases the USDC from escrow to the freelancer. In case of disagreement, a dispute can be initiated.</p>
+                  </div>
+                </div>
+                <p className="text-lg text-gray-700 mt-8 max-w-3xl mx-auto">
+                  This ensures fair and transparent transactions, protecting both clients and freelancers.
+                </p>
+              </div>
+            </section>
+
+
+            <section id="vision" className="py-16 sm:py-20 bg-gray-100 text-center shadow-inner">
+              <div className="max-w-5xl mx-auto px-4">
+                <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-6">Our Vision</h2>
+                <p className="text-lg sm:text-xl text-gray-700 max-w-3xl mx-auto leading-relaxed">
+                  To create a world where every African freelancer has seamless access to global opportunities, empowered by secure, transparent, and equitable payment solutions that truly value their work.
+                </p>
+              </div>
+            </section>
+
+            <section id="mission" className="py-16 sm:py-20 bg-white text-center shadow-inner">
+              <div className="max-w-5xl mx-auto px-4">
+                <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-6">Our Mission</h2>
+                <p className="text-lg sm:text-xl text-gray-700 max-w-3xl mx-auto leading-relaxed">
+                  FreelanceFlow is dedicated to building and continuously refining a decentralized platform that provides African freelancers with the tools for secure, low-cost USDC payments, utilizing innovative blockchain technology to foster trust, efficiency, and financial growth.
+                </p>
+              </div>
+            </section>
+
+            <section id="about" className="py-16 sm:py-20 bg-gray-100 shadow-inner">
+              <div className="max-w-5xl mx-auto text-center px-4 transition duration-300 ease-in-out">
+                <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-6">About FreelanceFlow</h2>
+                <p className="text-lg sm:text-xl text-gray-700 max-w-3xl mx-auto leading-relaxed">
+                  FreelanceFlow is a pioneering blockchain-powered platform dedicated to revolutionizing how African freelancers engage with the global gig economy. We provide a robust ecosystem enabling secure, transparent, and significantly low-cost stablecoin USDC payments through advanced smart contract escrow. Our solution leverages cutting-edge blockchain technology to ensure fast, reliable, and equitable transactions, empowering gig workers across the continent to maximize their earnings and opportunities.
+                </p>
+              </div>
+            </section>
+
+            <section id="features" className="py-16 sm:py-20 bg-white">
+              <div className="max-w-6xl mx-auto px-4 transition duration-300 ease-in-out">
+                <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue text-center mb-8 sm:mb-12">Key Features Designed for You</h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-10">
+                  <div className="bg-gray-50 p-6 sm:p-8 rounded-lg shadow-xl text-center hover:scale-105 transition duration-300 ease-in-out transform animate-icon-float animate-glowing-border">
+                    <UsdcIcon />
+                    <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple mt-4 mb-2">Low-Cost USDC Payments</h3>
+                    <p className="text-base sm:text-lg text-gray-700 transition duration-300 ease-in-out">Receive and send USDC stablecoin with significantly reduced transaction fees, maximizing your earnings.</p>
+                  </div>
+
+                  <div className="bg-gray-50 p-6 sm:p-8 rounded-lg shadow-xl text-center hover:scale-105 transition duration-300 ease-in-out transform animate-icon-float animate-glowing-border">
+                    <SecurityIcon />
+                    <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple mt-4 mb-2">Built-in Escrow Security</h3>
+                    <p className="text-base sm:text-lg text-gray-700">Funds are held securely by smart contracts and released only when both parties confirm work completion, ensuring trust and fairness and mitigating disputes.</p>
+                  </div>
+
+                  <div className="bg-gray-50 p-6 sm:p-8 rounded-lg shadow-xl text-center hover:scale-105 transition duration-300 ease-in-out transform animate-icon-float animate-glowing-border">
+                    <LiskIcon />
+                    <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple mt-4 mb-2">Robust Blockchain Infrastructure</h3>
+                    <p className="text-base sm:text-lg text-gray-700">Powered by a scalable and efficient Layer 2 blockchain, providing a reliable and future-proof foundation for decentralized payments worldwide.</p>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section id="team" className="py-16 sm:py-20 bg-white shadow-inner">
+              <div className="max-w-4xl mx-auto text-center px-4 transition duration-300 ease-in-out">
+                <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-8">Meet Our Visionary Team</h2>
+                <div className="flex flex-col md:flex-row justify-center items-start md:space-x-8 space-y-12 md:space-y-0">
+
+                  <div className="flex flex-col items-center flex-1">
+                    <img
+                      src={process.env.PUBLIC_URL + "/images/Nick copy.webp"}
+                      alt="Nicodemus Kiptoo Profile"
+                      className="w-32 h-32 sm:w-40 sm:h-40 rounded-full object-cover object-top shadow-md mb-4 border-4 border-secondary-purple"
                     />
-                    <button type="submit" className="absolute right-0 top-0 h-full w-10 flex items-center justify-center text-blue-200 hover:text-white">
-                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
-                    </button>
-                  </form>
-                </li>
-                <li><Link to="/" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Home</Link></li>
-                <li><Link to="/dashboard" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Dashboard</Link></li>
-                <li><Link to="/profile" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Profile</Link></li>
-                <li><Link to="/post-job" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Post Job</Link></li>
-                <li><Link to="/browse-jobs" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Browse Jobs</Link></li>
-                <li className="text-gray-300 text-sm mt-4 mb-2">--- Information & Demos ---</li>
-                <li><Link to="/deposit-funds" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Deposit Funds</Link></li>
-                <li><Link to="/cross-chain-transfer" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Cross-Chain Transfer</Link></li>
-                <li><Link to="/dispute-resolution" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Dispute Resolution</Link></li>
-                <li><Link to="/withdraw" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Withdraw Funds</Link></li>
-                <li><Link to="/settings" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Settings</Link></li> {/* New Settings Link */}
-                <li><Link to="/support" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Customer Support</Link></li>
-                <li><a href="#about" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">About</a></li>
-                <li><a href="#vision" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Vision</a></li>
-                <li><a href="#mission" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Mission</a></li>
-                <li><a href="#features" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Features</a></li>
-                <li><a href="#team" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Team</a></li>
-                <li><a href="#roadmap" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Roadmap</a></li>
-                <li><a href="/WHITEPAPER.pdf" target="_blank" rel="noopener noreferrer" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Whitepaper</a></li>
-                <li><a href="#contact" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Contact</a></li>
-                {/* Wallet Connect Button for Mobile Menu */}
-                <li className="w-full px-4 pt-4">
-                  <button
-                    onClick={connectWallet}
-                    className="w-full px-6 py-3 bg-accent-green text-white font-semibold rounded-md shadow-lg hover:bg-green-600 transition duration-300 transform hover:scale-105"
-                  >
-                    {account ? truncateAddress(account) : 'Connect Wallet'}
-                  </button>
-                </li>
-              </ul>
-            </nav>
-          )}
-        </header>
+                    <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple">Nicodemus</h3>
+                    <p className="text-base sm:text-lg text-gray-700 mt-2 max-w-xs text-center">
+                      Founder. Nicodemus leads the effective use of innovative solutions that streamline work and transactions for the African gig economy.
+                    </p>
 
-        <Routes>
-          <Route path="/" element={
-            <>
-              <section className="relative bg-gradient-to-br from-primary-blue to-secondary-purple text-white py-24 text-center overflow-hidden animate-gradient">
-                <div className="absolute inset-0 z-0 overflow-hidden">
-                  <div className="absolute top-0 left-1/4 h-full w-px bg-white/20 animate-line-flow"></div>
-                  <div className="absolute top-0 left-3/4 h-full w-px bg-white/20 animate-line-flow-delay-2"></div>
-                  <div className="absolute top-0 left-1/6 h-full w-px bg-white/20 animate-line-flow-delay-1"></div>
-                  <div className="absolute top-0 left-5/6 h-full w-px bg-white/20 animate-line-flow-delay-2"></div>
-                </div>
-
-                <div className="max-w-5xl mx-auto relative z-10 px-4">
-                  <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold mb-6 animate-fade-in-down tracking-tight animate-text-glow">
-                    FreelanceFlow
-                  </h1>
-                  <p className="text-xl md:text-2xl lg:text-3xl font-light mb-8 animate-fade-in-up">
-                    Your gateway to secure, low-cost USDC payments, empowering African freelancers to thrive globally.
-                  </p>
-                  <a
-                    href="https://discord.gg/7TVd2ZdP9h"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-block px-10 py-4 bg-white text-secondary-purple font-bold rounded-full shadow-lg hover:bg-gray-100 hover:scale-105 transition duration-300 ease-in-out transform animate-pulse-slow animate-glowing-border"
-                  >
-                    Join Our Community
-                  </a>
-                </div>
-              </section>
-
-              <section id="how-it-works" className="py-16 sm:py-20 bg-white text-center shadow-inner">
-                <div className="max-w-6xl mx-auto px-4">
-                  <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-8">How FreelanceFlow Works</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-10">
-                    <div className="p-6 bg-gray-50 rounded-lg shadow-md text-center">
-                      <div className="text-5xl text-accent-green mb-4">1</div>
-                      <h3 className="text-xl font-semibold text-secondary-purple mb-2">Client Posts Job & Funds Escrow</h3>
-                      <p className="text-base text-gray-700">A client posts a job with a clear description and a set USDC amount. They then deposit the full job amount into a secure smart contract escrow.</p>
-                    </div>
-                    <div className="p-6 bg-gray-50 rounded-lg shadow-md text-center">
-                      <div className="text-5xl text-accent-green mb-4">2</div>
-                      <h3 className="text-xl font-semibold text-secondary-purple mb-2">Freelancer Applies & Works</h3>
-                      <p className="text-base text-gray-700">Interested freelancers apply. The client selects a freelancer, who then accepts the assignment and begins working on the task.</p>
-                    </div>
-                    <div className="p-6 bg-gray-50 rounded-lg shadow-md text-center">
-                      <div className="text-5xl text-accent-green mb-4">3</div>
-                      <h3 className="text-xl font-semibold text-secondary-purple mb-2">Funds Released or Disputed</h3>
-                      <p className="text-base text-gray-700">Once the job is completed, the freelancer marks it as done. The client verifies the work and releases the USDC from escrow to the freelancer. In case of disagreement, a dispute can be initiated.</p>
+                    <div className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-2">
+                      <a href="https://www.linkedin.com/in/nicodemus-kiptoo-4276b9364/" target="_blank" rel="noopener noreferrer" className="hover:text-primary-blue transition duration-300">LinkedIn</a>
+                      <a href="https://x.com/nicodemuskipto0" target="_blank" rel="noopener noreferrer" className="hover:text-primary-blue transition duration-300">X</a>
                     </div>
                   </div>
-                  <p className="text-lg text-gray-700 mt-8 max-w-3xl mx-auto">
-                    This ensures fair and transparent transactions, protecting both clients and freelancers.
-                  </p>
-                </div>
-              </section>
 
+                  <div className="flex flex-col items-center flex-1">
+                    <img
+                      src={process.env.PUBLIC_URL + "/images/Ashley.webp"}
+                      alt="Hacker Profile"
+                      className="w-32 h-32 sm:w-40 sm:h-40 rounded-full object-cover object-top shadow-md mb-4 border-4 border-secondary-purple"
+                    />
+                    <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple">Ashley</h3>
+                    <p className="text-base sm:text-lg text-gray-700 mt-2 max-w-xs text-center">
+                      Growth hacker. Ashley focuses on strategies that help freelancers have access to more secure gigs and diverse talent across the continent.
+                    </p>
 
-              <section id="vision" className="py-16 sm:py-20 bg-gray-100 text-center shadow-inner">
-                <div className="max-w-5xl mx-auto px-4">
-                  <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-6">Our Vision</h2>
-                  <p className="text-lg sm:text-xl text-gray-700 max-w-3xl mx-auto leading-relaxed">
-                    To create a world where every African freelancer has seamless access to global opportunities, empowered by secure, transparent, and equitable payment solutions that truly value their work.
-                  </p>
-                </div>
-              </section>
-
-              <section id="mission" className="py-16 sm:py-20 bg-white text-center shadow-inner">
-                <div className="max-w-5xl mx-auto px-4">
-                  <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-6">Our Mission</h2>
-                  <p className="text-lg sm:text-xl text-gray-700 max-w-3xl mx-auto leading-relaxed">
-                    FreelanceFlow is dedicated to building and continuously refining a decentralized platform that provides African freelancers with the tools for secure, low-cost USDC payments, utilizing innovative blockchain technology to foster trust, efficiency, and financial growth.
-                  </p>
-                </div>
-              </section>
-
-              <section id="about" className="py-16 sm:py-20 bg-gray-100 shadow-inner">
-                <div className="max-w-5xl mx-auto text-center px-4 transition duration-300 ease-in-out">
-                  <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-6">About FreelanceFlow</h2>
-                  <p className="text-lg sm:text-xl text-gray-700 max-w-3xl mx-auto leading-relaxed">
-                    FreelanceFlow is a pioneering blockchain-powered platform dedicated to revolutionizing how African freelancers engage with the global gig economy. We provide a robust ecosystem enabling secure, transparent, and significantly low-cost stablecoin USDC payments through advanced smart contract escrow. Our solution leverages cutting-edge blockchain technology to ensure fast, reliable, and equitable transactions, empowering gig workers across the continent to maximize their earnings and opportunities.
-                  </p>
-                </div>
-              </section>
-
-              <section id="features" className="py-16 sm:py-20 bg-white">
-                <div className="max-w-6xl mx-auto px-4 transition duration-300 ease-in-out">
-                  <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue text-center mb-8 sm:mb-12">Key Features Designed for You</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-10">
-                    <div className="bg-gray-50 p-6 sm:p-8 rounded-lg shadow-xl text-center hover:scale-105 transition duration-300 ease-in-out transform animate-icon-float animate-glowing-border">
-                      <UsdcIcon />
-                      <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple mt-4 mb-2">Low-Cost USDC Payments</h3>
-                      <p className="text-base sm:text-lg text-gray-700 transition duration-300 ease-in-out">Receive and send USDC stablecoin with significantly reduced transaction fees, maximizing your earnings.</p>
+                    <div className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-2">
+                      <a href="https://www.linkedin.com/in/ashley-jepchirchir-9222982a9/" target="_blank" rel="noopener noreferrer" className="hover:text-primary-blue transition duration-300">LinkedIn</a>
+                      <a href="https://x.com/A_jepchirchir" target="_blank" rel="noopener noreferrer" className="hover:text-primary-blue transition duration-300">X</a>
                     </div>
+                  </div>
 
-                    <div className="bg-gray-50 p-6 sm:p-8 rounded-lg shadow-xl text-center hover:scale-105 transition duration-300 ease-in-out transform animate-icon-float animate-glowing-border">
-                      <SecurityIcon />
-                      <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple mt-4 mb-2">Built-in Escrow Security</h3>
-                      <p className="text-base sm:text-lg text-gray-700">Funds are held securely by smart contracts and released only when both parties confirm work completion, ensuring trust and fairness and mitigating disputes.</p>
-                    </div>
+                  <div className="flex flex-col items-center flex-1">
+                    <img
+                      src={process.env.PUBLIC_URL + "/images/Joan.jpg"}
+                      alt="CMO Profile"
+                      className="w-32 h-32 sm:w-40 sm:h-40 rounded-full object-cover object-top shadow-md mb-4 border-4 border-secondary-purple"
+                    />
+                    <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple">Joan</h3>
+                    <p className="text-base sm:text-lg text-gray-700 mt-2 max-w-xs text-center">
+                      Business developer. Joan focuses on guiding market entry and growth strategies to connect FreelanceFlow with a global audience.
+                    </p>
 
-                    <div className="bg-gray-50 p-6 sm:p-8 rounded-lg shadow-xl text-center hover:scale-105 transition duration-300 ease-in-out transform animate-icon-float animate-glowing-border">
-                      <LiskIcon />
-                      <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple mt-4 mb-2">Robust Blockchain Infrastructure</h3>
-                      <p className="text-base sm:text-lg text-gray-700">Powered by a scalable and efficient Layer 2 blockchain, providing a reliable and future-proof foundation for decentralized payments worldwide.</p>
+                    <div className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-2">
+                      <a href="https://www.linkedin.com/in/eng-joan-jerop-810106133/" target="_blank" rel="noopener noreferrer" className="hover:text-primary-blue transition duration-300">LinkedIn</a>
+                      <a href="https://x.com/jeropcrypto" target="_blank" rel="noopener noreferrer" className="hover:text-primary-blue transition duration-300">X</a>
                     </div>
                   </div>
                 </div>
-              </section>
-
-              <section id="team" className="py-16 sm:py-20 bg-white shadow-inner">
-                <div className="max-w-4xl mx-auto text-center px-4 transition duration-300 ease-in-out">
-                  <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-8">Meet Our Visionary Team</h2>
-                  <div className="flex flex-col md:flex-row justify-center items-start md:space-x-8 space-y-12 md:space-y-0">
-
-                    <div className="flex flex-col items-center flex-1">
-                      <img
-                        src={process.env.PUBLIC_URL + "/images/Nick copy.webp"}
-                        alt="Nicodemus Kiptoo Profile"
-                        className="w-32 h-32 sm:w-40 sm:h-40 rounded-full object-cover object-top shadow-md mb-4 border-4 border-secondary-purple"
-                      />
-                      <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple">Nicodemus</h3>
-                      <p className="text-base sm:text-lg text-gray-700 mt-2 max-w-xs text-center">
-                        Founder. Nicodemus leads the effective use of innovative solutions that streamline work and transactions for the African gig economy.
-                      </p>
-
-                      <div className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-2">
-                        <a href="https://www.linkedin.com/in/nicodemus-kiptoo-4276b9364/" target="_blank" rel="noopener noreferrer" className="hover:text-primary-blue transition duration-300">LinkedIn</a>
-                        <a href="https://x.com/nicodemuskipto0" target="_blank" rel="noopener noreferrer" className="hover:text-primary-blue transition duration-300">X</a>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col items-center flex-1">
-                      <img
-                        src={process.env.PUBLIC_URL + "/images/Ashley.webp"}
-                        alt="Hacker Profile"
-                        className="w-32 h-32 sm:w-40 sm:h-40 rounded-full object-cover object-top shadow-md mb-4 border-4 border-secondary-purple"
-                      />
-                      <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple">Ashley</h3>
-                      <p className="text-base sm:text-lg text-gray-700 mt-2 max-w-xs text-center">
-                        Growth hacker. Ashley focuses on strategies that help freelancers have access to more secure gigs and diverse talent across the continent.
-                      </p>
-
-                      <div className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-2">
-                        <a href="https://www.linkedin.com/in/ashley-jepchirchir-9222982a9/" target="_blank" rel="noopener noreferrer" className="hover:text-primary-blue transition duration-300">LinkedIn</a>
-                        <a href="https://x.com/A_jepchirchir" target="_blank" rel="noopener noreferrer" className="hover:text-primary-blue transition duration-300">X</a>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col items-center flex-1">
-                      <img
-                        src={process.env.PUBLIC_URL + "/images/Joan.jpg"}
-                        alt="CMO Profile"
-                        className="w-32 h-32 sm:w-40 sm:h-40 rounded-full object-cover object-top shadow-md mb-4 border-4 border-secondary-purple"
-                      />
-                      <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple">Joan</h3>
-                      <p className="text-base sm:text-lg text-gray-700 mt-2 max-w-xs text-center">
-                        Business developer. Joan focuses on guiding market entry and growth strategies to connect FreelanceFlow with a global audience.
-                      </p>
-
-                      <div className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-2">
-                        <a href="https://www.linkedin.com/in/eng-joan-jerop-810106133/" target="_blank" rel="noopener noreferrer" className="hover:text-primary-blue transition duration-300">LinkedIn</a>
-                        <a href="https://x.com/jeropcrypto" target="_blank" rel="noopener noreferrer" className="hover:text-primary-blue transition duration-300">X</a>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+              </div>
               </section>
 
               <section id="roadmap" className="py-16 sm:py-20 bg-gray-100">
@@ -3695,7 +3694,7 @@ function App() {
             </>
           } />
           <Route path="/dashboard" element={<Dashboard account={account} />} />
-          <Route path="/profile/:address?" element={<Profile account={account} />} /> {/* Added optional :address param */}
+          <Route path="/profile/:address?" element={<Profile account={account} />} />
           <Route path="/job/:id" element={<JobDetails account={account} publicClient={publicClient} walletClient={walletClient} setNotification={showNotification} />} />
           <Route path="/deposit-funds" element={
             <DivviIntegration
@@ -3710,13 +3709,20 @@ function App() {
           <Route path="/cross-chain-transfer" element={<CrossChainIntegration account={account} publicClient={publicClient} walletClient={walletClient} setNotification={showNotification} />} />
           <Route path="/dispute-resolution" element={<DisputeResolution account={account} setNotification={showNotification} />} />
           <Route path="/withdraw" element={<Withdrawal account={account} setNotification={showNotification} />} />
-          <Route path="/admin" element={<AdminDashboard setNotification={showNotification} />} /> {/* ADMIN ROUTE (no public link) */}
-          <Route path="/support" element={<CustomerSupport />} /> {/* CUSTOMER SUPPORT ROUTE */}
-          <Route path="/search" element={<SearchPage setNotification={showNotification} />} /> {/* NEW SEARCH ROUTE */}
-          <Route path="/settings" element={<SettingsPage account={account} setNotification={showNotification} />} /> {/* NEW SETTINGS ROUTE */}
+          <Route path="/admin" element={<AdminDashboard setNotification={showNotification} />} />
+          <Route path="/support" element={<CustomerSupport />} />
+          <Route path="/search" element={<SearchPage setNotification={showNotification} />} />
+          <Route path="/settings" element={<SettingsPage account={account} setNotification={showNotification} />} />
         </Routes>
         <Notification message={notification.message} type={notification.type} onClose={() => setNotification({ message: '', type: '' })} />
       </div>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <MainAppContent />
     </BrowserRouter>
   );
 }
