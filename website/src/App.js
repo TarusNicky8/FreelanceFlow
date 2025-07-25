@@ -149,7 +149,7 @@ const LiskIcon = () => (
 const Notification = ({ message, type, onClose }) => {
   if (!message) return null;
 
-  const bgColor = type === 'error' ? 'bg-red-500' : 'bg-green-500';
+  const bgColor = type === 'error' ? 'bg-red-500' : type === 'success' ? 'bg-green-500' : 'bg-blue-500';
   const textColor = 'text-white';
 
   return (
@@ -230,6 +230,7 @@ const DivviIntegration = ({ account, walletClient, publicClient, setNotification
       return;
     }
     // --- End Chain Mismatch Check ---
+
 
     setIsProcessingTx(true);
     setNotification('Initiating general USDC deposit with Divvi tracking...', 'info');
@@ -496,7 +497,7 @@ const Profile = ({ account }) => {
             <label className="block text-lg font-medium text-gray-800 mb-1">Rating</label>
             <p className="text-xl font-semibold text-accent-green">
               {profile.rating !== undefined ? `${profile.rating}/5` : 'N/A'}
-              <span className="text-sm text-gray-500 ml-2">(based on completed jobs)</span>
+              <span className="text-sm text-gray-500 ml-2">(based on {profile.totalRatingsCount || 0} ratings)</span>
             </p>
           </div>
           <button
@@ -892,7 +893,7 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       return;
     }
     if (hasApplied) {
-      setNotification('You have already applied for this job.', 'error');
+      setNotification('You have already applied for this job.', 'info');
       return;
     }
 
@@ -922,15 +923,10 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       setNotification('Wallet not connected or you are not the client.', 'error');
       return;
     }
-    if (job.status !== 'open' || job.escrowStatus !== 'deposited') { // Job must be open and funded for client to approve
-      setNotification('Job is not open for applicant approval or not funded.', 'error');
+    if (job.status !== 'open' && job.status !== 'pending-client-approval') { // Allow approval if still open or if another freelancer was rejected
+      setNotification('Job is not in a state to approve applicants.', 'error');
       return;
     }
-    if (job.freelancer) {
-        setNotification('A freelancer is already assigned to this job. Reject them first if you wish to approve another.', 'error');
-        return;
-    }
-
 
     setIsProcessingTx(true);
     setNotification(`Approving applicant ${truncateAddress(applicantAddress)}...`, 'info');
@@ -963,8 +959,8 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       setNotification('Wallet not connected or you are not the client.', 'error');
       return;
     }
-    if (job.status !== 'open' || job.escrowStatus !== 'deposited') { // Job must be open and funded for client to reject
-      setNotification('Job is not open for applicant rejection or not funded.', 'error');
+    if (job.status !== 'open' && job.status !== 'pending-client-approval') {
+      setNotification('Job is not in a state to reject applicants.', 'error');
       return;
     }
 
@@ -981,7 +977,7 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
         ...prevJob,
         applicants: prevJob.applicants.filter(app => app.address.toLowerCase() !== applicantAddress.toLowerCase())
       }));
-      setNotification(`Applicant ${truncateAddress(applicantAddress)} rejected.`, 'info');
+      setNotification(`Applicant ${truncateAddress(applicantAddress)} rejected.`, 'success');
 
     } catch (error) {
       console.error('Error rejecting applicant:', error);
@@ -1111,7 +1107,7 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       return;
     }
     if (job.status !== 'completed' || job.escrowStatus !== 'deposited') { // Job must be marked completed by freelancer, escrow active
-      setNotification('Job is not in a state for fund release (must be completed and escrow deposited).', 'error');
+      setNotification('Job is not in a state for fund release (must be completed and funds deposited).', 'error');
       return;
     }
 
@@ -1165,13 +1161,7 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       setNotification('Funds released successfully, job marked as completed!', 'success');
 
       // Show rating modal after successful release
-      if (job.freelancer) {
-          setShowRatingModal(true);
-      }
-
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 1500);
+      setShowRatingModal(true);
 
     } catch (error) {
       console.error('Error releasing funds:', error);
@@ -1191,8 +1181,8 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       setNotification('Only the client can refund funds.', 'error');
       return;
     }
-    if (job.escrowStatus !== 'deposited' && job.escrowStatus !== 'disputed') {
-      setNotification('Job is not in a deposited or disputed state for refund.', 'error');
+    if (job.escrowStatus !== 'deposited' && job.escrowStatus !== 'disputed') { // Can refund if deposited (not yet released) or disputed
+      setNotification('Job is not in a state for refund (must be deposited or disputed).', 'error');
       return;
     }
 
@@ -1293,34 +1283,38 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
     }
   };
 
-  // --- Handle Submitting Freelancer Rating ---
-  const handleSubmitRating = async () => {
+  // --- Handle Rating Freelancer ---
+  const handleRateFreelancer = async () => {
     if (!account || !job || !isClient || !job.freelancer) {
-      setNotification('Unauthorized or job data missing for rating.', 'error');
+      setNotification('Cannot rate: Wallet not connected, job data missing, or you are not the client.', 'error');
       return;
     }
     if (ratingInput < 1 || ratingInput > 5) {
-      setNotification('Please select a rating between 1 and 5.', 'error');
+      setNotification('Please provide a rating between 1 and 5.', 'error');
+      return;
+    }
+    if (job.rated) {
+      setNotification('Freelancer has already been rated for this job.', 'info');
+      setShowRatingModal(false); // Close modal if already rated
       return;
     }
 
     setIsProcessingTx(true);
-    setNotification(`Submitting rating of ${ratingInput} for freelancer ${truncateAddress(job.freelancer)}...`, 'info');
+    setNotification('Submitting rating...', 'info');
     try {
       await axios.put(`${API_BASE_URL}/api/jobs/${id}/rate-freelancer`, {
         clientAddress: account,
         freelancerAddress: job.freelancer,
-        rating: ratingInput,
+        rating: parseInt(ratingInput),
       });
 
+      setJob(prevJob => ({ ...prevJob, rated: true })); // Mark job as rated
       setNotification('Freelancer rated successfully!', 'success');
       setShowRatingModal(false); // Close modal
-      setRatingInput(0); // Reset rating input
-      // Optionally re-fetch job or profile to show updated rating, though not strictly necessary for this flow
 
     } catch (error) {
-      console.error('Error submitting rating:', error);
-      setNotification(`Error submitting rating: ${error.message || 'Please try again.'}`, 'error');
+      console.error('Error rating freelancer:', error);
+      setNotification(`Error rating freelancer: ${error.message || 'Please try again.'}`, 'error');
     } finally {
       setIsProcessingTx(false);
     }
@@ -1362,6 +1356,7 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
   const showMarkCompletedButton = isFreelancer && job.status === 'in-progress';
   const showReleaseFundsButton = isClient && job.status === 'completed' && job.escrowStatus === 'deposited'; // Client releases after freelancer marks completed
   const showRefundFundsButton = isClient && (job.escrowStatus === 'deposited' || job.escrowStatus === 'disputed'); // Client can refund if deposited or disputed
+  const showRateFreelancerButton = isClient && job.escrowStatus === 'released' && job.freelancer && !job.rated;
 
 
   return (
@@ -1371,21 +1366,26 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       <div className="space-y-3 text-gray-700 mb-6">
         <p className="text-lg">Description: {job.description}</p>
         <p className="text-lg">Amount: <span className="font-semibold text-accent-green">{job.amount} USDC</span></p>
-        <p className="text-lg">
-          Client: {job.client ? (
-            <Link to={`/profile/${job.client}`} className="font-mono text-primary-blue hover:underline">
+        <p className="text-lg">Client: <span className="font-mono text-secondary-purple">
+          {job.client ? (
+            <Link to={`/profile/${job.client}`} className="text-primary-blue hover:underline">
               {truncateAddress(job.client)}
             </Link>
           ) : 'N/A'}
-        </p>
-        <p className="text-lg">
-          Freelancer: {job.freelancer ? (
-            <Link to={`/profile/${job.freelancer}`} className="font-mono text-primary-blue hover:underline">
+        </span></p>
+        <p className="text-lg">Freelancer: <span className="font-mono text-secondary-purple">
+          {job.freelancer ? (
+            <Link to={`/profile/${job.freelancer}`} className="text-primary-blue hover:underline">
               {truncateAddress(job.freelancer)}
             </Link>
           ) : 'Not assigned'}
+        </span></p>
+        <p className="text-lg">
+          Current Status: <span className={`font-semibold ${job.status === 'open' ? 'text-blue-600' : job.status === 'pending-client-approval' ? 'text-orange-500' : job.status === 'in-progress' ? 'text-yellow-600' : job.status === 'completed' ? 'text-green-600' : job.status === 'disputed' ? 'text-red-600' : 'text-gray-600'}`}>
+            {job.status}
+            {job.status === 'disputed' && <span className="ml-2 text-red-700">(Disputed!)</span>}
+          </span>
         </p>
-        <p className="text-lg">Current Status: <span className={`font-semibold ${job.status === 'open' ? 'text-blue-600' : job.status === 'pending-client-approval' ? 'text-orange-500' : job.status === 'in-progress' ? 'text-yellow-600' : job.status === 'completed' ? 'text-green-600' : job.status === 'disputed' ? 'text-red-600' : 'text-gray-600'}`}>{job.status}</span></p>
         <p className="text-lg">Escrow Status: <span className={`font-semibold ${job.escrowStatus === 'pending-deposit' ? 'text-red-500' : job.escrowStatus === 'deposited' || job.escrowStatus === 'active' ? 'text-green-500' : 'text-gray-600'}`}>{job.escrowStatus}</span></p>
         {isClient && <p className="text-lg">Your USDC Balance: <span className="font-semibold text-primary-blue">{clientUsdcBalance} USDC</span></p>}
       </div>
@@ -1420,7 +1420,7 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
             onClick={handleAcceptAssignedJob}
             disabled={isProcessingTx || !account}
           >
-            {isProcessingTx ? 'Accept Assigned Job' : 'Accept Assigned Job'}
+            {isProcessingTx ? 'Accepting Job...' : 'Accept Assigned Job'}
           </button>
         )}
 
@@ -1454,6 +1454,17 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
             disabled={isProcessingTx || !account}
           >
             {isProcessingTx ? 'Refunding...' : 'Refund Funds'}
+          </button>
+        )}
+
+        {/* Client: Rate Freelancer Button */}
+        {showRateFreelancerButton && (
+          <button
+            className="px-6 py-3 bg-purple-600 text-white font-semibold rounded-md hover:bg-purple-700 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={() => setShowRatingModal(true)}
+            disabled={isProcessingTx || !account}
+          >
+            Rate Freelancer
           </button>
         )}
       </div>
@@ -1496,7 +1507,7 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       )}
 
       {/* In-App Messaging Section */}
-      {(isClient || (isFreelancer && job.freelancer)) && (job.status !== 'open' || job.freelancer) && ( // Only show messaging if job is assigned/in progress/completed
+      {(isClient || isFreelancer) && job.status !== 'open' && ( // Only show messaging if job is assigned/in progress/completed
         <div className="mt-8 p-4 bg-gray-50 rounded-lg shadow-inner">
           <h3 className="text-xl font-semibold text-primary-blue mb-4">Job Messages</h3>
           <div className="h-64 overflow-y-auto border border-gray-200 rounded-md p-3 mb-4 bg-white">
@@ -1510,11 +1521,7 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
                       : 'bg-gray-200 text-gray-800 mr-auto'
                   }`}
                 >
-                  <p className="font-semibold text-sm">
-                    <Link to={`/profile/${message.sender}`} className="text-blue-200 hover:underline">
-                      {truncateAddress(message.sender)}
-                    </Link>
-                  </p>
+                  <p className="font-semibold text-sm">{truncateAddress(message.sender)}</p>
                   <p className="text-base break-words">{message.text}</p>
                   <p className="text-xs text-right opacity-80 mt-1">{new Date(message.timestamp).toLocaleString()}</p>
                 </div>
@@ -1549,36 +1556,34 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
         <div className="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50">
           <div className="bg-white p-8 rounded-lg shadow-xl max-w-md w-full text-center">
             <h3 className="text-2xl font-bold text-primary-blue mb-4">Rate Freelancer</h3>
-            <p className="text-lg text-gray-700 mb-6">How would you rate {truncateAddress(job.freelancer)} for this job?</p>
-            <div className="flex justify-center space-x-2 mb-6">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                  key={star}
-                  onClick={() => setRatingInput(star)}
-                  className={`text-4xl ${ratingInput >= star ? 'text-yellow-500' : 'text-gray-300'} hover:text-yellow-400 transition-colors`}
-                >
-                  &#9733; {/* Unicode star character */}
-                </button>
-              ))}
+            <p className="text-lg text-gray-700 mb-6">How would you rate {job.freelancer ? truncateAddress(job.freelancer) : 'the freelancer'} for this job?</p>
+            <input
+              type="number"
+              min="1"
+              max="5"
+              value={ratingInput}
+              onChange={(e) => setRatingInput(parseInt(e.target.value))}
+              className="w-24 p-3 border border-gray-300 rounded-md text-center text-xl font-semibold mb-6"
+            />
+            <div className="flex justify-center space-x-4">
+              <button
+                onClick={handleRateFreelancer}
+                className="px-6 py-3 bg-accent-green text-white font-semibold rounded-md hover:bg-green-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isProcessingTx || ratingInput < 1 || ratingInput > 5}
+              >
+                Submit Rating
+              </button>
+              <button
+                onClick={() => setShowRatingModal(false)}
+                className="px-6 py-3 bg-gray-400 text-white font-semibold rounded-md hover:bg-gray-500 transition duration-300"
+                disabled={isProcessingTx}
+              >
+                Cancel
+              </button>
             </div>
-            <button
-              onClick={handleSubmitRating}
-              className="px-6 py-3 bg-accent-green text-white font-semibold rounded-md hover:bg-green-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={isProcessingTx || ratingInput === 0}
-            >
-              {isProcessingTx ? 'Submitting...' : 'Submit Rating'}
-            </button>
-            <button
-              onClick={() => setShowRatingModal(false)}
-              className="mt-4 px-6 py-3 bg-gray-400 text-white font-semibold rounded-md hover:bg-gray-500 transition duration-300 ml-2"
-              disabled={isProcessingTx}
-            >
-              Cancel
-            </button>
           </div>
         </div>
       )}
-
 
       <button
         className="mt-8 px-6 py-3 bg-gray-600 text-white font-semibold rounded-md hover:bg-gray-700 transition duration-300"
@@ -1724,7 +1729,7 @@ const PostJob = ({ account, setNotification }) => {
 };
 
 // --- BrowseJobs Component ---
-const BrowseJobs = () => {
+const BrowseJobs = ({ setNotification }) => {
   const [jobs, setJobs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
@@ -1743,12 +1748,13 @@ const BrowseJobs = () => {
       } catch (error) {
         console.error('Error fetching jobs:', error);
         setErrorMessage(`Error loading jobs: ${error.message || 'Network error'}`);
+        setNotification(`Error loading jobs: ${error.message || 'Network error'}`, 'error');
       } finally {
         setIsLoading(false);
       }
     };
     fetchJobs();
-  }, [filterSkills]); // Re-fetch jobs when filterSkills changes
+  }, [filterSkills, setNotification]); // Re-fetch jobs when filterSkills changes
 
   return (
     <div className="max-w-6xl mx-auto p-4 bg-white shadow-lg rounded-lg my-8">
@@ -2168,28 +2174,17 @@ function App() {
   const [walletClient, setWalletClient] = useState(null);
   const [publicClient, setPublicClient] = useState(null);
   const [account, setAccount] = useState(null);
-  const [notificationMessage, setNotificationMessage] = useState('');
-  const [notificationType, setNotificationType] = useState('info'); // 'info', 'success', 'error'
-  const notificationTimeoutRef = useRef(null);
-
-  // ADDED: State for mobile menu and info menu
+  const [notification, setNotification] = useState({ message: '', type: '' });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isInfoMenuOpen, setIsInfoMenuOpen] = useState(false);
 
-
   // Function to set a notification
-  const setNotification = (message, type = 'info', duration = 5000) => {
-    // Clear any existing timeout
-    if (notificationTimeoutRef.current) {
-      clearTimeout(notificationTimeoutRef.current);
-    }
-    setNotificationMessage(message);
-    setNotificationType(type);
-    notificationTimeoutRef.current = setTimeout(() => {
-      setNotificationMessage('');
-    }, duration);
+  const showNotification = (message, type) => {
+    setNotification({ message, type });
+    setTimeout(() => {
+      setNotification({ message: '', type: '' }); // Clear after 5 seconds
+    }, 5000);
   };
-
 
   const initializeWeb3Clients = async (connectedAddress) => {
     try {
@@ -2204,10 +2199,10 @@ function App() {
       setWalletClient(client);
       setPublicClient(publicClientInstance);
       setAccount(connectedAddress);
-      setNotification(`Wallet connected: ${truncateAddress(connectedAddress)}`, 'success');
+      showNotification(`Wallet connected: ${truncateAddress(connectedAddress)}`, 'success');
     } catch (error) {
       console.error("Error initializing Web3 clients:", error);
-      setNotification(`Error initializing wallet: ${error.message}`, 'error');
+      showNotification(`Error initializing wallet: ${error.message}`, 'error');
       setAccount(null);
       setWalletClient(null);
       setPublicClient(null);
@@ -2215,10 +2210,10 @@ function App() {
   };
 
   const connectWallet = async () => {
-    setNotification('Connecting wallet...', 'info');
+    showNotification('Connecting wallet...', 'info');
     try {
       if (typeof window.ethereum === 'undefined') {
-        setNotification('MetaMask or similar wallet not detected! Please install a Web3 wallet.', 'error');
+        showNotification('MetaMask or similar wallet not detected! Please install a Web3 wallet.', 'error');
         return;
       }
 
@@ -2228,9 +2223,9 @@ function App() {
     } catch (error) {
       console.error("Error connecting wallet:", error);
       if (error.code === 4001) {
-        setNotification('Wallet connection rejected by user.', 'error');
+        showNotification('Wallet connection rejected by user.', 'error');
       } else {
-        setNotification(`Error connecting wallet: ${error.message}`, 'error');
+        showNotification(`Error connecting wallet: ${error.message}`, 'error');
       }
       setAccount(null);
       setWalletClient(null);
@@ -2248,7 +2243,7 @@ function App() {
           setAccount(null);
           setWalletClient(null);
           setPublicClient(null);
-          setNotification('Wallet disconnected.', 'info');
+          showNotification('Wallet disconnected.', 'info');
         }
       };
 
@@ -2258,7 +2253,7 @@ function App() {
           if (accounts.length > 0) {
             await initializeWeb3Clients(accounts[0]);
           } else {
-            setNotification('No wallet connected initially.', 'info');
+            showNotification('No wallet connected initially.', 'info');
           }
         })
         .catch(error => console.error("Error checking initial accounts:", error));
@@ -2270,12 +2265,12 @@ function App() {
         window.ethereum.request({ method: 'eth_accounts' })
           .then(async (accounts) => {
             if (accounts.length > 0) {
-              initializeWeb3Clients(accounts[0]); // Don't await, let it run in background
+              await initializeWeb3Clients(accounts[0]);
             } else {
               setAccount(null);
               setWalletClient(null);
               setPublicClient(null);
-              setNotification('Wallet disconnected or chain changed to unknown network.', 'info');
+              showNotification('Wallet disconnected or chain changed to unknown network.', 'info');
             }
           })
           .catch(error => console.error("Error on chainChanged accounts check:", error));
@@ -2646,30 +2641,23 @@ function App() {
             </>
           } />
           <Route path="/dashboard" element={<Dashboard account={account} />} />
-          <Route path="/profile" element={<Profile account={account} />} />
-          <Route path="/profile/:address" element={<Profile account={account} />} /> {/* New route for public profiles */}
-          <Route path="/job/:id" element={<JobDetails account={account} publicClient={publicClient} walletClient={walletClient} setNotification={setNotification} />} />
+          <Route path="/profile/:address?" element={<Profile account={account} />} /> {/* Added optional :address param */}
+          <Route path="/job/:id" element={<JobDetails account={account} publicClient={publicClient} walletClient={walletClient} setNotification={showNotification} />} />
           <Route path="/deposit-funds" element={
             <DivviIntegration
               account={account}
               walletClient={walletClient}
               publicClient={publicClient}
-              setNotification={setNotification}
+              setNotification={showNotification}
             />
           } />
-          <Route path="/post-job" element={<PostJob account={account} setNotification={setNotification} />} />
-          <Route path="/browse-jobs" element={<BrowseJobs />} />
-          <Route path="/cross-chain-transfer" element={<CrossChainIntegration account={account} publicClient={publicClient} walletClient={walletClient} setNotification={setNotification} />} />
-          <Route path="/dispute-resolution" element={<DisputeResolution account={account} setNotification={setNotification} />} />
-          <Route path="/withdraw" element={<Withdrawal account={account} setNotification={setNotification} />} />
+          <Route path="/post-job" element={<PostJob account={account} setNotification={showNotification} />} />
+          <Route path="/browse-jobs" element={<BrowseJobs setNotification={showNotification} />} />
+          <Route path="/cross-chain-transfer" element={<CrossChainIntegration account={account} publicClient={publicClient} walletClient={walletClient} setNotification={showNotification} />} />
+          <Route path="/dispute-resolution" element={<DisputeResolution account={account} setNotification={showNotification} />} />
+          <Route path="/withdraw" element={<Withdrawal account={account} setNotification={showNotification} />} />
         </Routes>
-
-        {/* Global Notification Component */}
-        <Notification
-          message={notificationMessage}
-          type={notificationType}
-          onClose={() => setNotificationMessage('')}
-        />
+        <Notification message={notification.message} type={notification.type} onClose={() => setNotification({ message: '', type: '' })} />
       </div>
     </BrowserRouter>
   );
