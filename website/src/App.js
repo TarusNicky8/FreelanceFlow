@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { BrowserRouter, Routes, Route, Link, useNavigate, useParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'; // Added useSearchParams
 import axios from 'axios';
 import { createWalletClient, custom, parseUnits, encodeFunctionData, createPublicClient, http, formatUnits } from 'viem';
 import { isAddress } from 'viem'; // Import isAddress for validation
@@ -2313,6 +2313,27 @@ const Withdrawal = ({ account, setNotification }) => {
   const [mobilePhoneNumber, setMobilePhoneNumber] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [totalGeneralDeposits, setTotalGeneralDeposits] = useState(0); // New state for user's general escrow balance
+
+  // Fetch user's total general deposits
+  useEffect(() => {
+    const fetchTotalDeposits = async () => {
+      if (account) {
+        try {
+          const response = await axios.get(`${API_BASE_URL}/api/deposits/total/${account}`);
+          setTotalGeneralDeposits(parseFloat(response.data.totalDeposits));
+        } catch (error) {
+          console.error("Error fetching total general deposits:", error);
+          setNotification(`Error fetching your general escrow balance: ${error.message}`, 'error');
+          setTotalGeneralDeposits(0);
+        }
+      } else {
+        setTotalGeneralDeposits(0);
+      }
+    };
+    fetchTotalDeposits();
+  }, [account, setNotification]);
+
 
   // Define mobile money networks based on selected country
   const getMobileMoneyNetworks = (selectedCountry) => {
@@ -2321,19 +2342,26 @@ const Withdrawal = ({ account, setNotification }) => {
       case 'NG': return ['MTN Mobile Money', 'Airtel Money', 'Glo Money'];
       case 'ZA': return ['FNB eWallet', 'Standard Bank Instant Money'];
       case 'GH': return ['MTN Mobile Money', 'Vodafone Cash', 'AirtelTigo Money'];
+      case 'UG': return ['MTN Mobile Money', 'Airtel Money'];
+      case 'TZ': return ['M-Pesa', 'Tigo Pesa', 'Airtel Money', 'Halopesa'];
       default: return ['Other'];
     }
   };
 
   const handleWithdrawal = async (e) => {
-    e.e.preventDefault();
+    e.preventDefault(); // Corrected from e.e.preventDefault()
     if (!account) {
       setNotification('Please connect your wallet to initiate a withdrawal.', 'error');
       return;
     }
-    if (isNaN(parseFloat(amount)) || parseFloat(amount) <= 0 || !mobilePhoneNumber || !country || !mobileMoneyNetwork) {
+    const withdrawalAmountNum = parseFloat(amount);
+    if (isNaN(withdrawalAmountNum) || withdrawalAmountNum <= 0 || !mobilePhoneNumber || !country || !mobileMoneyNetwork) {
       setNotification('Please fill all withdrawal details correctly.', 'error');
       return;
+    }
+    if (withdrawalAmountNum > totalGeneralDeposits) {
+        setNotification(`Insufficient funds in your general escrow. You have ${totalGeneralDeposits} USDC available.`, 'error');
+        return;
     }
 
     setShowConfirmModal(true);
@@ -2356,6 +2384,9 @@ const Withdrawal = ({ account, setNotification }) => {
       setNotification(`Withdrawal request submitted! Our team will process your ${amount} USDC to ${mobileMoneyNetwork}. This is an off-chain request.`, 'success');
       setAmount('');
       setMobilePhoneNumber('');
+      // Optionally re-fetch totalGeneralDeposits after a successful request
+      const response = await axios.get(`${API_BASE_URL}/api/deposits/total/${account}`);
+      setTotalGeneralDeposits(parseFloat(response.data.totalDeposits));
 
     } catch (error) {
       console.error('Error during withdrawal:', error);
@@ -2376,6 +2407,11 @@ const Withdrawal = ({ account, setNotification }) => {
       <p className="text-lg text-gray-700 mb-4">
         Connected Wallet: <span className="font-mono text-secondary-purple">{account || 'Not connected'}</span>
       </p>
+      {account && (
+        <p className="text-lg text-gray-700 mb-4">
+          Your General Escrow Balance: <span className="font-semibold text-primary-blue">{totalGeneralDeposits} USDC</span>
+        </p>
+      )}
 
       {isLoading && (
         <div className="flex items-center justify-center mb-4 text-primary-blue">
@@ -2450,7 +2486,7 @@ const Withdrawal = ({ account, setNotification }) => {
         <button
           type="submit"
           className="w-full px-6 py-3 bg-accent-green text-white font-semibold rounded-md hover:bg-green-600 transition duration-300 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={isLoading || !account}
+          disabled={isLoading || !account || parseFloat(amount) <= 0 || parseFloat(amount) > totalGeneralDeposits}
         >
           {isLoading ? 'Processing...' : 'Initiate Withdrawal Request'}
         </button>
@@ -2882,6 +2918,235 @@ const CustomerSupport = () => {
   );
 };
 
+// --- NEW: SearchPage Component ---
+const SearchPage = ({ setNotification }) => {
+  const [searchParams] = useSearchParams();
+  const query = searchParams.get('query') || '';
+  const [jobs, setJobs] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  useEffect(() => {
+    const performSearch = async () => {
+      if (!query) {
+        setJobs([]);
+        setUsers([]);
+        setIsLoading(false);
+        setErrorMessage('Please enter a search query.');
+        return;
+      }
+
+      setIsLoading(true);
+      setErrorMessage('');
+      try {
+        const [jobsResponse, usersResponse] = await Promise.all([
+          axios.get(`${API_BASE_URL}/api/search/jobs?query=${encodeURIComponent(query)}`),
+          axios.get(`${API_BASE_URL}/api/search/users?query=${encodeURIComponent(query)}`)
+        ]);
+        setJobs(jobsResponse.data);
+        setUsers(usersResponse.data);
+        setNotification(`Search results for "${query}" loaded.`, 'info');
+      } catch (error) {
+        console.error('Error during search:', error);
+        setErrorMessage(`Error fetching search results: ${error.message || 'Network error'}`);
+        setNotification(`Error fetching search results: ${error.message || 'Network error'}`, 'error');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    performSearch();
+  }, [query, setNotification]);
+
+  return (
+    <div className="max-w-6xl mx-auto p-4 bg-white shadow-lg rounded-lg my-8">
+      <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">Search Results for "{query}"</h2>
+
+      {errorMessage && (
+        <div className="p-3 mb-4 rounded-md bg-red-100 text-red-700">
+          {errorMessage}
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-8 text-primary-blue">
+          <svg className="animate-spin h-6 w-6 mr-3 text-primary-blue" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Searching...
+        </div>
+      ) : (
+        <>
+          <h3 className="text-xl font-semibold mt-8 text-primary-blue border-b pb-2">Jobs Found ({jobs.length})</h3>
+          {jobs.length > 0 ? (
+            <ul className="mt-4 space-y-4">
+              {jobs.map((job) => (
+                <li key={job._id} className="bg-gray-50 p-4 rounded-lg shadow-md flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                  <div className="mb-2 sm:mb-0">
+                    <p className="text-lg font-semibold text-gray-800">{job.title} - <span className="text-accent-green">{job.amount} USDC</span></p>
+                    <p className="text-sm text-gray-600 truncate max-w-sm">{job.description}</p>
+                    <p className="text-xs text-gray-500">
+                      Client: {job.client ? (
+                        <Link to={`/profile/${job.client}`} className="text-primary-blue hover:underline">
+                          {truncateAddress(job.client)}
+                        </Link>
+                      ) : 'N/A'} | Status: {job.status} | Escrow: {job.escrowStatus}
+                    </p>
+                    {job.requiredSkills && job.requiredSkills.length > 0 && (
+                      <p className="text-xs text-gray-500 mt-1">Required Skills: {job.requiredSkills.join(', ')}</p>
+                    )}
+                  </div>
+                  <Link
+                    className="px-4 py-2 bg-primary-blue text-white rounded-md hover:bg-blue-700 transition duration-300 flex-shrink-0"
+                    to={`/job/${job._id}`}
+                  >
+                    View Details
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="mt-4 p-4 bg-yellow-50 rounded-lg shadow-sm text-yellow-800 text-center">
+              <p className="text-base">No jobs found matching your query.</p>
+            </div>
+          )}
+
+          <h3 className="text-xl font-semibold mt-8 text-primary-blue border-b pb-2">Users Found ({users.length})</h3>
+          {users.length > 0 ? (
+            <ul className="mt-4 space-y-4">
+              {users.map((user) => (
+                <li key={user.address} className="bg-gray-50 p-4 rounded-lg shadow-md flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                  <div className="mb-2 sm:mb-0">
+                    <p className="text-lg font-semibold text-gray-800">
+                      <Link to={`/profile/${user.address}`} className="text-primary-blue hover:underline">
+                        {truncateAddress(user.address)}
+                      </Link>
+                    </p>
+                    <p className="text-sm text-gray-600">Role: {user.role || 'N/A'}</p>
+                    {user.skills && user.skills.length > 0 && (
+                      <p className="text-xs text-gray-500 mt-1">Skills: {user.skills.join(', ')}</p>
+                    )}
+                  </div>
+                  <Link
+                    className="px-4 py-2 bg-secondary-purple text-white rounded-md hover:bg-purple-700 transition duration-300 flex-shrink-0"
+                    to={`/profile/${user.address}`}
+                  >
+                    View Profile
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="mt-4 p-4 bg-yellow-50 rounded-lg shadow-sm text-yellow-800 text-center">
+              <p className="text-base">No users found matching your query.</p>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+};
+
+// --- NEW: SettingsPage Component ---
+const SettingsPage = ({ account, setNotification }) => {
+  const navigate = useNavigate();
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [isProcessingDelete, setIsProcessingDelete] = useState(false);
+
+  const handleDeleteAccount = () => {
+    setShowDeleteConfirmModal(true);
+  };
+
+  const confirmDeleteAccount = async () => {
+    setShowDeleteConfirmModal(false);
+    setIsProcessingDelete(true);
+    setNotification('Attempting to delete account...', 'info');
+
+    try {
+      // IMPORTANT: Backend deletion logic is NOT implemented in server.js for this demo.
+      // This is a placeholder for future functionality.
+      // In a real application, you would make an API call here:
+      // await axios.delete(`${API_BASE_URL}/api/users/${account}`);
+
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API call delay
+
+      setNotification('Account deletion initiated (backend logic not implemented). Your data will not be removed from the database in this demo.', 'info');
+      console.warn('Account deletion backend logic is NOT implemented for this demo.');
+
+      // Optionally redirect after a delay, even if deletion is mocked
+      setTimeout(() => {
+        navigate('/'); // Redirect to home or login page
+      }, 3000);
+
+    } catch (error) {
+      console.error('Error during simulated account deletion:', error);
+      setNotification(`Account deletion failed: ${error.message || 'Please try again.'}`, 'error');
+    } finally {
+      setIsProcessingDelete(false);
+    }
+  };
+
+  return (
+    <div className="max-w-3xl mx-auto p-6 bg-white shadow-lg rounded-lg my-8">
+      <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">Settings</h2>
+
+      <div className="space-y-6">
+        <div className="p-4 bg-blue-50 rounded-lg shadow-sm">
+          <h3 className="text-xl font-semibold text-primary-blue mb-2">Your Account</h3>
+          <p className="text-lg text-gray-700">Connected Wallet: <span className="font-mono text-secondary-purple">{account ? truncateAddress(account) : 'Not connected'}</span></p>
+          {account && (
+            <Link
+              to="/profile"
+              className="mt-4 inline-block px-6 py-2 bg-primary-blue text-white rounded-md hover:bg-blue-700 transition duration-300"
+            >
+              View/Edit Profile
+            </Link>
+          )}
+        </div>
+
+        <div className="p-4 bg-gray-50 rounded-lg shadow-sm">
+          <h3 className="text-xl font-semibold text-primary-blue mb-2">Notification Preferences (Mock)</h3>
+          <p className="text-lg text-gray-700">Manage how you receive alerts and updates.</p>
+          <button className="mt-4 px-6 py-2 bg-gray-400 text-white rounded-md cursor-not-allowed">
+            Coming Soon
+          </button>
+        </div>
+
+        <div className="p-4 bg-gray-50 rounded-lg shadow-sm">
+          <h3 className="text-xl font-semibold text-primary-blue mb-2">Theme (Mock)</h3>
+          <p className="text-lg text-gray-700">Customize the look and feel of your FreelanceFlow experience.</p>
+          <button className="mt-4 px-6 py-2 bg-gray-400 text-white rounded-md cursor-not-allowed">
+            Coming Soon
+          </button>
+        </div>
+
+        <div className="p-4 bg-red-50 rounded-lg shadow-sm">
+          <h3 className="text-xl font-semibold text-red-700 mb-2">Danger Zone</h3>
+          <p className="text-lg text-red-700 mb-4">Permanently delete your account and all associated data.</p>
+          <button
+            onClick={handleDeleteAccount}
+            className="px-6 py-3 bg-red-600 text-white font-semibold rounded-md hover:bg-red-700 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={!account || isProcessingDelete}
+          >
+            {isProcessingDelete ? 'Processing...' : 'Delete Account'}
+          </button>
+        </div>
+      </div>
+
+      <ConfirmationModal
+        isOpen={showDeleteConfirmModal}
+        title="Confirm Account Deletion"
+        message="Are you absolutely sure you want to delete your account? This action is irreversible. Please note: Backend deletion logic is NOT implemented in this demo."
+        onConfirm={confirmDeleteAccount}
+        onCancel={() => setShowDeleteConfirmModal(false)}
+        confirmButtonText="Yes, Delete My Account"
+        isProcessing={isProcessingDelete}
+      />
+    </div>
+  );
+};
+
 
 function App() {
   const [walletClient, setWalletClient] = useState(null);
@@ -2890,6 +3155,8 @@ function App() {
   const [notification, setNotification] = useState({ message: '', type: '' });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isInfoMenuOpen, setIsInfoMenuOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState(''); // State for search input
+  const navigate = useNavigate(); // Hook for navigation
 
   // Function to set a notification
   const showNotification = (message, type) => {
@@ -3003,6 +3270,16 @@ function App() {
     if (isInfoMenuOpen) setIsInfoMenuOpen(false);
   };
 
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/search?query=${encodeURIComponent(searchQuery.trim())}`);
+      setSearchQuery(''); // Clear search input after navigating
+    } else {
+      showNotification('Please enter a search query.', 'error');
+    }
+  };
+
   return (
     <BrowserRouter>
       <div className="bg-gradient-to-br from-gray-50 to-gray-200 min-h-screen font-sans text-gray-800">
@@ -3022,6 +3299,22 @@ function App() {
                 <Link to="/browse-jobs" className="hover:text-blue-200 transition duration-300 ease-in-out">Browse Jobs</Link>
               </div>
               <div className="flex items-center gap-x-4">
+                {/* Search Input in Header */}
+                <form onSubmit={handleSearchSubmit} className="relative flex items-center">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search jobs or users..."
+                    className="pl-4 pr-10 py-2 rounded-full bg-blue-700 text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-white focus:bg-blue-600 transition duration-300 text-sm w-48"
+                  />
+                  <button type="submit" className="absolute right-0 top-0 h-full w-10 flex items-center justify-center text-blue-200 hover:text-white">
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </button>
+                </form>
+
                 <div className="relative">
                   <button
                     onClick={() => setIsInfoMenuOpen(!isInfoMenuOpen)}
@@ -3038,7 +3331,7 @@ function App() {
                       <Link to="/cross-chain-transfer" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Cross-Chain Transfer</Link>
                       <Link to="/dispute-resolution" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Dispute Resolution</Link>
                       <Link to="/withdraw" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Withdraw Funds</Link>
-                      {/* Admin Dashboard link removed from public navigation */}
+                      <Link to="/settings" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Settings</Link> {/* New Settings Link */}
                       <Link to="/support" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Customer Support</Link>
                       <a href="#about" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">About</a>
                       <a href="#vision" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Vision</a>
@@ -3071,6 +3364,23 @@ function App() {
           {isMobileMenuOpen && (
             <nav className="md:hidden bg-primary-blue pb-2 pt-1 overflow-y-auto max-h-screen">
               <ul className="flex flex-col items-center space-y-3 text-lg py-2">
+                {/* Search Input for Mobile */}
+                <li className="w-full px-4 mb-3">
+                  <form onSubmit={handleSearchSubmit} className="relative flex items-center w-full">
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search jobs or users..."
+                      className="pl-4 pr-10 py-2 rounded-full bg-blue-700 text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-white focus:bg-blue-600 transition duration-300 text-sm w-full"
+                    />
+                    <button type="submit" className="absolute right-0 top-0 h-full w-10 flex items-center justify-center text-blue-200 hover:text-white">
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </button>
+                  </form>
+                </li>
                 <li><Link to="/" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Home</Link></li>
                 <li><Link to="/dashboard" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Dashboard</Link></li>
                 <li><Link to="/profile" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Profile</Link></li>
@@ -3081,7 +3391,7 @@ function App() {
                 <li><Link to="/cross-chain-transfer" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Cross-Chain Transfer</Link></li>
                 <li><Link to="/dispute-resolution" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Dispute Resolution</Link></li>
                 <li><Link to="/withdraw" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Withdraw Funds</Link></li>
-                {/* Admin Dashboard link removed from public navigation */}
+                <li><Link to="/settings" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Settings</Link></li> {/* New Settings Link */}
                 <li><Link to="/support" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Customer Support</Link></li>
                 <li><a href="#about" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">About</a></li>
                 <li><a href="#vision" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Vision</a></li>
@@ -3402,6 +3712,8 @@ function App() {
           <Route path="/withdraw" element={<Withdrawal account={account} setNotification={showNotification} />} />
           <Route path="/admin" element={<AdminDashboard setNotification={showNotification} />} /> {/* ADMIN ROUTE (no public link) */}
           <Route path="/support" element={<CustomerSupport />} /> {/* CUSTOMER SUPPORT ROUTE */}
+          <Route path="/search" element={<SearchPage setNotification={showNotification} />} /> {/* NEW SEARCH ROUTE */}
+          <Route path="/settings" element={<SettingsPage account={account} setNotification={showNotification} />} /> {/* NEW SETTINGS ROUTE */}
         </Routes>
         <Notification message={notification.message} type={notification.type} onClose={() => setNotification({ message: '', type: '' })} />
       </div>
