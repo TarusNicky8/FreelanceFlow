@@ -326,8 +326,8 @@ const DivviIntegration = ({ account, walletClient, publicClient, setNotification
       // });
       // ---------------------------------------------------
 
-      setNotification(`General deposit successful and Divvi referral (mocked) completed! Tx Hash: ${truncateAddress(depositTxHash)}`, 'success');
-      console.log('Divvi referral (mocked) completed!');
+      setNotification(`General deposit successful and Divvi referral (conceptual) completed! Tx Hash: ${truncateAddress(depositTxHash)}`, 'success');
+      console.log('Divvi referral (conceptual) completed!');
 
     } catch (error) {
       console.error("Error during general USDC deposit or Divvi integration:", error);
@@ -343,7 +343,7 @@ const DivviIntegration = ({ account, walletClient, publicClient, setNotification
     <section className="max-w-3xl mx-auto p-6 bg-white shadow-lg rounded-lg my-8 text-center">
       <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">Deposit Funds (General Escrow)</h2>
       <p className="text-lg text-gray-700 mb-6">
-        Deposit USDC into the general escrow for future use. This process is enhanced with Divvi tracking for transparent on-chain activity.
+        Deposit USDC into the general escrow for future use. This process is enhanced with conceptual Divvi tracking for transparent on-chain activity.
       </p>
       <div className="mb-4">
         <label htmlFor="depositAmount" className="block text-lg font-medium text-gray-800 mb-2">Amount to Deposit (USDC):</label>
@@ -684,10 +684,13 @@ const Dashboard = ({ account }) => {
               </Link>
             </div>
           ) : (
-            <div className="mt-4 p-4 bg-red-50 rounded-lg shadow-sm text-red-700">
+            <div className="mt-4 p-4 bg-yellow-50 rounded-lg shadow-sm text-yellow-800 flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
               <p className="text-base">Profile not found. Please create your profile to get started!</p>
               <Link
-                className="mt-4 px-6 py-2 bg-primary-blue text-white rounded-md hover:bg-blue-700 transition duration-300 inline-block"
+                className="ml-auto px-6 py-2 bg-primary-blue text-white rounded-md hover:bg-blue-700 transition duration-300 inline-block"
                 to="/profile"
               >
                 Create Profile
@@ -2049,7 +2052,7 @@ const BrowseJobs = ({ setNotification }) => {
 // --- CrossChainIntegration Component ---
 const CrossChainIntegration = ({ account, walletClient, publicClient, setNotification }) => {
   const [sourceChain, setSourceChain] = useState('Lisk Sepolia');
-  const [destinationChain, setDestinationChain] = useState('Optimism/Base (Mock)');
+  const [destinationChain, setDestinationChain] = useState('Optimism/Base');
   const [transferAmount, setTransferAmount] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false); // For confirmation modal
@@ -2095,24 +2098,18 @@ const CrossChainIntegration = ({ account, walletClient, publicClient, setNotific
     setNotification(`Initiating cross-chain transfer of ${transferAmount} USDC from ${sourceChain} to ${destinationChain}...`, 'info');
 
     try {
-      // --- Mocking LayerZero Integration ---
-      // In a real LayerZero integration, you would:
-      // 1. Get the OApp (Omnichain Application) contract instance for your specific bridge.
-      // 2. Encode the function data for the cross-chain transfer (e.g., 'send' function on your OApp).
-      //    This would involve specifying the destination chain ID, recipient address, amount, and LayerZero options.
-      // 3. Send the transaction via walletClient.sendTransaction.
-      // 4. Wait for transaction receipt.
-      // 5. Potentially use LayerZero Scan API to track message status across chains.
+      // This section represents a conceptual integration with LayerZero.
+      // In a live environment, this would involve actual smart contract calls
+      // to a LayerZero OApp (Omnichain Application) for cross-chain messaging.
 
-      // For this demo, we'll simulate the process.
       await new Promise(resolve => setTimeout(resolve, 3000)); // Simulate network delay
 
-      setNotification(`Simulated cross-chain transfer successful! ${transferAmount} USDC sent from ${sourceChain} to ${destinationChain}. (This is a mock transaction.)`, 'success');
+      setNotification(`Conceptual cross-chain transfer initiated! ${transferAmount} USDC from ${sourceChain} to ${destinationChain}. This feature is coming soon.`, 'info');
       setTransferAmount('');
 
     } catch (error) {
-      console.error('Error during simulated cross-chain transfer:', error);
-      setNotification(`Simulated transfer failed: ${error.message || 'Please try again.'}`, 'error');
+      console.error('Error during conceptual cross-chain transfer:', error);
+      setNotification(`Conceptual transfer failed: ${error.message || 'Please try again.'}`, 'error');
     } finally {
       setIsProcessing(false);
     }
@@ -2121,9 +2118,9 @@ const CrossChainIntegration = ({ account, walletClient, publicClient, setNotific
 
   return (
     <div className="max-w-3xl mx-auto p-6 bg-white shadow-lg rounded-lg my-8">
-      <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">Cross-Chain Payments (LayerZero Integration)</h2>
+      <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">Cross-Chain Payments (Future Feature)</h2>
       <p className="text-lg text-gray-700 mb-6">
-        Seamlessly transfer USDC between Lisk Sepolia and other Optimism-based networks (e.g., Optimism Mainnet, Base) using LayerZero.
+        Seamlessly transfer USDC between Lisk Sepolia and other Optimism-based networks (e.g., Optimism Mainnet, Base) using LayerZero. This feature is currently under development and will be available soon.
       </p>
 
       <p className="text-lg text-gray-700 mb-4">
@@ -2153,7 +2150,7 @@ const CrossChainIntegration = ({ account, walletClient, publicClient, setNotific
             className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
             disabled={isProcessing || !account}
           >
-            <option value="Optimism/Base (Mock)">Optimism/Base (Mock)</option>
+            <option value="Optimism/Base">Optimism/Base (Coming Soon)</option>
             {/* Add more options as actual LayerZero integrations are built */}
           </select>
         </div>
@@ -2174,17 +2171,17 @@ const CrossChainIntegration = ({ account, walletClient, publicClient, setNotific
           className="w-full px-6 py-3 bg-secondary-purple text-white font-semibold rounded-md hover:bg-purple-700 transition duration-300 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
           disabled={isProcessing || !account}
         >
-          {isProcessing ? 'Transferring...' : 'Initiate Cross-Chain Transfer'}
+          {isProcessing ? 'Transferring...' : 'Initiate Cross-Chain Transfer (Coming Soon)'}
         </button>
       </div>
 
       <ConfirmationModal
         isOpen={showConfirmModal}
         title="Confirm Cross-Chain Transfer"
-        message={`Are you sure you want to transfer ${transferAmount} USDC from ${sourceChain} to ${destinationChain}? This is a simulated transaction.`}
+        message={`Are you sure you want to initiate a conceptual transfer of ${transferAmount} USDC from ${sourceChain} to ${destinationChain}? This feature is coming soon.`}
         onConfirm={confirmCrossChainTransfer}
         onCancel={() => setShowConfirmModal(false)}
-        confirmButtonText="Yes, Transfer"
+        confirmButtonText="Yes, Initiate Transfer"
         isProcessing={isProcessing}
       />
     </div>
@@ -2401,7 +2398,7 @@ const Withdrawal = ({ account, setNotification }) => {
       <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">Withdraw Funds (Fiat On/Off-Ramp)</h2>
       <p className="text-lg text-gray-700 mb-6">
         Convert your USDC earnings to local fiat currency and withdraw directly to your mobile money account.
-        <span className="font-semibold text-red-600 block mt-2">Note: This is an off-chain request. Actual processing will be handled by our team.</span>
+        <span className="font-semibold text-red-600 block mt-2">Note: This is an off-chain request, processed by our team.</span>
       </p>
 
       <p className="text-lg text-gray-700 mb-4">
@@ -2511,7 +2508,10 @@ const AdminDashboard = ({ setNotification }) => {
   const [adminKey, setAdminKey] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [disputes, setDisputes] = useState([]);
-  const [allJobs, setAllJobs] = useState([]); // To allow admin to manually update job status
+  const [allJobs, setAllJobs] = useState([]);
+  const [allUsers, setAllUsers] = useState([]); // New state for all users
+  const [allWithdrawals, setAllWithdrawals] = useState([]); // New state for all withdrawals
+  const [userCount, setUserCount] = useState(0); // New state for user count
   const [isLoading, setIsLoading] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState('');
   const [newJobStatus, setNewJobStatus] = useState('');
@@ -2521,6 +2521,8 @@ const AdminDashboard = ({ setNotification }) => {
   const [resolveDetails, setResolveDetails] = useState('');
   const [resolveJobStatus, setResolveJobStatus] = useState('');
   const [resolveEscrowStatus, setResolveEscrowStatus] = useState('');
+  const [showProcessWithdrawalModal, setShowProcessWithdrawalModal] = useState(false);
+  const [currentWithdrawalToProcess, setCurrentWithdrawalToProcess] = useState(null);
 
 
   const fetchAdminData = async () => {
@@ -2532,15 +2534,36 @@ const AdminDashboard = ({ setNotification }) => {
     setIsLoading(true);
     setNotification('Fetching admin data...', 'info');
     try {
+      // Fetch disputes
       const disputesResponse = await axios.get(`${API_BASE_URL}/api/admin/disputes`, {
         headers: { 'X-Admin-Key': adminKey }
       });
       setDisputes(disputesResponse.data);
 
-      const jobsResponse = await axios.get(`${API_BASE_URL}/api/jobs`, { // Fetch all jobs for manual update
-        headers: { 'X-Admin-Key': adminKey } // Admin can see all jobs
+      // Fetch all jobs
+      const jobsResponse = await axios.get(`${API_BASE_URL}/api/jobs`, { // Admin can see all jobs
+        headers: { 'X-Admin-Key': adminKey }
       });
       setAllJobs(jobsResponse.data);
+
+      // Fetch user count
+      const userCountResponse = await axios.get(`${API_BASE_URL}/api/admin/users/count`, {
+        headers: { 'X-Admin-Key': adminKey }
+      });
+      setUserCount(userCountResponse.data.count);
+
+      // Fetch all users
+      const allUsersResponse = await axios.get(`${API_BASE_URL}/api/admin/users`, {
+        headers: { 'X-Admin-Key': adminKey }
+      });
+      setAllUsers(allUsersResponse.data);
+
+      // Fetch all withdrawal requests
+      const allWithdrawalsResponse = await axios.get(`${API_BASE_URL}/api/admin/withdrawals`, {
+        headers: { 'X-Admin-Key': adminKey }
+      });
+      setAllWithdrawals(allWithdrawalsResponse.data);
+
 
       setIsAuthenticated(true);
       setNotification('Admin data loaded successfully!', 'success');
@@ -2552,14 +2575,6 @@ const AdminDashboard = ({ setNotification }) => {
       setIsLoading(false);
     }
   };
-
-  // Fetch data on initial load if key is already set (e.g., from session storage if you implement it)
-  // For now, we'll rely on manual fetch after key input.
-  // useEffect(() => {
-  //   if (adminKey) {
-  //     fetchAdminData();
-  //   }
-  // }, [adminKey]); // Depend on adminKey for re-fetch
 
   const handleResolveDispute = (dispute) => {
     setCurrentDisputeToResolve(dispute);
@@ -2640,6 +2655,33 @@ const AdminDashboard = ({ setNotification }) => {
     }
   };
 
+  const handleProcessWithdrawal = (withdrawal) => {
+    setCurrentWithdrawalToProcess(withdrawal);
+    setShowProcessWithdrawalModal(true);
+  };
+
+  const confirmProcessWithdrawal = async () => {
+    if (!currentWithdrawalToProcess) return;
+
+    setIsLoading(true);
+    setShowProcessWithdrawalModal(false);
+    setNotification('Processing withdrawal request...', 'info');
+    try {
+      await axios.put(`${API_BASE_URL}/api/admin/withdrawals/${currentWithdrawalToProcess._id}/process`,
+        {}, // No body needed for this conceptual process
+        { headers: { 'X-Admin-Key': adminKey } }
+      );
+      setNotification('Withdrawal request marked as processed!', 'success');
+      fetchAdminData(); // Re-fetch data to update lists
+    } catch (error) {
+      console.error('Error processing withdrawal:', error);
+      setNotification(`Error processing withdrawal: ${error.message || 'Please try again.'}`, 'error');
+    } finally {
+      setIsLoading(false);
+      setCurrentWithdrawalToProcess(null);
+    }
+  };
+
 
   return (
     <div className="max-w-6xl mx-auto p-4 bg-white shadow-lg rounded-lg my-8">
@@ -2672,6 +2714,64 @@ const AdminDashboard = ({ setNotification }) => {
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
               Loading admin data...
+            </div>
+          )}
+
+          {/* User Count */}
+          <div className="mb-6 p-4 bg-blue-50 rounded-lg shadow-sm text-center">
+            <h3 className="text-xl font-semibold text-primary-blue mb-2">Total Registered Users</h3>
+            <p className="text-4xl font-bold text-accent-green">{userCount}</p>
+          </div>
+
+          <h3 className="text-xl font-semibold mt-8 text-primary-blue border-b pb-2">All Users</h3>
+          {allUsers.length > 0 ? (
+            <ul className="mt-4 space-y-4">
+              {allUsers.map((user) => (
+                <li key={user.address} className="bg-gray-50 p-4 rounded-lg shadow-md">
+                  <p className="text-lg font-semibold text-gray-800">Address: <Link to={`/profile/${user.address}`} className="text-primary-blue hover:underline">{truncateAddress(user.address)}</Link></p>
+                  <p className="text-md text-gray-700">Role: {user.role}</p>
+                  <p className="text-md text-gray-700">Skills: {user.skills?.join(', ') || 'N/A'}</p>
+                  <p className="text-md text-gray-700">Rating: {user.rating !== undefined ? `${user.rating}/5` : 'N/A'}</p>
+                  <p className="text-sm text-gray-600">Registered: {new Date(user.createdAt).toLocaleString()}</p>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="mt-4 p-4 bg-yellow-50 rounded-lg shadow-sm text-yellow-800">
+              <p className="text-base">No users registered yet.</p>
+            </div>
+          )}
+
+          <h3 className="text-xl font-semibold mt-8 text-primary-blue border-b pb-2">All Withdrawal Requests</h3>
+          {allWithdrawals.length > 0 ? (
+            <ul className="mt-4 space-y-4">
+              {allWithdrawals.map((withdrawal) => (
+                <li key={withdrawal._id} className="bg-gray-50 p-4 rounded-lg shadow-md">
+                  <p className="text-lg font-semibold text-gray-800">Requestor: {truncateAddress(withdrawal.requestorAddress)}</p>
+                  <p className="text-md text-gray-700">Amount: {withdrawal.usdcAmount} USDC</p>
+                  <p className="text-md text-gray-700">Mobile Money: {withdrawal.mobileMoneyNetwork} ({withdrawal.country}) - {withdrawal.mobilePhoneNumber}</p>
+                  <p className="text-md text-gray-700">Status: <span className={`font-semibold ${withdrawal.status === 'pending' ? 'text-orange-600' : withdrawal.status === 'completed' ? 'text-green-600' : 'text-red-600'}`}>{withdrawal.status}</span></p>
+                  <p className="text-sm text-gray-600">Requested At: {new Date(withdrawal.requestedAt).toLocaleString()}</p>
+                  {withdrawal.processedAt && <p className="text-sm text-gray-600">Processed At: {new Date(withdrawal.processedAt).toLocaleString()}</p>}
+                  <div className="mt-3">
+                    {withdrawal.status === 'pending' ? (
+                      <button
+                        onClick={() => handleProcessWithdrawal(withdrawal)}
+                        className="px-4 py-2 bg-accent-green text-white rounded-md hover:bg-green-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                        disabled={isLoading}
+                      >
+                        Mark as Processed
+                      </button>
+                    ) : (
+                      <span className="text-gray-500 text-sm">Already processed.</span>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="mt-4 p-4 bg-yellow-50 rounded-lg shadow-sm text-yellow-800">
+              <p className="text-base">No withdrawal requests found.</p>
             </div>
           )}
 
@@ -2790,6 +2890,16 @@ const AdminDashboard = ({ setNotification }) => {
               {isLoading ? 'Updating...' : 'Update Job Status'}
             </button>
           </div>
+
+          <div className="mt-8 p-4 bg-gray-50 rounded-lg shadow-inner">
+            <h3 className="text-xl font-semibold text-primary-blue mb-2">User Suspension/Activation</h3>
+            <p className="text-lg text-gray-700 mb-4">
+              Advanced user management features like suspension and activation are coming soon.
+            </p>
+            <button className="px-6 py-3 bg-gray-400 text-white rounded-md cursor-not-allowed">
+              Coming Soon
+            </button>
+          </div>
         </>
       )}
 
@@ -2853,6 +2963,17 @@ const AdminDashboard = ({ setNotification }) => {
           </select>
         </div>
       </ConfirmationModal>
+
+      {/* Process Withdrawal Modal */}
+      <ConfirmationModal
+        isOpen={showProcessWithdrawalModal}
+        title="Process Withdrawal Request"
+        message={`Are you sure you want to mark this withdrawal request for ${currentWithdrawalToProcess?.usdcAmount} USDC by ${truncateAddress(currentWithdrawalToProcess?.requestorAddress)} as processed? This action confirms the off-chain transfer has been handled.`}
+        onConfirm={confirmProcessWithdrawal}
+        onCancel={() => setShowProcessWithdrawalModal(false)}
+        confirmButtonText="Yes, Process"
+        isProcessing={isLoading}
+      />
     </div>
   );
 };
@@ -3071,7 +3192,7 @@ const SettingsPage = ({ account, setNotification }) => {
 
       await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API call delay
 
-      setNotification('Account deletion initiated (backend logic not implemented). Your data will not be removed from the database in this demo.', 'info');
+      setNotification('Account deletion initiated (backend logic not yet implemented). Your data will not be removed from the database in this demo.', 'info');
       console.warn('Account deletion backend logic is NOT implemented for this demo.');
 
       // Optionally redirect after a delay, even if deletion is mocked
@@ -3080,7 +3201,7 @@ const SettingsPage = ({ account, setNotification }) => {
       }, 3000);
 
     } catch (error) {
-      console.error('Error during simulated account deletion:', error);
+      console.error('Error during conceptual account deletion:', error);
       setNotification(`Account deletion failed: ${error.message || 'Please try again.'}`, 'error');
     } finally {
       setIsProcessingDelete(false);
@@ -3106,7 +3227,7 @@ const SettingsPage = ({ account, setNotification }) => {
         </div>
 
         <div className="p-4 bg-gray-50 rounded-lg shadow-sm">
-          <h3 className="text-xl font-semibold text-primary-blue mb-2">Notification Preferences (Mock)</h3>
+          <h3 className="text-xl font-semibold text-primary-blue mb-2">Notification Preferences</h3>
           <p className="text-lg text-gray-700">Manage how you receive alerts and updates.</p>
           <button className="mt-4 px-6 py-2 bg-gray-400 text-white rounded-md cursor-not-allowed">
             Coming Soon
@@ -3114,7 +3235,7 @@ const SettingsPage = ({ account, setNotification }) => {
         </div>
 
         <div className="p-4 bg-gray-50 rounded-lg shadow-sm">
-          <h3 className="text-xl font-semibold text-primary-blue mb-2">Theme (Mock)</h3>
+          <h3 className="text-xl font-semibold text-primary-blue mb-2">Theme</h3>
           <p className="text-lg text-gray-700">Customize the look and feel of your FreelanceFlow experience.</p>
           <button className="mt-4 px-6 py-2 bg-gray-400 text-white rounded-md cursor-not-allowed">
             Coming Soon
@@ -3129,7 +3250,7 @@ const SettingsPage = ({ account, setNotification }) => {
             className="px-6 py-3 bg-red-600 text-white font-semibold rounded-md hover:bg-red-700 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={!account || isProcessingDelete}
           >
-            {isProcessingDelete ? 'Processing...' : 'Delete Account'}
+            {isProcessingDelete ? 'Processing...' : 'Delete Account (Coming Soon)'}
           </button>
         </div>
       </div>
@@ -3137,7 +3258,7 @@ const SettingsPage = ({ account, setNotification }) => {
       <ConfirmationModal
         isOpen={showDeleteConfirmModal}
         title="Confirm Account Deletion"
-        message="Are you absolutely sure you want to delete your account? This action is irreversible. Please note: Backend deletion logic is NOT implemented in this demo."
+        message="Are you absolutely sure you want to delete your account? This action is irreversible. Please note: Account deletion is a future feature and backend logic is not yet implemented in this demo."
         onConfirm={confirmDeleteAccount}
         onCancel={() => setShowDeleteConfirmModal(false)}
         confirmButtonText="Yes, Delete My Account"
@@ -3155,8 +3276,9 @@ function MainAppContent() {
   const [notification, setNotification] = useState({ message: '', type: '' });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isInfoMenuOpen, setIsInfoMenuOpen] = useState(false);
+  const infoMenuRef = useRef(null); // Ref for the More Info dropdown
   const [searchQuery, setSearchQuery] = useState('');
-  const navigate = useNavigate(); // Now this hook is called inside a component within BrowserRouter
+  const navigate = useNavigate();
 
   // Function to set a notification
   const showNotification = (message, type) => {
@@ -3267,8 +3389,27 @@ function MainAppContent() {
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
-    if (isInfoMenuOpen) setIsInfoMenuOpen(false);
+    if (isInfoMenuOpen) setIsInfoMenuOpen(false); // Close info menu if mobile menu is opened
   };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (infoMenuRef.current && !infoMenuRef.current.contains(event.target)) {
+        setIsInfoMenuOpen(false);
+      }
+    };
+
+    if (isInfoMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    } else {
+      document.removeEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isInfoMenuOpen]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
@@ -3289,15 +3430,15 @@ function MainAppContent() {
             <img src={logo} alt="FreelanceFlow Logo" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 border-white" />
             <span className="text-lg sm:text-2xl font-bold whitespace-nowrap">FreelanceFlow</span>
           </Link>
-          <nav className="hidden md:flex flex-1 justify-between items-center ml-8">
-            <div className="flex items-center gap-x-6 text-lg">
+          <nav className="hidden md:flex flex-1 justify-between items-center ml-4 sm:ml-8"> {/* Adjusted ml */}
+            <div className="flex items-center gap-x-4 lg:gap-x-6 text-lg"> {/* Adjusted gap-x */}
               <Link to="/" className="hover:text-blue-200 transition duration-300 ease-in-out">Home</Link>
               <Link to="/dashboard" className="hover:text-blue-200 transition duration-300 ease-in-out">Dashboard</Link>
               <Link to="/profile" className="hover:text-blue-200 transition duration-300 ease-in-out">Profile</Link>
               <Link to="/post-job" className="hover:text-blue-200 transition duration-300 ease-in-out">Post Job</Link>
               <Link to="/browse-jobs" className="hover:text-blue-200 transition duration-300 ease-in-out">Browse Jobs</Link>
             </div>
-            <div className="flex items-center gap-x-4">
+            <div className="flex items-center gap-x-3 sm:gap-x-4"> {/* Adjusted gap-x */}
               {/* Search Input in Header */}
               <form onSubmit={handleSearchSubmit} className="relative flex items-center">
                 <input
@@ -3305,7 +3446,7 @@ function MainAppContent() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search jobs or users..."
-                  className="pl-4 pr-10 py-2 rounded-full bg-blue-700 text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-white focus:bg-blue-600 transition duration-300 text-sm w-48"
+                  className="pl-4 pr-10 py-2 rounded-full bg-blue-700 text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-white focus:bg-blue-600 transition duration-300 text-sm w-40 sm:w-48"
                 />
                 <button type="submit" className="absolute right-0 top-0 h-full w-10 flex items-center justify-center text-blue-200 hover:text-white">
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -3314,13 +3455,13 @@ function MainAppContent() {
                 </button>
               </form>
 
-              <div className="relative">
+              <div className="relative" ref={infoMenuRef}> {/* Added ref here */}
                 <button
                   onClick={() => setIsInfoMenuOpen(!isInfoMenuOpen)}
-                  className="px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700 transition duration-300 ease-in-out flex items-center"
+                  className="px-3 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700 transition duration-300 ease-in-out flex items-center text-sm sm:text-base"
                 >
                   More Info
-                  <svg className={`ml-2 h-4 w-4 transform transition-transform ${isInfoMenuOpen ? 'rotate-180' : 'rotate-0'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className={`ml-1 sm:ml-2 h-4 w-4 transform transition-transform ${isInfoMenuOpen ? 'rotate-180' : 'rotate-0'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
@@ -3346,7 +3487,7 @@ function MainAppContent() {
               {/* Wallet Connect Button in Header */}
               <button
                 onClick={connectWallet}
-                className="px-4 py-2 bg-accent-green text-white font-semibold rounded-md shadow-lg hover:bg-green-600 transition duration-300 transform hover:scale-105 ml-4"
+                className="px-4 py-2 bg-accent-green text-white font-semibold rounded-md shadow-lg hover:bg-green-600 transition duration-300 transform hover:scale-105 ml-2 sm:ml-4" 
               >
                 {account ? truncateAddress(account) : 'Connect Wallet'}
               </button>

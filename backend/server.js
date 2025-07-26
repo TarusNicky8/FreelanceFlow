@@ -949,6 +949,77 @@ app.put('/api/admin/jobs/:id/update-status', authenticateAdmin, async (req, res)
     }
 });
 
+// NEW ADMIN ENDPOINTS
+
+// Admin: Get total number of registered users
+app.get('/api/admin/users/count', authenticateAdmin, async (req, res) => {
+    try {
+        const userCount = await User.countDocuments();
+        res.json({ count: userCount });
+    } catch (error) {
+        console.error('Error fetching user count for admin:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Admin: Get all registered users
+app.get('/api/admin/users', authenticateAdmin, async (req, res) => {
+    try {
+        const users = await User.find({});
+        res.json(users);
+    } catch (error) {
+        console.error('Error fetching all users for admin:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Admin: Get all withdrawal requests
+app.get('/api/admin/withdrawals', authenticateAdmin, async (req, res) => {
+    try {
+        const withdrawals = await Withdrawal.find({});
+        res.json(withdrawals);
+    } catch (error) {
+        console.error('Error fetching all withdrawals for admin:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Admin: Process a withdrawal request (mark as completed)
+app.put('/api/admin/withdrawals/:id/process', authenticateAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ message: 'Invalid withdrawal ID.' });
+        }
+
+        const withdrawal = await Withdrawal.findById(id);
+        if (!withdrawal) {
+            return res.status(404).json({ message: 'Withdrawal request not found.' });
+        }
+        if (withdrawal.status === 'completed' || withdrawal.status === 'failed') {
+            return res.status(400).json({ message: `Withdrawal request is already ${withdrawal.status}.` });
+        }
+
+        const updatedWithdrawal = await Withdrawal.findByIdAndUpdate(
+            id,
+            {
+                $set: {
+                    status: 'completed', // Mark as completed
+                    processedAt: Date.now(),
+                    // In a real system, you might add a txId from the payment provider here
+                }
+            },
+            { new: true, runValidators: true }
+        );
+
+        res.json(updatedWithdrawal);
+    } catch (error) {
+        console.error('Error processing withdrawal request by admin:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 
 // --- Server Start ---
 const PORT = process.env.PORT || 5000;
