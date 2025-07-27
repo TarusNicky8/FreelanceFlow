@@ -50,7 +50,7 @@ const liskNetwork = {
     name: process.env.NODE_ENV === 'production' ? 'Lisk' : 'Lisk Sepolia Testnet',
     rpcUrls: {
         default: {
-            http: [process.env.NODE_ENV === 'production' ? 'https://rpc.lisk.com' : 'https://rpc.sepolia-api.lisk.com'],
+            http: [process.env.NODE_ENV === 'production' ? 'https://rpc.api.lisk.com' : 'https://rpc.sepolia-api.lisk.com'],
         },
     },
     blockExplorers: {
