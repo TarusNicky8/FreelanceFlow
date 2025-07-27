@@ -1,40 +1,62 @@
-    const hre = require("hardhat");
+// contracts/scripts/deploy.js
 
-    async function main() {
-      const [deployer] = await hre.ethers.getSigners();
-      console.log("Deploying contracts with the account:", deployer.address);
+async function main() {
+  // Get the contract factories
+  const Escrow = await ethers.getContractFactory("Escrow");
 
-      let usdcAddress;
-      // Option 1: Use an existing USDC address from environment variable (e.g., for official testnet USDC)
-      if (process.env.USDC_ADDRESS_TO_USE) {
-        usdcAddress = process.env.USDC_ADDRESS_TO_USE;
-        console.log("Using existing USDC at address:", usdcAddress);
-      } else {
-        // Option 2: Deploy a new Mock USDC contract (common for local development/testing)
-        console.log("Deploying a new Mock USDC contract...");
-        const USDC = await hre.ethers.getContractFactory("USDC");
-        const usdc = await USDC.deploy();
-        await usdc.waitForDeployment();
-        usdcAddress = usdc.target;
-        console.log("Mock USDC deployed to:", usdcAddress);
-      }
+  // Get the current network name from the Hardhat Runtime Environment (hre)
+  const { network } = hre;
+  console.log(`Deploying contracts to ${network.name} network...`);
 
-      // Deploy the Escrow contract, passing the USDC address to its constructor
-      const Escrow = await hre.ethers.getContractFactory("Escrow");
-      const escrow = await Escrow.deploy(usdcAddress);
-      await escrow.waitForDeployment();
+  let usdcTokenAddress;
 
-      console.log("Escrow contract deployed to:", escrow.target);
+  // --- IMPORTANT: Conditional deployment/usage of USDC ---
+  if (network.name === "liskMainnet") {
+    // For Lisk Mainnet, you MUST use the official USDC token address.
+    // This address has been updated with the one you provided.
+    usdcTokenAddress = "0xF242275d3a6527d877f2c927a82D9b057609cc71"; // Official Lisk Mainnet USDC Address
+    console.log(`Using official USDC token at: ${usdcTokenAddress} on Lisk Mainnet.`);
+  } else {
+    // For testnets (like Lisk Sepolia) or local development, deploy a mock USDC.
+    const UsdcMock = await ethers.getContractFactory("USDC_Mock");
+    console.log("Deploying USDC_Mock (for testnet/development)...");
+    const usdcMock = await UsdcMock.deploy();
+    await usdcMock.waitForDeployment();
+    usdcTokenAddress = await usdcMock.getAddress();
+    console.log(`USDC_Mock deployed to: ${usdcTokenAddress}`);
+  }
+  // --- End of USDC handling ---
 
-      // IMPORTANT: Log these addresses clearly to update your backend
-      console.log("\n--- Addresses to update in Vercel Backend Environment Variables ---");
-      console.log("ESCROW_SEPOLIA_CONTRACT_ADDRESS:", escrow.target);
-      console.log("USDC_SEPOLIA_CONTRACT_ADDRESS (for backend if needed):", usdcAddress);
-      console.log("------------------------------------------------------------------");
-    }
+  // Deploy Escrow contract, passing the USDC token address (either mock or real) to its constructor
+  console.log("Deploying Escrow contract...");
+  const escrow = await Escrow.deploy(usdcTokenAddress);
+  await escrow.waitForDeployment();
+  const escrowAddress = await escrow.getAddress();
+  console.log(`Escrow deployed to: ${escrowAddress}`);
 
-    main().catch((error) => {
-      console.error(error);
-      process.exitCode = 1;
-    });
-    
+  console.log(`\nDeployment complete on ${network.name} network!`);
+  console.log("------------------------------------------");
+  console.log(`USDC Token Address used: ${usdcTokenAddress}`); // This will be mock or real
+  console.log(`Escrow Contract Address: ${escrowAddress}`);
+  console.log("------------------------------------------");
+
+  // Optional: Save addresses to a file for easy access
+  const fs = require('fs');
+  const contractsDir = __dirname + '/../contractsData';
+  if (!fs.existsSync(contractsDir)) {
+    fs.mkdirSync(contractsDir);
+  }
+  // Change filename to reflect the deployed network
+  fs.writeFileSync(
+    contractsDir + `/${network.name}-contract-addresses.json`,
+    JSON.stringify({ UsdcToken: usdcTokenAddress, Escrow: escrowAddress }, undefined, 2)
+  );
+  console.log(`Contract addresses saved to ${contractsDir}/${network.name}-contract-addresses.json`);
+}
+
+main()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });

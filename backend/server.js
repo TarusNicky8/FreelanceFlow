@@ -45,17 +45,18 @@ app.use(express.json()); // Middleware to parse JSON request bodies
 // --- Blockchain Configuration ---
 // Determine Lisk network based on environment
 const liskNetwork = {
+    // Corrected to official Lisk Mainnet Chain ID: 1135
     id: process.env.NODE_ENV === 'production' ? 1135 : 4202, // 1135 for Mainnet, 4202 for Sepolia Testnet
-    name: process.env.NODE_ENV === 'production' ? 'Lisk Mainnet' : 'Lisk Sepolia Testnet',
+    name: process.env.NODE_ENV === 'production' ? 'Lisk' : 'Lisk Sepolia Testnet',
     rpcUrls: {
         default: {
-            // Corrected Lisk Sepolia RPC URL for consistency with frontend
             http: [process.env.NODE_ENV === 'production' ? 'https://rpc.lisk.com' : 'https://rpc.sepolia-api.lisk.com'],
         },
     },
     blockExplorers: {
         default: {
-            name: 'Lisk Blockscout',
+            name: process.env.NODE_ENV === 'production' ? 'Lisk Blockscout' : 'Lisk Blockscout',
+            // Corrected to official Lisk Mainnet Block Explorer: https://blockscout.lisk.com
             url: process.env.NODE_ENV === 'production' ? 'https://blockscout.lisk.com/' : 'https://sepolia-blockscout.lisk.com/',
         },
     },
