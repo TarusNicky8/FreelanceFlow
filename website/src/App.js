@@ -3020,15 +3020,15 @@ const CustomerSupport = () => {
         </div>
 
         <div className="p-4 bg-purple-50 rounded-lg shadow-sm">
-          <h3 className="text-xl font-semibold text-secondary-purple mb-2">Join Our Discord Community</h3>
+          <h3 className="text-xl font-semibold text-secondary-purple mb-2">Join Our Telegram Community</h3>
           <p className="text-lg text-gray-700">Connect with other users and get community support:</p>
           <a
-            href="https://discord.gg/7TVd2ZdP9h"
+            href="https://t.me/FreelanceFlowsnet"
             target="_blank"
             rel="noopener noreferrer"
             className="mt-2 inline-block px-6 py-2 bg-secondary-purple text-white rounded-md hover:bg-purple-700 transition duration-300"
           >
-            Join Discord
+            Join Telegram
           </a>
         </div>
 
@@ -3636,7 +3636,7 @@ function MainAppContent() {
                   Your gateway to secure, low-cost USDC payments, empowering African freelancers to thrive globally.
                 </p>
                 <a
-                  href="https://discord.gg/7TVd2ZdP9h"
+                  href="https://t.me/FreelanceFlowsnet"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-block px-10 py-4 bg-white text-secondary-purple font-bold rounded-full shadow-lg hover:bg-gray-100 hover:scale-105 transition duration-300 ease-in-out transform animate-pulse-slow animate-glowing-border"
@@ -3881,8 +3881,8 @@ function MainAppContent() {
                     <a href="https://github.com/TarusNicky8" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition duration-300">
                       <i className="fab fa-github"></i>
                     </a>
-                    <a href="https://discord.gg/7TVd2ZdP9h" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition duration-300">
-                      <i className="fab fa-discord"></i>
+                    <a href="https://t.me/FreelanceFlowsnet" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition duration-300">
+                      <i className="fab fa-telegram"></i>
                     </a>
                     <a href="https://x.com/freelanceflo" target="_blank" rel="noopener noreferrer" className='hover:text-blue-400 transition duration-300'>
                       <i className="fab fa-x"></i>
