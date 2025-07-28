@@ -6,26 +6,23 @@ require('dotenv').config();
 
 const app = express();
 
-// --- Log incoming requests for debugging ---
 app.use((req, res, next) => {
     console.log(`Incoming Request: ${req.method} ${req.url}`);
     console.log(`Request Origin Header: ${req.headers.origin}`);
     next();
 });
 
-// --- CORS Configuration ---
 const allowedOrigins = [
     'https://freelanceflow.net',
     'https://www.freelanceflow.net',
-    'https://freelanceflow-lisk.vercel.app', // Add your Vercel frontend domain
-    'https://freelanceflow-backend-api.vercel.app', // Add your Vercel backend domain (if different)
+    'https://freelanceflow-lisk.vercel.app',
+    'https://freelanceflow-backend-api.vercel.app',
     'http://localhost:3000',
     'http://localhost:5000'
 ];
 
 app.use(cors({
     origin: function (origin, callback) {
-        // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
         if (allowedOrigins.includes(origin)) {
             console.log(`CORS: Origin ${origin} is allowed.`);
@@ -35,18 +32,15 @@ app.use(cors({
         console.error(msg);
         return callback(new Error(msg), false);
     },
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'], // Ensure PATCH is included if used
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Admin-Key'], // Added X-Admin-Key
-    credentials: true // Allow cookies/auth headers to be sent
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Admin-Key'],
+    credentials: true
 }));
 
-app.use(express.json()); // Middleware to parse JSON request bodies
+app.use(express.json());
 
-// --- Blockchain Configuration ---
-// Determine Lisk network based on environment
 const liskNetwork = {
-    // Corrected to official Lisk Mainnet Chain ID: 1135
-    id: process.env.NODE_ENV === 'production' ? 1135 : 4202, // 1135 for Mainnet, 4202 for Sepolia Testnet
+    id: process.env.NODE_ENV === 'production' ? 1135 : 4202,
     name: process.env.NODE_ENV === 'production' ? 'Lisk' : 'Lisk Sepolia Testnet',
     rpcUrls: {
         default: {
@@ -56,14 +50,12 @@ const liskNetwork = {
     blockExplorers: {
         default: {
             name: process.env.NODE_ENV === 'production' ? 'Lisk Blockscout' : 'Lisk Blockscout',
-            // Corrected to official Lisk Mainnet Block Explorer: https://blockscout.lisk.com
             url: process.env.NODE_ENV === 'production' ? 'https://blockscout.lisk.com/' : 'https://sepolia-blockscout.lisk.com/',
         },
     },
     testnet: process.env.NODE_ENV !== 'production',
 };
 
-// Contract Addresses (from .env, specific to network)
 const USDC_CONTRACT_ADDRESS = process.env.NODE_ENV === 'production'
     ? process.env.USDC_MAINNET_CONTRACT_ADDRESS
     : process.env.USDC_SEPOLIA_CONTRACT_ADDRESS;
@@ -72,7 +64,6 @@ const ESCROW_CONTRACT_ADDRESS = process.env.NODE_ENV === 'production'
     ? process.env.ESCROW_MAINNET_CONTRACT_ADDRESS
     : process.env.ESCROW_SEPOLIA_CONTRACT_ADDRESS;
 
-// Initialize Viem public client for blockchain reads
 const publicClient = createPublicClient({
     chain: liskNetwork,
     transport: http(liskNetwork.rpcUrls.default.http[0]),
@@ -83,89 +74,74 @@ console.log(`Using Lisk RPC: ${liskNetwork.rpcUrls.default.http[0]}`);
 console.log(`ESCROW_CONTRACT_ADDRESS: ${ESCROW_CONTRACT_ADDRESS}`);
 console.log(`USDC_CONTRACT_ADDRESS: ${USDC_CONTRACT_ADDRESS}`);
 
-// --- MongoDB Connection ---
 console.log('Attempting to connect to MongoDB with URI:', process.env.MONGO_URI ? 'URI_SET' : 'URI_NOT_SET');
 mongoose.connect(process.env.MONGO_URI, {
-    useNewUrlParser: true, // Deprecated in Mongoose 6+, but harmless
-    useUnifiedTopology: true, // Deprecated in Mongoose 6+, but harmless
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
 })
     .then(() => console.log('MongoDB connected successfully'))
     .catch(err => {
         console.error('MongoDB initial connection error:', err);
-        // Exit process if MongoDB connection fails on startup
         process.exit(1);
     });
 
-// --- Mongoose Schemas ---
-
-// User Schema: Stores freelancer/client profiles
 const userSchema = new mongoose.Schema({
     address: { type: String, required: true, unique: true, lowercase: true },
     role: { type: String, enum: ['freelancer', 'client', 'both'], default: 'freelancer' },
     skills: [String],
     portfolio: [String],
-    rating: { type: Number, default: 0, min: 0, max: 5 }, // Average rating from 0-5
-    totalRatingSum: { type: Number, default: 0 }, // Sum of all ratings received
-    totalRatingsCount: { type: Number, default: 0 }, // Number of ratings received
+    rating: { type: Number, default: 0, min: 0, max: 5 },
+    totalRatingSum: { type: Number, default: 0 },
+    totalRatingsCount: { type: Number, default: 0 },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
 });
-// Update 'updatedAt' timestamp on save and update operations
 userSchema.pre('save', function (next) { this.updatedAt = Date.now(); next(); });
 userSchema.pre('findOneAndUpdate', function (next) { this.set({ updatedAt: Date.now() }); next(); });
 
-// Job Schema: Stores job listings and their state
 const jobSchema = new mongoose.Schema({
     title: { type: String, required: true },
     description: { type: String, required: true },
-    amount: { type: Number, required: true, min: 0 }, // Amount in USDC (human-readable, e.g., 100)
-    client: { type: String, required: true, lowercase: true }, // Client's wallet address
-    freelancer: { type: String, default: null, lowercase: true }, // Freelancer's wallet address (null if unassigned)
-    
-    // Main status for the job workflow
+    amount: { type: Number, required: true, min: 0 },
+    client: { type: String, required: true, lowercase: true },
+    freelancer: { type: String, default: null, lowercase: true },
     status: {
         type: String,
         enum: ['open', 'pending-client-approval', 'in-progress', 'completed', 'disputed', 'cancelled'],
         default: 'open'
     },
-    // On-chain escrow status (reflects smart contract state)
     escrowStatus: {
         type: String,
         enum: ['pending-deposit', 'deposited', 'active', 'released', 'refunded', 'disputed'],
-        default: 'pending-deposit' // Initial state: job posted, waiting for client to deposit funds
+        default: 'pending-deposit'
     },
-    clientApprovedFreelancer: { type: Boolean, default: false }, // Client explicitly approved freelancer after acceptance
-
-    depositTxHash: { type: String, default: null }, // Transaction hash for the initial escrow deposit
-    completionTxHash: { type: String, default: null }, // Transaction hash for fund release
+    clientApprovedFreelancer: { type: Boolean, default: false },
+    depositTxHash: { type: String, default: null },
+    completionTxHash: { type: String, default: null },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
-    // --- NEW FIELDS FOR JOB APPLICATION AND MESSAGING ---
-    applicants: [ // Array of objects for job applicants
+    applicants: [
       {
-        address: { type: String, required: true, lowercase: true }, // Wallet address of the applicant
+        address: { type: String, required: true, lowercase: true },
         timestamp: { type: Date, default: Date.now },
       }
     ],
-    messages: [ // Array of objects for in-app messages
+    messages: [
       {
-        sender: { type: String, required: true, lowercase: true }, // Wallet address of the sender
+        sender: { type: String, required: true, lowercase: true },
         text: { type: String, required: true },
         timestamp: { type: Date, default: Date.now },
       }
     ],
-    requiredSkills: [{ type: String }], // Array of strings for skills required for the job
-    // New field to track if the freelancer has been rated for this job
+    requiredSkills: [{ type: String }],
     rated: { type: Boolean, default: false }
 });
-// Update 'updatedAt' timestamp on save and update operations
 jobSchema.pre('save', function (next) { this.updatedAt = Date.now(); next(); });
 jobSchema.pre('findOneAndUpdate', function (next) { this.set({ updatedAt: Date.now() }); next(); });
 
-// Dispute Schema: Records disputes for jobs
 const disputeSchema = new mongoose.Schema({
-    jobId: { type: mongoose.Schema.Types.ObjectId, ref: 'Job', required: true }, // Reference to the disputed job
-    reporterAddress: { type: String, required: true, lowercase: true }, // Address of the user who reported the dispute
+    jobId: { type: mongoose.Schema.Types.ObjectId, ref: 'Job', required: true },
+    reporterAddress: { type: String, required: true, lowercase: true },
     reason: { type: String, required: true },
     status: { type: String, enum: ['open', 'under-review', 'resolved', 'closed'], default: 'open' },
     reportedAt: { type: Date, default: Date.now },
@@ -173,45 +149,32 @@ const disputeSchema = new mongoose.Schema({
     resolutionDetails: { type: String, default: null },
 });
 
-// Withdrawal Schema: Records withdrawal requests (UPDATED FOR MOBILE MONEY)
 const withdrawalSchema = new mongoose.Schema({
     requestorAddress: { type: String, required: true, lowercase: true },
     usdcAmount: { type: Number, required: true, min: 0 },
-    
-    // New fields for mobile money / fiat off-ramp
-    country: { type: String, required: true }, // e.g., 'KE', 'NG', 'ZA'
-    mobileMoneyNetwork: { type: String, required: true }, // e.g., 'M-Pesa', 'MTN Mobile Money'
-    mobilePhoneNumber: { type: String, required: true }, // User's mobile phone number
-    
+    country: { type: String, required: true },
+    mobileMoneyNetwork: { type: String, required: true },
+    mobilePhoneNumber: { type: String, required: true },
     status: { type: String, enum: ['pending', 'processing', 'completed', 'failed'], default: 'pending' },
     requestedAt: { type: Date, default: Date.now },
     processedAt: { type: Date, default: null },
-    txId: { type: String, default: null }, // Transaction ID from fiat on/off-ramp provider (if applicable)
+    txId: { type: String, default: null },
 });
-
 
 const User = mongoose.model('User', userSchema);
 const Job = mongoose.model('Job', jobSchema);
 const Dispute = mongoose.model('Dispute', disputeSchema);
 const Withdrawal = mongoose.model('Withdrawal', withdrawalSchema);
 
-// --- Admin Authentication Middleware (Placeholder) ---
-// IMPORTANT: Replace this with a robust authentication and authorization mechanism for production.
-// This is a simple check for an X-Admin-Key header.
 const authenticateAdmin = (req, res, next) => {
     const adminKey = req.headers['x-admin-key'];
-    // In a real app, you would compare this to a securely stored environment variable
-    // or validate a JWT token, or check against a whitelist of admin addresses.
-    if (adminKey === process.env.ADMIN_SECRET_KEY) { // Replace with your actual admin key in .env
+    if (adminKey === process.env.ADMIN_SECRET_KEY) {
         next();
     } else {
         res.status(403).json({ error: 'Forbidden: Admin access required.' });
     }
 };
 
-// --- API Routes ---
-
-// User Routes
 app.post('/api/users', async (req, res) => {
     try {
         const user = new User(req.body);
@@ -247,16 +210,14 @@ app.put('/api/users/:address', async (req, res) => {
     }
 });
 
-// Job Routes
 app.post('/api/jobs', async (req, res) => {
     try {
         const jobData = {
             ...req.body,
             client: req.body.client.toLowerCase(),
-            status: 'open', // Job is open for freelancers to accept
-            escrowStatus: 'pending-deposit', // Initial state, client needs to fund escrow
-            // Ensure requiredSkills is passed if present in req.body
-            requiredSkills: req.body.requiredSkills || [], // Initialize as empty array if not provided
+            status: 'open',
+            escrowStatus: 'pending-deposit',
+            requiredSkills: req.body.requiredSkills || [],
         };
         const job = new Job(jobData);
         await job.save();
@@ -269,7 +230,6 @@ app.post('/api/jobs', async (req, res) => {
 
 app.get('/api/jobs', async (req, res) => {
     try {
-        // Allow filtering by status, escrowStatus, and skills
         const queryFilter = {};
         if (req.query.status) {
             queryFilter.status = req.query.status;
@@ -280,9 +240,6 @@ app.get('/api/jobs', async (req, res) => {
         if (req.query.skills) {
             const skillArray = req.query.skills.split(',').map(s => s.trim()).filter(s => s !== '');
             if (skillArray.length > 0) {
-                // Use $in to find jobs that require ANY of the specified skills
-                // Using $all for jobs that require ALL specified skills: queryFilter.requiredSkills = { $all: skillArray };
-                // Using $in for jobs that require ANY specified skills:
                 queryFilter.requiredSkills = { $in: skillArray };
             }
         }
@@ -306,7 +263,6 @@ app.get('/api/jobs/:id', async (req, res) => {
     }
 });
 
-// NEW: Endpoint to get jobs for a specific user (client or freelancer)
 app.get('/api/jobs/forUser/:address', async (req, res) => {
     try {
         const userAddress = req.params.address.toLowerCase();
@@ -314,7 +270,7 @@ app.get('/api/jobs/forUser/:address', async (req, res) => {
             $or: [
                 { client: userAddress },
                 { freelancer: userAddress },
-                { "applicants.address": userAddress } // Also include jobs where user is an applicant
+                { "applicants.address": userAddress }
             ]
         });
         res.json(jobs);
@@ -324,8 +280,6 @@ app.get('/api/jobs/forUser/:address', async (req, res) => {
     }
 });
 
-
-// Generic PUT for updating job details. Specific actions below.
 app.put('/api/jobs/:id', async (req, res) => {
     try {
         const updateData = { ...req.body };
@@ -341,25 +295,21 @@ app.put('/api/jobs/:id', async (req, res) => {
     }
 });
 
-// NEW: Endpoint to confirm on-chain deposit for a job
 app.put('/api/jobs/:id/deposit-confirmed', async (req, res) => {
     try {
         const job = await Job.findById(req.params.id);
         if (!job) return res.status(404).json({ error: 'Job not found' });
 
-        // Ensure only the client can confirm deposit
         if (job.client.toLowerCase() !== req.body.clientAddress.toLowerCase()) {
             return res.status(403).json({ error: 'Unauthorized: Only the client can confirm deposit.' });
         }
 
-        // Update job status and escrow status
         const updatedJob = await Job.findByIdAndUpdate(
             req.params.id,
             {
                 $set: {
                     escrowStatus: 'deposited',
-                    // For now, it stays 'open' until accepted by freelancer.
-                    depositTxHash: req.body.depositTxHash // Store the transaction hash
+                    depositTxHash: req.body.depositTxHash
                 }
             },
             { new: true, runValidators: true }
@@ -371,8 +321,6 @@ app.put('/api/jobs/:id/deposit-confirmed', async (req, res) => {
     }
 });
 
-
-// NEW: POST /api/jobs/:id/apply - Freelancer applies for a job
 app.post('/api/jobs/:id/apply', async (req, res) => {
   try {
     const { id } = req.params;
@@ -393,7 +341,7 @@ app.post('/api/jobs/:id/apply', async (req, res) => {
       return res.status(409).json({ message: 'You have already applied for this job.' });
     }
 
-    job.applicants.push({ address: applicantAddress.toLowerCase() }); // Store address in lowercase
+    job.applicants.push({ address: applicantAddress.toLowerCase() });
     await job.save();
     res.status(200).json({ message: 'Application submitted successfully.', job });
   } catch (error) {
@@ -402,7 +350,6 @@ app.post('/api/jobs/:id/apply', async (req, res) => {
   }
 });
 
-// NEW: PUT /api/jobs/:id/approve-applicant - Client approves an applicant
 app.put('/api/jobs/:id/approve-applicant', async (req, res) => {
   try {
     const { id } = req.params;
@@ -419,21 +366,18 @@ app.put('/api/jobs/:id/approve-applicant', async (req, res) => {
     if (job.client.toLowerCase() !== clientAddress.toLowerCase()) {
       return res.status(403).json({ message: 'Unauthorized: Only the client can approve applicants for this job.' });
     }
-    // Job must be open and funded for client to approve an applicant
     if (job.status !== 'open' || job.escrowStatus !== 'deposited') {
         return res.status(400).json({ message: 'Job is not open for applicant approval or not funded.' });
     }
     if (!job.applicants.some(app => app.address.toLowerCase() === freelancerAddress.toLowerCase())) {
       return res.status(404).json({ message: 'Applicant not found for this job.' });
     }
-    if (job.freelancer) { // If a freelancer is already assigned, prevent approving another
+    if (job.freelancer) {
         return res.status(400).json({ message: 'A freelancer is already assigned to this job. Reject them first if you wish to approve another.' });
     }
 
-
-    job.freelancer = freelancerAddress.toLowerCase(); // Assign freelancer
-    job.status = 'pending-client-approval'; // Freelancer needs to accept this assignment
-    // Remove approved freelancer from applicants list
+    job.freelancer = freelancerAddress.toLowerCase();
+    job.status = 'pending-client-approval';
     job.applicants = job.applicants.filter(app => app.address.toLowerCase() !== freelancerAddress.toLowerCase());
     await job.save();
     res.status(200).json({ message: 'Applicant approved successfully.', job });
@@ -443,11 +387,10 @@ app.put('/api/jobs/:id/approve-applicant', async (req, res) => {
   }
 });
 
-// NEW: PUT /api/jobs/:id/reject-applicant - Client rejects an applicant
 app.put('/api/jobs/:id/reject-applicant', async (req, res) => {
   try {
     const { id } = req.params;
-    const { clientAddress, freelancerAddress } = req.body; // freelancerAddress here is the applicant to reject
+    const { clientAddress, freelancerAddress } = req.body;
 
     if (!clientAddress || !freelancerAddress || !mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: 'Invalid job ID, client address, or applicant address.' });
@@ -460,7 +403,6 @@ app.put('/api/jobs/:id/reject-applicant', async (req, res) => {
     if (job.client.toLowerCase() !== clientAddress.toLowerCase()) {
       return res.status(403).json({ message: 'Unauthorized: Only the client can reject applicants for this job.' });
     }
-    // Job must be open and funded for client to reject an applicant
     if (job.status !== 'open' || job.escrowStatus !== 'deposited') {
         return res.status(400).json({ message: 'Job is not open for applicant rejection or not funded.' });
     }
@@ -477,7 +419,6 @@ app.put('/api/jobs/:id/reject-applicant', async (req, res) => {
   }
 });
 
-// NEW: PUT /api/jobs/:id/accept-assigned - Freelancer accepts the job after client approval
 app.put('/api/jobs/:id/accept-assigned', async (req, res) => {
   try {
     const { id } = req.params;
@@ -491,7 +432,7 @@ app.put('/api/jobs/:id/accept-assigned', async (req, res) => {
     if (!job) {
       return res.status(404).json({ message: 'Job not found.' });
     }
-    if (!job.freelancer || job.freelancer.toLowerCase() !== freelancerAddress.toLowerCase()) { // Ensure they are the assigned freelancer
+    if (!job.freelancer || job.freelancer.toLowerCase() !== freelancerAddress.toLowerCase()) {
       return res.status(403).json({ message: 'You are not the assigned freelancer for this job.' });
     }
     if (job.status !== 'pending-client-approval') {
@@ -507,8 +448,6 @@ app.put('/api/jobs/:id/accept-assigned', async (req, res) => {
   }
 });
 
-
-// NEW: Endpoint for freelancer to mark job as completed
 app.put('/api/jobs/:id/mark-completed', async (req, res) => {
     try {
         const { freelancerAddress } = req.body;
@@ -526,7 +465,7 @@ app.put('/api/jobs/:id/mark-completed', async (req, res) => {
             req.params.id,
             {
                 $set: {
-                    status: 'completed' // Mark as completed (client still needs to release funds)
+                    status: 'completed'
                 }
             },
             { new: true, runValidators: true }
@@ -538,14 +477,11 @@ app.put('/api/jobs/:id/mark-completed', async (req, res) => {
     }
 });
 
-
-// NEW: Endpoint to confirm on-chain fund release for a job
 app.put('/api/jobs/:id/release-confirmed', async (req, res) => {
     try {
         const job = await Job.findById(req.params.id);
         if (!job) return res.status(404).json({ error: 'Job not found' });
 
-        // Ensure only the client can confirm release (or an admin)
         if (job.client.toLowerCase() !== req.body.clientAddress.toLowerCase()) {
             return res.status(403).json({ error: 'Unauthorized: Only the client can confirm fund release.' });
         }
@@ -554,8 +490,8 @@ app.put('/api/jobs/:id/release-confirmed', async (req, res) => {
             req.params.id,
             {
                 $set: {
-                    escrowStatus: 'released', // On-chain escrow status
-                    completionTxHash: req.body.completionTxHash // Store the transaction hash
+                    escrowStatus: 'released',
+                    completionTxHash: req.body.completionTxHash
                 }
             },
             { new: true, runValidators: true }
@@ -567,13 +503,11 @@ app.put('/api/jobs/:id/release-confirmed', async (req, res) => {
     }
 });
 
-// NEW: Endpoint to confirm on-chain refund for a job
 app.put('/api/jobs/:id/refund-confirmed', async (req, res) => {
     try {
         const job = await Job.findById(req.params.id);
         if (!job) return res.status(404).json({ error: 'Job not found' });
 
-        // Ensure only the client can confirm refund (or an admin)
         if (job.client.toLowerCase() !== req.body.clientAddress.toLowerCase()) {
             return res.status(403).json({ error: 'Unauthorized: Only the client can confirm refund.' });
         }
@@ -582,8 +516,8 @@ app.put('/api/jobs/:id/refund-confirmed', async (req, res) => {
             req.params.id,
             {
                 $set: {
-                    escrowStatus: 'refunded', // On-chain escrow status
-                    status: 'cancelled' // Job is cancelled after refund
+                    escrowStatus: 'refunded',
+                    status: 'cancelled'
                 }
             },
             { new: true, runValidators: true }
@@ -595,15 +529,13 @@ app.put('/api/jobs/:id/refund-confirmed', async (req, res) => {
     }
 });
 
-
-// Get total general deposits for an account (from smart contract)
 app.get('/api/deposits/total/:account', async (req, res) => {
     try {
         const addressToCheck = req.params.account;
         const escrowAbiForGeneralDeposits = [
             {
                 inputs: [{ internalType: 'address', name: '', type: 'address' }],
-                name: 'generalDeposits', // Changed to generalDeposits
+                name: 'generalDeposits',
                 outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
                 stateMutability: 'view',
                 type: 'function',
@@ -617,7 +549,7 @@ app.get('/api/deposits/total/:account', async (req, res) => {
             args: [addressToCheck],
         });
 
-        const totalDeposits = formatUnits(depositBigInt, 6); // USDC uses 6 decimals
+        const totalDeposits = formatUnits(depositBigInt, 6);
         res.json({ totalDeposits });
     } catch (error) {
         console.error('Error fetching total general deposits:', error);
@@ -625,13 +557,11 @@ app.get('/api/deposits/total/:account', async (req, res) => {
     }
 });
 
-// Disputes
 app.post('/api/disputes', async (req, res) => {
     try {
         const disputeData = { ...req.body, reporterAddress: req.body.reporterAddress.toLowerCase() };
         const dispute = new Dispute(disputeData);
         await dispute.save();
-        // Update job status to 'disputed' in MongoDB
         await Job.findByIdAndUpdate(dispute.jobId, { status: 'disputed', escrowStatus: 'disputed' });
         res.status(201).json(dispute);
     } catch (error) {
@@ -640,16 +570,15 @@ app.post('/api/disputes', async (req, res) => {
     }
 });
 
-// Withdrawals (UPDATED TO ACCEPT NEW FIELDS)
 app.post('/api/withdrawals', async (req, res) => {
     try {
         const withdrawalData = {
             requestorAddress: req.body.requestorAddress.toLowerCase(),
             usdcAmount: req.body.usdcAmount,
-            country: req.body.country, // New field
-            mobileMoneyNetwork: req.body.mobileMoneyNetwork, // New field
-            mobilePhoneNumber: req.body.mobilePhoneNumber, // New field
-            status: 'pending', // Default status
+            country: req.body.country,
+            mobileMoneyNetwork: req.body.mobileMoneyNetwork,
+            mobilePhoneNumber: req.body.mobilePhoneNumber,
+            status: 'pending',
         };
         const withdrawal = new Withdrawal(withdrawalData);
         await withdrawal.save();
@@ -660,7 +589,6 @@ app.post('/api/withdrawals', async (req, res) => {
     }
 });
 
-// NEW: POST /api/jobs/:id/messages - Send a message for a job
 app.post('/api/jobs/:id/messages', async (req, res) => {
   try {
     const { id } = req.params;
@@ -675,7 +603,6 @@ app.post('/api/jobs/:id/messages', async (req, res) => {
       return res.status(404).json({ message: 'Job not found.' });
     }
 
-    // Ensure only client or assigned freelancer can send messages
     const isAuthorized = job.client.toLowerCase() === sender.toLowerCase() ||
                          (job.freelancer && job.freelancer.toLowerCase() === sender.toLowerCase());
 
@@ -683,17 +610,16 @@ app.post('/api/jobs/:id/messages', async (req, res) => {
       return res.status(403).json({ message: 'Only the client or assigned freelancer can send messages for this job.' });
     }
 
-    const newMessage = { sender: sender.toLowerCase(), text }; // Store sender in lowercase
+    const newMessage = { sender: sender.toLowerCase(), text };
     job.messages.push(newMessage);
     await job.save();
-    res.status(201).json(newMessage); // Return the newly added message
+    res.status(201).json(newMessage);
   } catch (error) {
     console.error('Error sending message:', error);
     res.status(500).json({ message: error.message });
   }
 });
 
-// NEW: GET /api/jobs/:id/messages - Get all messages for a job
 app.get('/api/jobs/:id/messages', async (req, res) => {
   try {
     const { id } = req.params;
@@ -701,7 +627,7 @@ app.get('/api/jobs/:id/messages', async (req, res) => {
       return res.status(400).json({ message: 'Invalid job ID.' });
     }
 
-    const job = await Job.findById(id).select('messages'); // Only fetch messages
+    const job = await Job.findById(id).select('messages');
     if (!job) {
       return res.status(404).json({ message: 'Job not found.' });
     }
@@ -712,7 +638,6 @@ app.get('/api/jobs/:id/messages', async (req, res) => {
   }
 });
 
-// NEW: PUT /api/jobs/:id/rate-freelancer - Client rates the freelancer for a job
 app.put('/api/jobs/:id/rate-freelancer', async (req, res) => {
     try {
         const { id } = req.params;
@@ -739,21 +664,18 @@ app.put('/api/jobs/:id/rate-freelancer', async (req, res) => {
             return res.status(400).json({ message: 'Freelancer has already been rated for this job.' });
         }
 
-        // Update the job to mark it as rated
         job.rated = true;
         await job.save();
 
-        // Find the freelancer's user profile
         const freelancerUser = await User.findOne({ address: freelancerAddress.toLowerCase() });
         if (!freelancerUser) {
             console.warn(`Freelancer user profile not found for address: ${freelancerAddress}. Cannot update rating.`);
             return res.status(404).json({ message: 'Freelancer profile not found to update rating.' });
         }
 
-        // Update totalRatingSum and totalRatingsCount
         freelancerUser.totalRatingSum += rating;
         freelancerUser.totalRatingsCount += 1;
-        freelancerUser.rating = (freelancerUser.totalRatingSum / freelancerUser.totalRatingsCount).toFixed(1); // Calculate new average
+        freelancerUser.rating = (freelancerUser.totalRatingSum / freelancerUser.totalRatingsCount).toFixed(1);
 
         await freelancerUser.save();
 
@@ -764,14 +686,13 @@ app.put('/api/jobs/:id/rate-freelancer', async (req, res) => {
     }
 });
 
-// --- NEW SEARCH ENDPOINTS ---
 app.get('/api/search/jobs', async (req, res) => {
     try {
         const searchTerm = req.query.query;
         if (!searchTerm) {
             return res.status(400).json({ error: 'Search query is required.' });
         }
-        const regex = new RegExp(searchTerm, 'i'); // Case-insensitive search
+        const regex = new RegExp(searchTerm, 'i');
 
         const jobs = await Job.find({
             $or: [
@@ -792,7 +713,7 @@ app.get('/api/search/users', async (req, res) => {
         if (!searchTerm) {
             return res.status(400).json({ error: 'Search query is required.' });
         }
-        const regex = new RegExp(searchTerm, 'i'); // Case-insensitive search
+        const regex = new RegExp(searchTerm, 'i');
 
         const users = await User.find({
             $or: [
@@ -808,16 +729,9 @@ app.get('/api/search/users', async (req, res) => {
     }
 });
 
-
-// --- ADMIN ROUTES ---
-// All admin routes should be protected by the authenticateAdmin middleware
-// You will need to set process.env.ADMIN_SECRET_KEY in your .env file for this to work.
-// Example: ADMIN_SECRET_KEY=your_super_secret_admin_key_here
-
-// Get all disputes (for admin review)
 app.get('/api/admin/disputes', authenticateAdmin, async (req, res) => {
     try {
-        const disputes = await Dispute.find({}).populate('jobId'); // Populate job details
+        const disputes = await Dispute.find({}).populate('jobId');
         res.json(disputes);
     } catch (error) {
         console.error('Error fetching disputes for admin:', error);
@@ -825,11 +739,10 @@ app.get('/api/admin/disputes', authenticateAdmin, async (req, res) => {
     }
 });
 
-// Admin resolves a dispute
 app.put('/api/admin/disputes/:id/resolve', authenticateAdmin, async (req, res) => {
     try {
         const { id } = req.params;
-        const { resolutionDetails, jobStatus, escrowStatus } = req.body; // Admin can specify outcome
+        const { resolutionDetails, jobStatus, escrowStatus } = req.body;
 
         if (!mongoose.Types.ObjectId.isValid(id)) {
             return res.status(400).json({ message: 'Invalid dispute ID.' });
@@ -854,7 +767,6 @@ app.put('/api/admin/disputes/:id/resolve', authenticateAdmin, async (req, res) =
             { new: true, runValidators: true }
         );
 
-        // Optionally update the associated job's status and escrow status based on resolution
         if (jobStatus || escrowStatus) {
             const jobUpdate = {};
             if (jobStatus) jobUpdate.status = jobStatus;
@@ -869,11 +781,10 @@ app.put('/api/admin/disputes/:id/resolve', authenticateAdmin, async (req, res) =
     }
 });
 
-// Admin closes a dispute (e.g., no action needed, or invalid)
 app.put('/api/admin/disputes/:id/close', authenticateAdmin, async (req, res) => {
     try {
         const { id } = req.params;
-        const { resolutionDetails } = req.body; // Optional details for closing
+        const { resolutionDetails } = req.body;
 
         if (!mongoose.Types.ObjectId.isValid(id)) {
             return res.status(400).json({ message: 'Invalid dispute ID.' });
@@ -905,7 +816,6 @@ app.put('/api/admin/disputes/:id/close', authenticateAdmin, async (req, res) => 
     }
 });
 
-// Admin can manually update a job's status and escrow status (for dispute outcomes, etc.)
 app.put('/api/admin/jobs/:id/update-status', authenticateAdmin, async (req, res) => {
     try {
         const { id } = req.params;
@@ -950,9 +860,6 @@ app.put('/api/admin/jobs/:id/update-status', authenticateAdmin, async (req, res)
     }
 });
 
-// NEW ADMIN ENDPOINTS
-
-// Admin: Get total number of registered users
 app.get('/api/admin/users/count', authenticateAdmin, async (req, res) => {
     try {
         const userCount = await User.countDocuments();
@@ -963,7 +870,6 @@ app.get('/api/admin/users/count', authenticateAdmin, async (req, res) => {
     }
 });
 
-// Admin: Get all registered users
 app.get('/api/admin/users', authenticateAdmin, async (req, res) => {
     try {
         const users = await User.find({});
@@ -974,7 +880,6 @@ app.get('/api/admin/users', authenticateAdmin, async (req, res) => {
     }
 });
 
-// Admin: Get all withdrawal requests
 app.get('/api/admin/withdrawals', authenticateAdmin, async (req, res) => {
     try {
         const withdrawals = await Withdrawal.find({});
@@ -985,7 +890,6 @@ app.get('/api/admin/withdrawals', authenticateAdmin, async (req, res) => {
     }
 });
 
-// Admin: Process a withdrawal request (mark as completed)
 app.put('/api/admin/withdrawals/:id/process', authenticateAdmin, async (req, res) => {
     try {
         const { id } = req.params;
@@ -1006,9 +910,8 @@ app.put('/api/admin/withdrawals/:id/process', authenticateAdmin, async (req, res
             id,
             {
                 $set: {
-                    status: 'completed', // Mark as completed
+                    status: 'completed',
                     processedAt: Date.now(),
-                    // In a real system, you might add a txId from the payment provider here
                 }
             },
             { new: true, runValidators: true }
@@ -1021,11 +924,7 @@ app.put('/api/admin/withdrawals/:id/process', authenticateAdmin, async (req, res
     }
 });
 
-
-// --- Server Start ---
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
-// --- EXPORT THE APP DIRECTLY for Vercel Serverless Function compatibility ---
-// This is crucial for Vercel to pick up your Express app correctly when deployed from a subdirectory.
 module.exports = app;

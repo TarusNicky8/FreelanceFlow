@@ -1,8 +1,7 @@
-// index.js
-const app = require('./server'); // Import your Express app from server.js
 
-// Vercel sets the PORT environment variable.
-// Use 5000 as a fallback for local development.
+const app = require('./server'); 
+
+
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {

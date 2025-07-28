@@ -1,13 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { createWalletClient, custom, parseUnits, encodeFunctionData, createPublicClient, http, formatUnits } from 'viem';
-import { isAddress } from 'viem';
 import { getAddress } from 'viem';
 
 import logo from './App icon.svg';
 
-// Function to truncate address for display
 const truncateAddress = (address) => {
   if (!address) return '';
   return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
@@ -32,9 +30,6 @@ const liskSepolia = {
   testnet: true,
 };
 
-// --- ABIs for USDC and Escrow Contracts ---
-
-// USDC ABI (only approve and balanceOf needed for this app)
 const usdcAbi = [
   {
     "inputs": [
@@ -57,9 +52,7 @@ const usdcAbi = [
   }
 ];
 
-// Escrow Contract ABI (updated for job-specific functions)
 const escrowAbi = [
-  // General Deposit
   {
     "inputs": [
       { "internalType": "uint256", "name": "amount", "type": "uint256" }
@@ -69,7 +62,6 @@ const escrowAbi = [
     "stateMutability": "nonpayable",
     "type": "function"
   },
-  // Job-specific Deposit
   {
     "inputs": [
       { "internalType": "string", "name": "_jobId", "type": "string" },
@@ -82,7 +74,6 @@ const escrowAbi = [
     "stateMutability": "nonpayable",
     "type": "function"
   },
-  // Job-specific Release
   {
     "inputs": [
       { "internalType": "string", "name": "_jobId", "type": "string" }
@@ -92,7 +83,6 @@ const escrowAbi = [
     "stateMutability": "nonpayable",
     "type": "function"
   },
-  // Job-specific Refund
   {
     "inputs": [
       { "internalType": "string", "name": "_jobId", "type": "string" }
@@ -102,7 +92,6 @@ const escrowAbi = [
     "stateMutability": "nonpayable",
     "type": "function"
   },
-  // Get Job Escrow Details (view function)
   {
     "inputs": [
       { "internalType": "string", "name": "_jobId", "type": "string" }
@@ -112,12 +101,11 @@ const escrowAbi = [
       { "internalType": "address", "name": "client", "type": "address" },
       { "internalType": "address", "name": "freelancer", "type": "address" },
       { "internalType": "uint256", "name": "amount", "type": "uint256" },
-      { "internalType": "uint8", "name": "status", "type": "uint8" } // EscrowStatus enum is uint8
+      { "internalType": "uint8", "name": "status", "type": "uint8" }
     ],
     "stateMutability": "view",
     "type": "function"
   },
-  // General Deposits mapping (for Dashboard total)
   {
     "inputs": [{ "internalType": "address", "name": "", "type": "address" }],
     "name": "generalDeposits",
@@ -127,14 +115,11 @@ const escrowAbi = [
   }
 ];
 
-// Contract Addresses (UPDATED AS PER YOUR DEPLOYMENT LOG)
 const usdcContractAddress = '0xF242275d3a6527d877f2c927a82D9b057609cc71';
 const escrowContractAddress = '0x44e58cA9A3597d3f050322F167f29396d7c84F0a';
 
-// Backend API Base URL (from environment variable, or fallback to localhost for local dev)
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
 
-// --- Icon Components ---
 const UsdcIcon = () => (
   <img src={process.env.PUBLIC_URL + '/icons/usdc.png'} alt="USDC Icon" className="h-14 w-14 text-blue-600 mb-4 mx-auto" />
 );
@@ -145,7 +130,6 @@ const LiskIcon = () => (
   <img src={process.env.PUBLIC_URL + '/icons/lisk.webp'} alt="Lisk Icon" className="h-14 w-14 text-lisk-blue mb-4 mx-auto" />
 );
 
-// --- Notification Component (Simple Toast) ---
 const Notification = ({ message, type, onClose }) => {
   if (!message) return null;
 
@@ -162,7 +146,6 @@ const Notification = ({ message, type, onClose }) => {
   );
 };
 
-// --- Confirmation Modal Component ---
 const ConfirmationModal = ({ isOpen, title, message, onConfirm, onCancel, confirmButtonText, cancelButtonText, isProcessing, children }) => {
   if (!isOpen) return null;
 
@@ -171,7 +154,7 @@ const ConfirmationModal = ({ isOpen, title, message, onConfirm, onCancel, confir
       <div className="bg-white p-8 rounded-lg shadow-xl max-w-md w-full text-center">
         <h3 className="text-2xl font-bold text-primary-blue mb-4">{title}</h3>
         <p className="text-lg text-gray-700 mb-6">{message}</p>
-        {children} {/* Render children (e.g., additional form elements) here */}
+        {children}
         <div className="flex justify-center space-x-4 mt-6">
           <button
             onClick={onConfirm}
@@ -193,15 +176,28 @@ const ConfirmationModal = ({ isOpen, title, message, onConfirm, onCancel, confir
   );
 };
 
+const ProcessWithdrawalModal = ({ isOpen, title, message, onConfirm, onCancel, confirmButtonText, isProcessing }) => {
+  return (
+    <ConfirmationModal
+      isOpen={isOpen}
+      title={title}
+      message={message}
+      onConfirm={onConfirm}
+      onCancel={onCancel}
+      confirmButtonText={confirmButtonText}
+      cancelButtonText="Cancel"
+      isProcessing={isProcessing}
+    />
+  );
+};
 
-// --- DivviIntegration Component (Now uses depositGeneral) ---
+
 const DivviIntegration = ({ account, walletClient, publicClient, setNotification }) => {
   const [userUsdcBalance, setUserUsdcBalance] = useState(0);
   const [amountToDeposit, setAmountToDeposit] = useState('100');
   const [isProcessingTx, setIsProcessingTx] = useState(false);
-  const [showConfirmModal, setShowConfirmModal] = useState(false); // For confirmation modal
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
-  // Fetch user's USDC balance
   useEffect(() => {
     const fetchUsdcBalance = async () => {
       if (account && publicClient) {
@@ -224,7 +220,7 @@ const DivviIntegration = ({ account, walletClient, publicClient, setNotification
     };
 
     fetchUsdcBalance();
-  }, [account, publicClient, usdcContractAddress, setNotification]); // Re-fetch when account or publicClient changes
+  }, [account, publicClient, setNotification]);
 
   const handleDepositUSDCGeneral = async () => {
     if (!account || !walletClient || !publicClient) {
@@ -241,7 +237,6 @@ const DivviIntegration = ({ account, walletClient, publicClient, setNotification
       return;
     }
 
-    // --- Chain Mismatch Check ---
     try {
       const currentChainId = await walletClient.getChainId();
       if (currentChainId !== liskSepolia.id) {
@@ -249,7 +244,7 @@ const DivviIntegration = ({ account, walletClient, publicClient, setNotification
         try {
           await walletClient.switchChain({ id: liskSepolia.id });
           setNotification(`Successfully prompted to switch to ${liskSepolia.name}. Please confirm in your wallet and try the deposit again.`, 'info');
-          return; // Exit and let user retry after chain switch
+          return;
         } catch (switchError) {
           console.error("Error switching chain:", switchError);
           setNotification(`Failed to switch to ${liskSepolia.name}. Please switch manually in your wallet. Error: ${switchError.message}`, 'error');
@@ -261,28 +256,17 @@ const DivviIntegration = ({ account, walletClient, publicClient, setNotification
       setNotification(`Could not verify wallet chain. Please ensure your wallet is connected and on ${liskSepolia.name}. Error: ${chainCheckError.message}`, 'error');
       return;
     }
-    // --- End Chain Mismatch Check ---
 
-    setShowConfirmModal(true); // Show confirmation modal
+    setShowConfirmModal(true);
   };
 
   const confirmDeposit = async () => {
-    setShowConfirmModal(false); // Close modal
+    setShowConfirmModal(false);
     setIsProcessingTx(true);
     setNotification('Initiating general USDC deposit with Divvi tracking...', 'info');
     try {
-      const amountInSmallestUnit = parseUnits(amountToDeposit.toString(), 6); // USDC has 6 decimals
+      const amountInSmallestUnit = parseUnits(amountToDeposit.toString(), 6);
 
-      // --- Divvi SDK Integration (uncomment and install @divvi/referral-sdk to enable) ---
-      // const divviConsumerAddress = '0x58ccf714F804a10cd9FE22fCcc044d77Ea34e5b1';
-      // const divviProviderAddresses = ['0x0423189886d7966f0dd7e7d256898daeee625dca','0xc95876688026be9d6fa7a7c33328bd013effa2bb','0x7beb0e14f8d2e6f6678cc30d867787b384b19e20'];
-      // const dataSuffix = getDataSuffix({
-      //   consumer: divviConsumerAddress,
-      //   providers: divviProviderAddresses,
-      // });
-      // -----------------------------------------------------------------------------------
-
-      // 1. Approve USDC for the Escrow contract
       const approveCallData = encodeFunctionData({
         abi: usdcAbi,
         functionName: 'approve',
@@ -300,31 +284,22 @@ const DivviIntegration = ({ account, walletClient, publicClient, setNotification
       await publicClient.waitForTransactionReceipt({ hash: approveTxHash });
       setNotification('USDC Approved. Now initiating general deposit...', 'info');
 
-      // 2. Deposit USDC into the Escrow contract's general deposits
       const depositCallData = encodeFunctionData({
         abi: escrowAbi,
-        functionName: 'depositGeneral', // Call the general deposit function
+        functionName: 'depositGeneral',
         args: [amountInSmallestUnit],
       });
 
       const depositTxHash = await walletClient.sendTransaction({
         account,
         to: escrowContractAddress,
-        data: depositCallData, // + dataSuffix if Divvi is enabled
+        data: depositCallData,
         value: 0n,
       });
 
       setNotification(`Deposit transaction sent! Hash: ${truncateAddress(depositTxHash)}. Waiting for confirmation...`, 'info');
       await publicClient.waitForTransactionReceipt({ hash: depositTxHash });
       setNotification('General deposit confirmed. Now reporting referral to Divvi...', 'info');
-
-      // --- Divvi SDK Integration (uncomment to enable) ---
-      // const chainId = await walletClient.getChainId();
-      // await submitReferral({
-      //   txHash: depositTxHash,
-      //   chainId,
-      // });
-      // ---------------------------------------------------
 
       setNotification(`General deposit successful and Divvi referral (conceptual) completed! Tx Hash: ${truncateAddress(depositTxHash)}`, 'success');
       console.log('Divvi referral (conceptual) completed!');
@@ -361,7 +336,7 @@ const DivviIntegration = ({ account, walletClient, publicClient, setNotification
           Your Wallet USDC Balance: <span className="font-semibold text-primary-blue">{userUsdcBalance} USDC</span>
         </p>
       )}
-      {account && walletClient && publicClient ? ( // Check all three for full readiness
+      {account && walletClient && publicClient ? (
         <button
           onClick={handleDepositUSDCGeneral}
           className="px-8 py-4 bg-secondary-purple text-white font-semibold rounded-full shadow-lg hover:bg-purple-700 transition duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -386,18 +361,17 @@ const DivviIntegration = ({ account, walletClient, publicClient, setNotification
   );
 };
 
-// --- Profile Component ---
 const Profile = ({ account }) => {
-  const { address: urlAddress } = useParams(); // Get address from URL if present
-  const displayAddress = urlAddress || account; // Use URL address if available, else connected account
+  const { address: urlAddress } = useParams();
+  const displayAddress = urlAddress || account;
 
-  const [profile, setProfile] = useState({ skills: [], portfolio: [], rating: 0, role: 'freelancer', totalRatingSum: 0, totalRatingsCount: 0 }); // Default role
+  const [profile, setProfile] = useState({ skills: [], portfolio: [], rating: 0, role: 'freelancer', totalRatingSum: 0, totalRatingsCount: 0 });
   const [skillsInput, setSkillsInput] = useState('');
   const [portfolioInput, setPortfolioInput] = useState('');
-  const [selectedRole, setSelectedRole] = useState('freelancer'); // State for role selection
+  const [selectedRole, setSelectedRole] = useState('freelancer');
   const [isLoading, setIsLoading] = useState(false);
-  const [statusMessage, setStatusMessage] = useState(''); // Kept for Profile component's internal messages
-  const [isError, setIsError] = useState(false); // Kept for Profile component's internal error state
+  const [statusMessage, setStatusMessage] = useState('');
+  const [isError, setIsError] = useState(false);
 
   const navigate = useNavigate();
 
@@ -417,7 +391,7 @@ const Profile = ({ account }) => {
         setProfile(fetchedProfile);
         setSkillsInput(fetchedProfile.skills?.join(', ') || '');
         setPortfolioInput(fetchedProfile.portfolio?.join(', ') || '');
-        setSelectedRole(fetchedProfile.role || 'freelancer'); // Set selected role from fetched data
+        setSelectedRole(fetchedProfile.role || 'freelancer');
         setStatusMessage('Profile loaded successfully.');
       } catch (error) {
         console.error('Error fetching profile:', error);
@@ -428,7 +402,7 @@ const Profile = ({ account }) => {
       }
     };
     fetchProfile();
-  }, [displayAddress]); // Re-fetch when displayAddress changes
+  }, [displayAddress]);
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -453,7 +427,7 @@ const Profile = ({ account }) => {
       await axios.put(`${API_BASE_URL}/api/users/${account}`, {
         skills: updatedSkills,
         portfolio: updatedPortfolio,
-        role: selectedRole, // Include selected role
+        role: selectedRole,
       });
 
       setProfile(prev => ({ ...prev, skills: updatedSkills, portfolio: updatedPortfolio, role: selectedRole }));
@@ -590,7 +564,6 @@ const Profile = ({ account }) => {
   );
 };
 
-// --- Dashboard Component ---
 const Dashboard = ({ account }) => {
   const [totalEscrowDeposits, setTotalEscrowDeposits] = useState(0);
   const [clientJobs, setClientJobs] = useState([]);
@@ -611,22 +584,18 @@ const Dashboard = ({ account }) => {
       setErrorMessage('');
 
       try {
-        // Fetch general escrow deposits
         const depositResponse = await axios.get(`${API_BASE_URL}/api/deposits/total/${account}`);
         setTotalEscrowDeposits(depositResponse.data.totalDeposits || 0);
 
-        // Fetch all jobs associated with the user
         const jobsResponse = await axios.get(`${API_BASE_URL}/api/jobs/forUser/${account}`);
         const allUserJobs = Array.isArray(jobsResponse.data) ? jobsResponse.data : [];
 
-        // Filter jobs by role
         const clientJobsFiltered = allUserJobs.filter(job => job.client.toLowerCase() === account.toLowerCase());
         const freelancerJobsFiltered = allUserJobs.filter(job => job.freelancer && job.freelancer.toLowerCase() === account.toLowerCase());
 
         setClientJobs(clientJobsFiltered);
         setFreelancerJobs(freelancerJobsFiltered);
 
-        // Fetch user profile
         const profileResponse = await axios.get(`${API_BASE_URL}/api/users/${account}`);
         setUserProfile(profileResponse.data);
 
@@ -670,7 +639,7 @@ const Dashboard = ({ account }) => {
             <p className="text-sm text-gray-600 mt-1">Funds you have generally deposited into escrow (not tied to specific jobs).</p>
           </div>
 
-          {userProfile && userProfile.address ? ( // Check if userProfile and its address exist
+          {userProfile && userProfile.address ? (
             <div className="mt-4 p-4 bg-purple-50 rounded-lg shadow-sm">
               <h3 className="text-xl font-semibold text-secondary-purple mb-2">Your Profile at a Glance</h3>
               <p className="text-base text-gray-700">Role: {userProfile.role || 'N/A'}</p>
@@ -770,31 +739,29 @@ const Dashboard = ({ account }) => {
   );
 };
 
-// --- JobDetails Component ---
 const JobDetails = ({ account, publicClient, walletClient, setNotification }) => {
   const { id } = useParams();
   const [job, setJob] = useState(null);
-  const [clientUsdcBalance, setClientUsdcBalance] = useState(0); // For client to check balance before funding
+  const [clientUsdcBalance, setClientUsdcBalance] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessingTx, setIsProcessingTx] = useState(false);
-  const [newMessage, setNewMessage] = useState(''); // For in-app messaging
-  const messagesEndRef = useRef(null); // For scrolling messages into view
-  const [ratingInput, setRatingInput] = useState(0); // For freelancer rating
+  const [newMessage, setNewMessage] = useState('');
+  const messagesEndRef = useRef(null);
+  const [ratingInput, setRatingInput] = useState(0);
   const [showRatingModal, setShowRatingModal] = useState(false);
-  const [showConfirmModal, setShowConfirmModal] = useState(false); // For general confirmations
-  const [modalAction, setModalAction] = useState(null); // To store which action the modal is confirming
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [modalAction, setModalAction] = useState(null);
 
 
   const navigate = useNavigate();
 
-  const fetchJobAndBalance = async () => {
+  const fetchJobAndBalance = useCallback(async () => {
     setIsLoading(true);
     try {
       const jobResponse = await axios.get(`${API_BASE_URL}/api/jobs/${id}`);
       setJob(jobResponse.data);
 
       if (account && publicClient && jobResponse.data.client.toLowerCase() === account.toLowerCase()) {
-        // Fetch client's USDC balance if they are the client
         const balance = await publicClient.readContract({
           address: usdcContractAddress,
           abi: usdcAbi,
@@ -810,24 +777,21 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [id, account, publicClient, setNotification]);
 
   useEffect(() => {
     fetchJobAndBalance();
-  }, [id, account, publicClient, setNotification]); // Re-fetch if ID, account, or publicClient changes
+  }, [fetchJobAndBalance]);
 
-  // Scroll to bottom of messages when they update
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [job?.messages]); // Scroll when job messages change
+  }, [job?.messages]);
 
-  // Helper to determine if current user is client or freelancer
   const isClient = account && job && job.client.toLowerCase() === account.toLowerCase();
   const isFreelancer = account && job && job.freelancer && job.freelancer.toLowerCase() === account.toLowerCase();
   const hasApplied = account && job?.applicants?.some(app => app.address.toLowerCase() === account.toLowerCase());
 
 
-  // --- Handle Funding Escrow for a Job ---
   const handleFundEscrow = async () => {
     if (!account || !walletClient || !publicClient || !job) {
       setNotification('Wallet not connected or job data missing.', 'error');
@@ -842,11 +806,10 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       return;
     }
     if (clientUsdcBalance < job.amount) {
-      setNotification('Insufficient USDC balance in your wallet for this job.', 'error'); // Enhanced message
+      setNotification('Insufficient USDC balance in your wallet for this job.', 'error');
       return;
     }
 
-    // --- Chain Mismatch Check ---
     try {
       const currentChainId = await walletClient.getChainId();
       if (currentChainId !== liskSepolia.id) {
@@ -854,7 +817,7 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
         try {
           await walletClient.switchChain({ id: liskSepolia.id });
           setNotification(`Successfully prompted to switch to ${liskSepolia.name}. Please confirm in your wallet and try the deposit again.`, 'info');
-          return; // Exit and let user retry after chain switch
+          return;
         } catch (switchError) {
           console.error("Error switching chain:", switchError);
           setNotification(`Failed to switch to ${liskSepolia.name}. Please switch manually in your wallet. Error: ${switchError.message}`, 'error');
@@ -866,17 +829,15 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       setNotification(`Could not verify wallet chain. Please ensure your wallet is connected and on ${liskSepolia.name}. Error: ${chainCheckError.message}`, 'error');
       return;
     }
-    // --- End Chain Mismatch Check ---
 
-    setModalAction(() => async () => { // Set the action to be confirmed
-      setShowConfirmModal(false); // Close modal
+    setModalAction(() => async () => {
+      setShowConfirmModal(false);
       setIsProcessingTx(true);
       setNotification('Initiating fund deposit for job escrow...', 'info');
 
       try {
         const amountInSmallestUnit = parseUnits(job.amount.toString(), 6);
 
-        // 1. Approve USDC for the Escrow contract
         const approveCallData = encodeFunctionData({
           abi: usdcAbi,
           functionName: 'approve',
@@ -894,11 +855,10 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
         await publicClient.waitForTransactionReceipt({ hash: approveTxHash });
         setNotification('USDC Approved. Now depositing funds to job escrow...', 'info');
 
-        // 2. Deposit USDC into the job-specific escrow
         const depositJobCallData = encodeFunctionData({
           abi: escrowAbi,
           functionName: 'depositJob',
-          args: [job._id, getAddress(job.client), getAddress(job.freelancer || '0x0000000000000000000000000000000000000000'), amountInSmallestUnit], // Pass client, freelancer, and amount
+          args: [job._id, getAddress(job.client), getAddress(job.freelancer || '0x0000000000000000000000000000000000000000'), amountInSmallestUnit],
         });
 
         const depositTxHash = await walletClient.sendTransaction({
@@ -912,16 +872,14 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
         await publicClient.waitForTransactionReceipt({ hash: depositTxHash });
         setNotification('Job funds deposited successfully on-chain!', 'success');
 
-        // 3. Update backend with deposit confirmation
         await axios.put(`${API_BASE_URL}/api/jobs/${id}/deposit-confirmed`, {
           clientAddress: account,
           depositTxHash: depositTxHash,
         });
 
-        // Update local job state
         setJob(prevJob => ({ ...prevJob, escrowStatus: 'deposited' }));
         setNotification('Job funds confirmed and updated in backend!', 'success');
-        fetchJobAndBalance(); // Re-fetch to update balance and job state
+        fetchJobAndBalance();
 
       } catch (error) {
         console.error("Error funding job escrow:", error);
@@ -930,10 +888,9 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
         setIsProcessingTx(false);
       }
     });
-    setShowConfirmModal(true); // Show confirmation modal
+    setShowConfirmModal(true);
   };
 
-  // --- Handle Freelancer Applying for Job ---
   const handleApply = async () => {
     if (!account) {
       setNotification('Please connect your wallet to apply for jobs.', 'error');
@@ -959,7 +916,6 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       try {
         await axios.post(`${API_BASE_URL}/api/jobs/${id}/apply`, { applicantAddress: account });
 
-        // Update local job state to reflect application
         setJob(prevJob => ({
           ...prevJob,
           applicants: [...(prevJob.applicants || []), { address: account, timestamp: new Date().toISOString() }]
@@ -976,13 +932,12 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
     setShowConfirmModal(true);
   };
 
-  // --- Handle Client Approving an Applicant ---
   const handleApproveApplicant = async (applicantAddress) => {
     if (!account || !job || !isClient) {
       setNotification('Wallet not connected or you are not the client.', 'error');
       return;
     }
-    if (job.status !== 'open' && job.status !== 'pending-client-approval') { // Allow approval if still open or if another freelancer was rejected
+    if (job.status !== 'open' && job.status !== 'pending-client-approval') {
       setNotification('Job is not in a state to approve applicants.', 'error');
       return;
     }
@@ -997,12 +952,11 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
           freelancerAddress: applicantAddress
         });
 
-        // Update local job state
         setJob(prevJob => ({
           ...prevJob,
           status: 'pending-client-approval',
           freelancer: applicantAddress,
-          applicants: prevJob.applicants.filter(app => app.address.toLowerCase() !== applicantAddress.toLowerCase()) // Remove approved from applicants list
+          applicants: prevJob.applicants.filter(app => app.address.toLowerCase() !== applicantAddress.toLowerCase())
         }));
         setNotification(`Applicant ${truncateAddress(applicantAddress)} approved! Job is now pending freelancer acceptance.`, 'success');
 
@@ -1016,7 +970,6 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
     setShowConfirmModal(true);
   };
 
-  // --- Handle Client Rejecting an Applicant ---
   const handleRejectApplicant = async (applicantAddress) => {
     if (!account || !job || !isClient) {
       setNotification('Wallet not connected or you are not the client.', 'error');
@@ -1034,10 +987,9 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       try {
         await axios.put(`${API_BASE_URL}/api/jobs/${id}/reject-applicant`, {
           clientAddress: account,
-          freelancerAddress: applicantAddress // This is the applicant to remove
+          freelancerAddress: applicantAddress
         });
 
-        // Update local job state
         setJob(prevJob => ({
           ...prevJob,
           applicants: prevJob.applicants.filter(app => app.address.toLowerCase() !== applicantAddress.toLowerCase())
@@ -1055,7 +1007,6 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
   };
 
 
-  // --- Handle Freelancer Accepting Job (after client approval) ---
   const handleAcceptAssignedJob = async () => {
     if (!account || !job || !isFreelancer) {
       setNotification('Wallet not connected or you are not the assigned freelancer.', 'error');
@@ -1066,7 +1017,6 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       return;
     }
 
-    // --- Chain Mismatch Check for Job Acceptance ---
     try {
       const currentChainId = await walletClient.getChainId();
       if (currentChainId !== liskSepolia.id) {
@@ -1074,7 +1024,7 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
         try {
           await walletClient.switchChain({ id: liskSepolia.id });
           setNotification(`Successfully prompted to switch to ${liskSepolia.name}. Please confirm in your wallet and try accepting the job again.`, 'info');
-          return; // Exit and let user retry after chain switch
+          return;
         } catch (switchError) {
           console.error("Error switching chain:", switchError);
           setNotification(`Failed to switch to ${liskSepolia.name}. Please switch manually in your wallet. Error: ${switchError.message}`, 'error');
@@ -1086,7 +1036,6 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       setNotification(`Could not verify wallet chain. Please ensure your wallet is connected and on ${liskSepolia.name}. Error: ${chainCheckError.message}`, 'error');
       return;
     }
-    // --- End Chain Mismatch Check ---
 
     setModalAction(() => async () => {
       setShowConfirmModal(false);
@@ -1113,7 +1062,6 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
   };
 
 
-  // --- Handle Freelancer Marking Job as Completed ---
   const handleMarkCompleted = async () => {
     if (!account || !job || !isFreelancer) {
       setNotification('Wallet not connected or you are not the assigned freelancer.', 'error');
@@ -1124,7 +1072,6 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       return;
     }
 
-    // --- Chain Mismatch Check for Marking Completed ---
     try {
       const currentChainId = await walletClient.getChainId();
       if (currentChainId !== liskSepolia.id) {
@@ -1132,7 +1079,7 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
         try {
           await walletClient.switchChain({ id: liskSepolia.id });
           setNotification(`Successfully prompted to switch to ${liskSepolia.name}. Please confirm in your wallet and try marking as completed again.`, 'info');
-          return; // Exit and let user retry after chain switch
+          return;
         } catch (switchError) {
           console.error("Error switching chain:", switchError);
           setNotification(`Failed to switch to ${liskSepolia.name}. Please switch manually in your wallet. Error: ${switchError.message}`, 'error');
@@ -1144,7 +1091,6 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       setNotification(`Could not verify wallet chain. Please ensure your wallet is connected and on ${liskSepolia.name}. Error: ${chainCheckError.message}`, 'error');
       return;
     }
-    // --- End Chain Mismatch Check ---
 
     setModalAction(() => async () => {
       setShowConfirmModal(false);
@@ -1153,7 +1099,7 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       try {
         await axios.put(`${API_BASE_URL}/api/jobs/${id}/mark-completed`, { freelancerAddress: account });
 
-        setJob(prevJob => ({ ...prevJob, status: 'completed' })); // Frontend status update
+        setJob(prevJob => ({ ...prevJob, status: 'completed' }));
         setNotification('Job marked as completed! Client can now release funds.', 'success');
 
         setTimeout(() => {
@@ -1171,7 +1117,6 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
   };
 
 
-  // --- Handle Client Releasing Funds (On-chain) ---
   const handleReleaseFunds = async () => {
     if (!account || !publicClient || !walletClient || !job) {
       setNotification('Wallet not connected or blockchain clients not ready.', 'error');
@@ -1181,12 +1126,11 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       setNotification('Only the client can release funds.', 'error');
       return;
     }
-    if (job.status !== 'completed' || job.escrowStatus !== 'deposited') { // Job must be marked completed by freelancer, escrow active
+    if (job.status !== 'completed' || job.escrowStatus !== 'deposited') {
       setNotification('Job is not in a state for fund release (must be completed and funds deposited).', 'error');
       return;
     }
 
-    // --- Chain Mismatch Check for Release Funds ---
     try {
       const currentChainId = await walletClient.getChainId();
       if (currentChainId !== liskSepolia.id) {
@@ -1194,7 +1138,7 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
         try {
           await walletClient.switchChain({ id: liskSepolia.id });
           setNotification(`Successfully prompted to switch to ${liskSepolia.name}. Please confirm in your wallet and try releasing funds again.`, 'info');
-          return; // Exit and let user retry after chain switch
+          return;
         } catch (switchError) {
           console.error("Error switching chain:", switchError);
           setNotification(`Failed to switch to ${liskSepolia.name}. Please switch manually in your wallet. Error: ${switchError.message}`, 'error');
@@ -1206,7 +1150,6 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       setNotification(`Could not verify wallet chain. Please ensure your wallet is connected and on ${liskSepolia.name}. Error: ${chainCheckError.message}`, 'error');
       return;
     }
-    // --- End Chain Mismatch Check ---
 
     setModalAction(() => async () => {
       setShowConfirmModal(false);
@@ -1215,8 +1158,8 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       try {
         const releaseCallData = encodeFunctionData({
           abi: escrowAbi,
-          functionName: 'releaseJob', // Call job-specific release
-          args: [job._id], // Pass job ID
+          functionName: 'releaseJob',
+          args: [job._id],
         });
 
         const txHash = await walletClient.sendTransaction({
@@ -1228,16 +1171,14 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
         setNotification(`Transaction sent! Hash: ${truncateAddress(txHash)}. Waiting for confirmation...`, 'info');
         await publicClient.waitForTransactionReceipt({ hash: txHash });
 
-        // Update backend after successful on-chain release
         await axios.put(`${API_BASE_URL}/api/jobs/${id}/release-confirmed`, {
           clientAddress: account,
           completionTxHash: txHash,
         });
 
-        setJob(prevJob => ({ ...prevJob, escrowStatus: 'released' })); // Update local escrow status
+        setJob(prevJob => ({ ...prevJob, escrowStatus: 'released' }));
         setNotification('Funds released successfully, job marked as completed!', 'success');
 
-        // Show rating modal after successful release
         setShowRatingModal(true);
 
       } catch (error) {
@@ -1250,7 +1191,6 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
     setShowConfirmModal(true);
   };
 
-  // --- Handle Client Refunding Funds (On-chain) ---
   const handleRefundFunds = async () => {
     if (!account || !publicClient || !walletClient || !job) {
       setNotification('Wallet not connected or blockchain clients not ready.', 'error');
@@ -1260,12 +1200,11 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       setNotification('Only the client can refund funds.', 'error');
       return;
     }
-    if (job.escrowStatus !== 'deposited' && job.escrowStatus !== 'disputed') { // Can refund if deposited (not yet released) or disputed
+    if (job.escrowStatus !== 'deposited' && job.escrowStatus !== 'disputed') {
       setNotification('Job is not in a state for refund (must be deposited or disputed).', 'error');
       return;
     }
 
-    // --- Chain Mismatch Check for Refund Funds ---
     try {
       const currentChainId = await walletClient.getChainId();
       if (currentChainId !== liskSepolia.id) {
@@ -1273,7 +1212,7 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
         try {
           await walletClient.switchChain({ id: liskSepolia.id });
           setNotification(`Successfully prompted to switch to ${liskSepolia.name}. Please confirm in your wallet and try refunding funds again.`, 'info');
-          return; // Exit and let user retry after chain switch
+          return;
         } catch (switchError) {
           console.error("Error switching chain:", switchError);
           setNotification(`Failed to switch to ${liskSepolia.name}. Please switch manually in your wallet. Error: ${switchError.message}`, 'error');
@@ -1285,7 +1224,6 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       setNotification(`Could not verify wallet chain. Please ensure your wallet is connected and on ${liskSepolia.name}. Error: ${chainCheckError.message}`, 'error');
       return;
     }
-    // --- End Chain Mismatch Check ---
 
     setModalAction(() => async () => {
       setShowConfirmModal(false);
@@ -1294,8 +1232,8 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       try {
         const refundCallData = encodeFunctionData({
           abi: escrowAbi,
-          functionName: 'refundJob', // Call job-specific refund
-          args: [job._id], // Pass job ID
+          functionName: 'refundJob',
+          args: [job._id],
         });
 
         const txHash = await walletClient.sendTransaction({
@@ -1307,12 +1245,11 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
         setNotification(`Transaction sent! Hash: ${truncateAddress(txHash)}. Waiting for confirmation...`, 'info');
         await publicClient.waitForTransactionReceipt({ hash: txHash });
 
-        // Update backend after successful on-chain refund
         await axios.put(`${API_BASE_URL}/api/jobs/${id}/refund-confirmed`, {
           clientAddress: account,
         });
 
-        setJob(prevJob => ({ ...prevJob, escrowStatus: 'refunded', status: 'cancelled' })); // Update local statuses
+        setJob(prevJob => ({ ...prevJob, escrowStatus: 'refunded', status: 'cancelled' }));
         setNotification('Funds refunded successfully, job marked as cancelled!', 'success');
 
         setTimeout(() => {
@@ -1329,7 +1266,6 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
     setShowConfirmModal(true);
   };
 
-  // --- Handle Sending a Message ---
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!account) {
@@ -1352,12 +1288,11 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
         text: newMessage.trim(),
       });
 
-      // Update local job state with the new message
       setJob(prevJob => ({
         ...prevJob,
-        messages: [...(prevJob.messages || []), response.data] // Assuming backend returns the saved message
+        messages: [...(prevJob.messages || []), response.data]
       }));
-      setNewMessage(''); // Clear input field
+      setNewMessage('');
       setNotification('Message sent!', 'success');
 
     } catch (error) {
@@ -1366,7 +1301,6 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
     }
   };
 
-  // --- Handle Rating Freelancer (from modal) ---
   const handleRateFreelancer = async () => {
     if (!account || !job || !isClient || !job.freelancer) {
       setNotification('Cannot rate: Wallet not connected, job data missing, or you are not the client.', 'error');
@@ -1378,11 +1312,11 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
     }
     if (job.rated) {
       setNotification('Freelancer has already been rated for this job.', 'info');
-      setShowRatingModal(false); // Close modal if already rated
+      setShowRatingModal(false);
       return;
     }
 
-    setShowRatingModal(false); // Close rating modal
+    setShowRatingModal(false);
     setIsProcessingTx(true);
     setNotification('Submitting rating...', 'info');
     try {
@@ -1392,7 +1326,7 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
         rating: parseInt(ratingInput),
       });
 
-      setJob(prevJob => ({ ...prevJob, rated: true })); // Mark job as rated
+      setJob(prevJob => ({ ...prevJob, rated: true }));
       setNotification('Freelancer rated successfully!', 'success');
 
     } catch (error) {
@@ -1431,14 +1365,13 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
     );
   }
 
-  // Determine button states based on job status and user role
   const showFundEscrowButton = isClient && job.escrowStatus === 'pending-deposit';
   const showApplyButton = !isClient && !job.freelancer && job.status === 'open' && job.escrowStatus === 'deposited' && !hasApplied;
   const showAcceptAssignedJobButton = isFreelancer && job.status === 'pending-client-approval' && job.freelancer.toLowerCase() === account.toLowerCase();
-  const showClientApplicantActions = isClient && job.status === 'open' && job.escrowStatus === 'deposited' && job.applicants && job.applicants.length > 0 && !job.freelancer; // Only show if job is open, funded, has applicants, and no freelancer assigned
+  const showClientApplicantActions = isClient && job.status === 'open' && job.escrowStatus === 'deposited' && job.applicants && job.applicants.length > 0 && !job.freelancer;
   const showMarkCompletedButton = isFreelancer && job.status === 'in-progress';
-  const showReleaseFundsButton = isClient && job.status === 'completed' && job.escrowStatus === 'deposited'; // Client releases after freelancer marks completed
-  const showRefundFundsButton = isClient && (job.escrowStatus === 'deposited' || job.escrowStatus === 'disputed'); // Client can refund if deposited or disputed
+  const showReleaseFundsButton = isClient && job.status === 'completed' && job.escrowStatus === 'deposited';
+  const showRefundFundsButton = isClient && (job.escrowStatus === 'deposited' || job.escrowStatus === 'disputed');
   const showRateFreelancerButton = isClient && job.escrowStatus === 'released' && job.freelancer && !job.rated;
 
 
@@ -1474,7 +1407,6 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4">
-        {/* Client: Fund Escrow Button */}
         {showFundEscrowButton && (
           <button
             className="px-6 py-3 bg-primary-blue text-white font-semibold rounded-md hover:bg-blue-700 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1485,7 +1417,6 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
           </button>
         )}
 
-        {/* Freelancer: Apply for Job Button */}
         {showApplyButton && (
           <button
             className="px-6 py-3 bg-secondary-purple text-white font-semibold rounded-md hover:bg-purple-700 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1496,7 +1427,6 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
           </button>
         )}
 
-        {/* Freelancer: Accept Assigned Job Button */}
         {showAcceptAssignedJobButton && (
           <button
             className="px-6 py-3 bg-accent-green text-white font-semibold rounded-md hover:bg-green-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1507,7 +1437,6 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
           </button>
         )}
 
-        {/* Freelancer: Mark as Completed Button */}
         {showMarkCompletedButton && (
           <button
             className="px-6 py-3 bg-yellow-600 text-white font-semibold rounded-md hover:bg-yellow-700 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1518,7 +1447,6 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
           </button>
         )}
 
-        {/* Client: Release Funds Button */}
         {showReleaseFundsButton && (
           <button
             className="px-6 py-3 bg-accent-green text-white font-semibold rounded-md hover:bg-green-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1529,7 +1457,6 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
           </button>
         )}
 
-        {/* Client: Refund Funds Button */}
         {showRefundFundsButton && (
           <button
             className="px-6 py-3 bg-red-500 text-white font-semibold rounded-md hover:bg-red-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1540,7 +1467,6 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
           </button>
         )}
 
-        {/* Client: Rate Freelancer Button */}
         {showRateFreelancerButton && (
           <button
             className="px-6 py-3 bg-purple-600 text-white font-semibold rounded-md hover:bg-purple-700 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1552,7 +1478,6 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
         )}
       </div>
 
-      {/* Client: Applicant List and Actions */}
       {showClientApplicantActions && (
         <div className="mt-8 p-4 bg-blue-50 rounded-lg shadow-inner">
           <h3 className="text-xl font-semibold text-primary-blue mb-4">Job Applicants ({job.applicants.length})</h3>
@@ -1589,8 +1514,7 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
         </div>
       )}
 
-      {/* In-App Messaging Section */}
-      {(isClient || isFreelancer) && job.status !== 'open' && ( // Only show messaging if job is assigned/in progress/completed
+      {(isClient || isFreelancer) && job.status !== 'open' && (
         <div className="mt-8 p-4 bg-gray-50 rounded-lg shadow-inner">
           <h3 className="text-xl font-semibold text-primary-blue mb-4">Job Messages</h3>
           <div className="h-64 overflow-y-auto border border-gray-200 rounded-md p-3 mb-4 bg-white">
@@ -1612,7 +1536,7 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
             ) : (
               <p className="text-gray-500 text-center py-4">No messages yet. Start the conversation!</p>
             )}
-            <div ref={messagesEndRef} /> {/* Scroll target */}
+            <div ref={messagesEndRef} />
           </div>
           <form onSubmit={handleSendMessage} className="flex space-x-2">
             <input
@@ -1634,7 +1558,6 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
         </div>
       )}
 
-      {/* Rating Modal */}
       {showRatingModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50">
           <div className="bg-white p-8 rounded-lg shadow-xl max-w-md w-full text-center">
@@ -1668,7 +1591,6 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
         </div>
       )}
 
-      {/* General Confirmation Modal */}
       <ConfirmationModal
         isOpen={showConfirmModal}
         title={
@@ -1726,15 +1648,14 @@ const JobDetails = ({ account, publicClient, walletClient, setNotification }) =>
   );
 };
 
-// --- PostJob Component ---
 const PostJob = ({ account, setNotification }) => {
   const navigate = useNavigate();
   const [jobTitle, setJobTitle] = useState('');
   const [jobDescription, setJobDescription] = useState('');
   const [jobAmount, setJobAmount] = useState('');
-  const [requiredSkillsInput, setRequiredSkillsInput] = useState(''); // New state for required skills
+  const [requiredSkillsInput, setRequiredSkillsInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [showConfirmModal, setShowConfirmModal] = useState(false); // For confirmation modal
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   const handlePostJob = async (e) => {
     e.preventDefault();
@@ -1747,11 +1668,11 @@ const PostJob = ({ account, setNotification }) => {
       return;
     }
 
-    setShowConfirmModal(true); // Show confirmation modal
+    setShowConfirmModal(true);
   };
 
   const confirmPostJob = async () => {
-    setShowConfirmModal(false); // Close modal
+    setShowConfirmModal(false);
     setIsLoading(true);
     setNotification('Posting job...', 'info');
 
@@ -1763,19 +1684,19 @@ const PostJob = ({ account, setNotification }) => {
         description: jobDescription,
         amount: parseFloat(jobAmount),
         client: account,
-        status: 'open', // Initial status
-        escrowStatus: 'pending-deposit', // Initial escrow status
-        requiredSkills: skillsArray, // Include required skills
+        status: 'open',
+        escrowStatus: 'pending-deposit',
+        requiredSkills: skillsArray,
       });
 
       setNotification('Job posted successfully! Redirecting to job details to fund escrow.', 'success');
       setJobTitle('');
       setJobDescription('');
       setJobAmount('');
-      setRequiredSkillsInput(''); // Clear skills input
+      setRequiredSkillsInput('');
 
       setTimeout(() => {
-        navigate(`/job/${response.data._id}`); // Navigate to the newly posted job's details page
+        navigate(`/job/${response.data._id}`);
       }, 2000);
 
     } catch (error) {
@@ -1876,7 +1797,6 @@ const PostJob = ({ account, setNotification }) => {
   );
 };
 
-// --- BrowseJobs Component ---
 const BrowseJobs = ({ setNotification }) => {
   const [jobs, setJobs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -1884,19 +1804,17 @@ const BrowseJobs = ({ setNotification }) => {
   const [filterSkills, setFilterSkills] = useState('');
   const [minAmount, setMinAmount] = useState('');
   const [maxAmount, setMaxAmount] = useState('');
-  const [sortBy, setSortBy] = useState('dateDesc'); // 'dateDesc', 'dateAsc', 'amountDesc', 'amountAsc'
-  const navigate = useNavigate();
+  const [sortBy, setSortBy] = useState('dateDesc');
+  //const navigate = useNavigate();
 
   useEffect(() => {
     const fetchJobs = async () => {
       setIsLoading(true);
       setErrorMessage('');
       try {
-        // Fetch jobs that are 'open' and 'deposited'
         const response = await axios.get(`${API_BASE_URL}/api/jobs?status=open&escrowStatus=deposited`);
         let fetchedJobs = response.data;
 
-        // Frontend Filtering by Skills
         if (filterSkills) {
           const skillArray = filterSkills.toLowerCase().split(',').map(s => s.trim()).filter(s => s !== '');
           fetchedJobs = fetchedJobs.filter(job =>
@@ -1904,7 +1822,6 @@ const BrowseJobs = ({ setNotification }) => {
           );
         }
 
-        // Frontend Filtering by Amount Range
         const min = parseFloat(minAmount);
         const max = parseFloat(maxAmount);
         if (!isNaN(min)) {
@@ -1914,7 +1831,6 @@ const BrowseJobs = ({ setNotification }) => {
           fetchedJobs = fetchedJobs.filter(job => job.amount <= max);
         }
 
-        // Frontend Sorting
         fetchedJobs.sort((a, b) => {
           if (sortBy === 'dateDesc') {
             return new Date(b.createdAt) - new Date(a.createdAt);
@@ -1938,7 +1854,7 @@ const BrowseJobs = ({ setNotification }) => {
       }
     };
     fetchJobs();
-  }, [filterSkills, minAmount, maxAmount, sortBy, setNotification]); // Re-fetch when filters/sort change
+  }, [filterSkills, minAmount, maxAmount, sortBy, setNotification]);
 
   return (
     <div className="max-w-6xl mx-auto p-4 bg-white shadow-lg rounded-lg my-8">
@@ -1950,7 +1866,6 @@ const BrowseJobs = ({ setNotification }) => {
         </div>
       )}
 
-      {/* Filtering and Sorting Controls */}
       <div className="mb-6 p-4 bg-gray-50 rounded-lg shadow-inner grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <div>
           <label htmlFor="filterSkills" className="block text-sm font-medium text-gray-800 mb-1">Filter by Skills (comma-separated):</label>
@@ -2049,13 +1964,12 @@ const BrowseJobs = ({ setNotification }) => {
   );
 };
 
-// --- CrossChainIntegration Component ---
 const CrossChainIntegration = ({ account, walletClient, publicClient, setNotification }) => {
   const [sourceChain, setSourceChain] = useState('Lisk Sepolia');
   const [destinationChain, setDestinationChain] = useState('Optimism/Base');
   const [transferAmount, setTransferAmount] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [showConfirmModal, setShowConfirmModal] = useState(false); // For confirmation modal
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   const handleCrossChainTransfer = async () => {
     if (!account || !walletClient || !publicClient) {
@@ -2067,7 +1981,6 @@ const CrossChainIntegration = ({ account, walletClient, publicClient, setNotific
       return;
     }
 
-    // --- Chain Mismatch Check for Cross-Chain Transfer ---
     try {
       const currentChainId = await walletClient.getChainId();
       if (currentChainId !== liskSepolia.id) {
@@ -2075,7 +1988,7 @@ const CrossChainIntegration = ({ account, walletClient, publicClient, setNotific
         try {
           await walletClient.switchChain({ id: liskSepolia.id });
           setNotification(`Successfully prompted to switch to ${liskSepolia.name}. Please confirm in your wallet and try the transfer again.`, 'info');
-          return; // Exit and let user retry after chain switch
+          return;
         } catch (switchError) {
           console.error("Error switching chain:", switchError);
           setNotification(`Failed to switch to ${liskSepolia.name}. Please switch manually in your wallet. Error: ${switchError.message}`, 'error');
@@ -2087,22 +2000,17 @@ const CrossChainIntegration = ({ account, walletClient, publicClient, setNotific
       setNotification(`Could not verify wallet chain. Please ensure your wallet is connected and on ${liskSepolia.name}. Error: ${chainCheckError.message}`, 'error');
       return;
     }
-    // --- End Chain Mismatch Check ---
 
-    setShowConfirmModal(true); // Show confirmation modal
+    setShowConfirmModal(true);
   };
 
   const confirmCrossChainTransfer = async () => {
-    setShowConfirmModal(false); // Close modal
+    setShowConfirmModal(false);
     setIsProcessing(true);
     setNotification(`Initiating cross-chain transfer of ${transferAmount} USDC from ${sourceChain} to ${destinationChain}...`, 'info');
 
     try {
-      // This section represents a conceptual integration with LayerZero.
-      // In a live environment, this would involve actual smart contract calls
-      // to a LayerZero OApp (Omnichain Application) for cross-chain messaging.
-
-      await new Promise(resolve => setTimeout(resolve, 3000)); // Simulate network delay
+      await new Promise(resolve => setTimeout(resolve, 3000));
 
       setNotification(`Conceptual cross-chain transfer initiated! ${transferAmount} USDC from ${sourceChain} to ${destinationChain}. This feature is coming soon.`, 'info');
       setTransferAmount('');
@@ -2138,7 +2046,6 @@ const CrossChainIntegration = ({ account, walletClient, publicClient, setNotific
             disabled={isProcessing || !account}
           >
             <option value="Lisk Sepolia">Lisk Sepolia Testnet</option>
-            {/* Add more options as actual LayerZero integrations are built */}
           </select>
         </div>
         <div>
@@ -2151,7 +2058,6 @@ const CrossChainIntegration = ({ account, walletClient, publicClient, setNotific
             disabled={isProcessing || !account}
           >
             <option value="Optimism/Base">Optimism/Base (Coming Soon)</option>
-            {/* Add more options as actual LayerZero integrations are built */}
           </select>
         </div>
         <div>
@@ -2188,12 +2094,11 @@ const CrossChainIntegration = ({ account, walletClient, publicClient, setNotific
   );
 };
 
-// --- DisputeResolution Component ---
 const DisputeResolution = ({ account, setNotification }) => {
   const [jobId, setJobId] = useState('');
   const [disputeReason, setDisputeReason] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [showConfirmModal, setShowConfirmModal] = useState(false); // For confirmation modal
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   const handleSubmitDispute = async (e) => {
     e.preventDefault();
@@ -2206,16 +2111,15 @@ const DisputeResolution = ({ account, setNotification }) => {
       return;
     }
 
-    setShowConfirmModal(true); // Show confirmation modal
+    setShowConfirmModal(true);
   };
 
   const confirmSubmitDispute = async () => {
-    setShowConfirmModal(false); // Close modal
+    setShowConfirmModal(false);
     setIsLoading(true);
     setNotification('Submitting dispute...', 'info');
 
     try {
-      // Call backend to submit dispute
       await axios.post(`${API_BASE_URL}/api/disputes`, {
         jobId: jobId,
         reporterAddress: account,
@@ -2302,17 +2206,15 @@ const DisputeResolution = ({ account, setNotification }) => {
   );
 };
 
-// --- Withdrawal Component (Enhanced for Mobile Money) ---
 const Withdrawal = ({ account, setNotification }) => {
   const [amount, setAmount] = useState('');
-  const [country, setCountry] = useState('KE'); // Default to Kenya
+  const [country, setCountry] = useState('KE');
   const [mobileMoneyNetwork, setMobileMoneyNetwork] = useState('M-Pesa');
   const [mobilePhoneNumber, setMobilePhoneNumber] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [totalGeneralDeposits, setTotalGeneralDeposits] = useState(0); // New state for user's general escrow balance
+  const [totalGeneralDeposits, setTotalGeneralDeposits] = useState(0);
 
-  // Fetch user's total general deposits
   useEffect(() => {
     const fetchTotalDeposits = async () => {
       if (account) {
@@ -2332,7 +2234,6 @@ const Withdrawal = ({ account, setNotification }) => {
   }, [account, setNotification]);
 
 
-  // Define mobile money networks based on selected country
   const getMobileMoneyNetworks = (selectedCountry) => {
     switch (selectedCountry) {
       case 'KE': return ['M-Pesa', 'Airtel Money', 'Telkom T-Kash'];
@@ -2381,7 +2282,6 @@ const Withdrawal = ({ account, setNotification }) => {
       setNotification(`Withdrawal request submitted! Our team will process your ${amount} USDC to ${mobileMoneyNetwork}. This is an off-chain request.`, 'success');
       setAmount('');
       setMobilePhoneNumber('');
-      // Optionally re-fetch totalGeneralDeposits after a successful request
       const response = await axios.get(`${API_BASE_URL}/api/deposits/total/${account}`);
       setTotalGeneralDeposits(parseFloat(response.data.totalDeposits));
 
@@ -2440,7 +2340,7 @@ const Withdrawal = ({ account, setNotification }) => {
             value={country}
             onChange={(e) => {
               setCountry(e.target.value);
-              setMobileMoneyNetwork(getMobileMoneyNetworks(e.target.value)[0] || ''); // Reset network on country change
+              setMobileMoneyNetwork(getMobileMoneyNetworks(e.target.value)[0] || '');
             }}
             className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-blue focus:border-transparent transition duration-200"
             disabled={isLoading || !account}
@@ -2451,7 +2351,6 @@ const Withdrawal = ({ account, setNotification }) => {
             <option value="GH">Ghana</option>
             <option value="UG">Uganda</option>
             <option value="TZ">Tanzania</option>
-            {/* Add more African countries as needed */}
           </select>
         </div>
         <div>
@@ -2503,15 +2402,14 @@ const Withdrawal = ({ account, setNotification }) => {
 };
 
 
-// --- AdminDashboard Component ---
 const AdminDashboard = ({ setNotification }) => {
   const [adminKey, setAdminKey] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [disputes, setDisputes] = useState([]);
   const [allJobs, setAllJobs] = useState([]);
-  const [allUsers, setAllUsers] = useState([]); // New state for all users
-  const [allWithdrawals, setAllWithdrawals] = useState([]); // New state for all withdrawals
-  const [userCount, setUserCount] = useState(0); // New state for user count
+  const [allUsers, setAllUsers] = useState([]);
+  const [allWithdrawals, setAllWithdrawals] = useState([]);
+  const [userCount, setUserCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState('');
   const [newJobStatus, setNewJobStatus] = useState('');
@@ -2534,31 +2432,26 @@ const AdminDashboard = ({ setNotification }) => {
     setIsLoading(true);
     setNotification('Fetching admin data...', 'info');
     try {
-      // Fetch disputes
       const disputesResponse = await axios.get(`${API_BASE_URL}/api/admin/disputes`, {
         headers: { 'X-Admin-Key': adminKey }
       });
       setDisputes(disputesResponse.data);
 
-      // Fetch all jobs
-      const jobsResponse = await axios.get(`${API_BASE_URL}/api/jobs`, { // Admin can see all jobs
+      const jobsResponse = await axios.get(`${API_BASE_URL}/api/jobs`, {
         headers: { 'X-Admin-Key': adminKey }
       });
       setAllJobs(jobsResponse.data);
 
-      // Fetch user count
       const userCountResponse = await axios.get(`${API_BASE_URL}/api/admin/users/count`, {
         headers: { 'X-Admin-Key': adminKey }
       });
       setUserCount(userCountResponse.data.count);
 
-      // Fetch all users
       const allUsersResponse = await axios.get(`${API_BASE_URL}/api/admin/users`, {
         headers: { 'X-Admin-Key': adminKey }
       });
       setAllUsers(allUsersResponse.data);
 
-      // Fetch all withdrawal requests
       const allWithdrawalsResponse = await axios.get(`${API_BASE_URL}/api/admin/withdrawals`, {
         headers: { 'X-Admin-Key': adminKey }
       });
@@ -2578,9 +2471,9 @@ const AdminDashboard = ({ setNotification }) => {
 
   const handleResolveDispute = (dispute) => {
     setCurrentDisputeToResolve(dispute);
-    setResolveDetails(''); // Clear previous details
-    setResolveJobStatus(dispute.jobId.status); // Pre-fill with current job status
-    setResolveEscrowStatus(dispute.jobId.escrowStatus); // Pre-fill with current escrow status
+    setResolveDetails('');
+    setResolveJobStatus(dispute.jobId.status);
+    setResolveEscrowStatus(dispute.jobId.escrowStatus);
     setShowResolveDisputeModal(true);
   };
 
@@ -2600,7 +2493,7 @@ const AdminDashboard = ({ setNotification }) => {
         { headers: { 'X-Admin-Key': adminKey } }
       );
       setNotification('Dispute resolved successfully and job status updated!', 'success');
-      fetchAdminData(); // Re-fetch data to update lists
+      fetchAdminData();
     } catch (error) {
       console.error('Error resolving dispute:', error);
       setNotification(`Error resolving dispute: ${error.message || 'Please try again.'}`, 'error');
@@ -2638,15 +2531,15 @@ const AdminDashboard = ({ setNotification }) => {
     try {
       await axios.put(`${API_BASE_URL}/api/admin/jobs/${selectedJobId}/update-status`,
         {
-          status: newJobStatus || undefined, // Only send if not empty
-          escrowStatus: newEscrowStatus || undefined, // Only send if not empty
+          status: newJobStatus || undefined,
+          escrowStatus: newEscrowStatus || undefined,
         },
         { headers: { 'X-Admin-Key': adminKey } }
       );
       setNotification('Job status updated successfully!', 'success');
       setNewJobStatus('');
       setNewEscrowStatus('');
-      fetchAdminData(); // Re-fetch data
+      fetchAdminData();
     } catch (error) {
       console.error('Error updating job status:', error);
       setNotification(`Error updating job status: ${error.message || 'Please try again.'}`, 'error');
@@ -2668,11 +2561,11 @@ const AdminDashboard = ({ setNotification }) => {
     setNotification('Processing withdrawal request...', 'info');
     try {
       await axios.put(`${API_BASE_URL}/api/admin/withdrawals/${currentWithdrawalToProcess._id}/process`,
-        {}, // No body needed for this conceptual process
+        {},
         { headers: { 'X-Admin-Key': adminKey } }
       );
       setNotification('Withdrawal request marked as processed!', 'success');
-      fetchAdminData(); // Re-fetch data to update lists
+      fetchAdminData();
     } catch (error) {
       console.error('Error processing withdrawal:', error);
       setNotification(`Error processing withdrawal: ${error.message || 'Please try again.'}`, 'error');
@@ -2717,7 +2610,6 @@ const AdminDashboard = ({ setNotification }) => {
             </div>
           )}
 
-          {/* User Count */}
           <div className="mb-6 p-4 bg-blue-50 rounded-lg shadow-sm text-center">
             <h3 className="text-xl font-semibold text-primary-blue mb-2">Total Registered Users</h3>
             <p className="text-4xl font-bold text-accent-green">{userCount}</p>
@@ -2903,7 +2795,6 @@ const AdminDashboard = ({ setNotification }) => {
         </>
       )}
 
-      {/* Resolve Dispute Modal */}
       <ConfirmationModal
         isOpen={showResolveDisputeModal}
         title="Resolve Dispute"
@@ -2964,8 +2855,7 @@ const AdminDashboard = ({ setNotification }) => {
         </div>
       </ConfirmationModal>
 
-      {/* Process Withdrawal Modal */}
-      <ConfirmationModal
+      <ProcessWithdrawalModal
         isOpen={showProcessWithdrawalModal}
         title="Process Withdrawal Request"
         message={`Are you sure you want to mark this withdrawal request for ${currentWithdrawalToProcess?.usdcAmount} USDC by ${truncateAddress(currentWithdrawalToProcess?.requestorAddress)} as processed? This action confirms the off-chain transfer has been handled.`}
@@ -2978,7 +2868,110 @@ const AdminDashboard = ({ setNotification }) => {
   );
 };
 
-// --- CustomerSupport Component ---
+const GetUsdcOnLiskGuide = () => {
+  return (
+    <div className="max-w-4xl mx-auto p-6 bg-white shadow-lg rounded-lg my-8">
+      <h2 className="text-3xl font-bold text-primary-blue mb-6 border-b pb-2">How to Get USDC on Lisk</h2>
+      <p className="text-lg text-gray-700 mb-6">
+        To use FreelanceFlow, you'll need USDC in your MetaMask wallet on the Lisk network. Here’s a step-by-step guide to help you get started:
+      </p>
+
+      <div className="space-y-8">
+        <div>
+          <h3 className="text-2xl font-semibold text-secondary-purple mb-3">1. Ensure MetaMask is Connected to Lisk</h3>
+          <p className="text-lg text-gray-700 mb-4">
+            First, make sure your MetaMask wallet is configured for the Lisk network. If you haven't already, you can add it manually:
+          </p>
+          <div className="bg-gray-50 p-4 rounded-lg shadow-inner mb-4">
+            <p className="font-semibold text-primary-blue">Lisk Network Details:</p>
+            <ul className="list-disc list-inside text-gray-700 ml-4">
+              <li><strong>Network Name:</strong> Lisk</li>
+              <li><strong>New RPC URL:</strong> https://rpc.api.lisk.com</li>
+              <li><strong>Chain ID:</strong> 1135</li>
+              <li><strong>Currency Symbol:</strong> ETH</li>
+              <li><strong>Block Explorer URL:</strong> <a href="https://blockscout.lisk.com" target="_blank" rel="noopener noreferrer" className="text-primary-blue hover:underline">https://blockscout.lisk.com</a></li>
+            </ul>
+          </div>
+          <p className="text-lg text-gray-700">
+            <strong>How to add manually:</strong> Open MetaMask, click on the network selection dropdown, click "Add Network" then "Add a network manually". Enter the details above and save.
+          </p>
+        </div>
+
+        <div>
+          <h3 className="text-2xl font-semibold text-secondary-purple mb-3">2. Add USDC as a Custom Token to MetaMask</h3>
+          <p className="text-lg text-gray-700 mb-4">
+            Even if you have USDC on the Lisk network, it might not automatically show up in your MetaMask wallet balance. You'll need to add it as a custom token:
+          </p>
+          <div className="bg-gray-50 p-4 rounded-lg shadow-inner mb-4">
+            <p className="font-semibold text-primary-blue">USDC (Bridged USDC) Contract Address on Lisk:</p>
+            <ul className="list-disc list-inside text-gray-700 ml-4">
+              <li><strong>Contract Address:</strong> 0xF242275d3a6527d877f2c927a82D9b057609cc71</li>
+              <li><strong>Token Symbol:</strong> USDC</li>
+              <li><strong>Decimals:</strong> 6</li>
+            </ul>
+          </div>
+          <p className="text-lg text-gray-700">
+            <strong>How to add the token:</strong> Ensure MetaMask is connected to the Lisk network. Scroll down in the "Assets" tab and click "Import tokens". Click the "Custom Token" tab, paste the USDC contract address, and the symbol and decimals should auto-fill. Then click "Import Custom Token".
+          </p>
+        </div>
+
+        <div>
+          <h3 className="text-2xl font-semibold text-secondary-purple mb-3">3. Acquiring USDC on Lisk</h3>
+          <p className="text-lg text-gray-700 mb-4">
+            Since Lisk is an EVM-compatible Layer 2, USDC typically originates on Ethereum or other chains and needs to be bridged over. Here are the primary ways to get USDC onto the Lisk network:
+          </p>
+
+          <div className="bg-gray-50 p-4 rounded-lg shadow-inner mb-4">
+            <h4 className="text-xl font-semibold text-primary-blue mb-2">Bridging from Ethereum (L1) or other L2s:</h4>
+            <p className="text-lg text-gray-700 mb-2">
+              You can bridge USDC from Ethereum Mainnet (or potentially other Layer 2s like OP Mainnet, Base, etc.) to Lisk using a reputable bridge or bridge aggregator. These tools find the best routes for your cross-chain transfers.
+            </p>
+            <p className="text-lg text-gray-700 mb-2">
+              <strong>How it works:</strong> You send USDC from your MetaMask on the originating chain to the bridge contract, and the equivalent amount of USDC on Lisk is then made available to your Lisk address.
+            </p>
+            <p className="text-sm text-gray-600">
+              <em>Bridging can incur fees and take varying amounts of time. Always check the bridge's official documentation.</em>
+            </p>
+            <div className="flex flex-wrap gap-3 mt-4">
+              <a href="https://bridge.gelato.network/bridge/lisk" target="_blank" rel="noopener noreferrer" className="px-5 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-300">Lisk Official Bridge</a>
+              <a href="https://thirdweb.com/bridge" target="_blank" rel="noopener noreferrer" className="px-5 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-300">thirdweb Universal Bridge</a>
+              <a href="https://jumper.exchange/" target="_blank" rel="noopener noreferrer" className="px-5 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-300">Jumper Exchange</a>
+            </div>
+          </div>
+
+          <div className="bg-gray-50 p-4 rounded-lg shadow-inner mb-4">
+            <h4 className="text-xl font-semibold text-primary-blue mb-2">Swapping on a Decentralized Exchange (DEX) on Lisk:</h4>
+            <p className="text-lg text-gray-700 mb-2">
+              Once you have some crypto on Lisk (like ETH, which is the native gas token, or LSK if you've bridged it), you can use a decentralized exchange (DEX) operating on Lisk to swap for USDC.
+            </p>
+            <p className="text-lg text-gray-700 mb-2">
+              For example, Velodrome Finance Slipstream is a prominent DEX on Lisk. You could potentially bridge ETH to Lisk and then swap that ETH for USDC on Velodrome if a USDC/ETH liquidity pool exists there.
+            </p>
+            <div className="flex flex-wrap gap-3 mt-4">
+              <a href="https://velodrome.finance/" target="_blank" rel="noopener noreferrer" className="px-5 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-300">Velodrome Finance (Lisk)</a>
+            </div>
+          </div>
+
+          <div className="bg-gray-50 p-4 rounded-lg shadow-inner">
+            <h4 className="text-xl font-semibold text-primary-blue mb-2">Buying on a Centralized Exchange (CEX):</h4>
+            <p className="text-lg text-gray-700 mb-2">
+              While less common for direct USDC withdrawals to Lisk, some major centralized exchanges (CEXs) might list LSK or eventually support direct USDC withdrawals to the Lisk network. Always check the withdrawal networks supported by your chosen exchange.
+            </p>
+            <p className="text-sm text-gray-600">
+              <em>If a CEX supports direct USDC withdrawals to Lisk, this would be the simplest option.</em>
+            </p>
+          </div>
+        </div>
+
+        <p className="text-lg text-gray-700 mt-8">
+          The most common path for getting USDC on Lisk will likely involve buying USDC on a major exchange (like Coinbase or Binance) on Ethereum Mainnet or another supported chain, and then bridging it to Lisk.
+        </p>
+      </div>
+    </div>
+  );
+};
+
+
 const CustomerSupport = () => {
   return (
     <div className="max-w-3xl mx-auto p-6 bg-white shadow-lg rounded-lg my-8 text-center">
@@ -3034,12 +3027,24 @@ const CustomerSupport = () => {
             </a>
           </div>
         </div>
+
+        <div className="p-4 bg-yellow-50 rounded-lg shadow-sm">
+          <h3 className="text-xl font-semibold text-yellow-800 mb-2">Getting USDC on Lisk</h3>
+          <p className="text-lg text-gray-700">
+            Need to get USDC into your wallet for use on FreelanceFlow? We've put together a guide to help you.
+          </p>
+          <Link
+            to="/get-usdc"
+            className="mt-2 inline-block px-6 py-2 bg-primary-blue text-white rounded-md hover:bg-blue-700 transition duration-300"
+          >
+            How to Get USDC
+          </Link>
+        </div>
       </div>
     </div>
   );
 };
 
-// --- NEW: SearchPage Component ---
 const SearchPage = ({ setNotification }) => {
   const [searchParams] = useSearchParams();
   const query = searchParams.get('query') || '';
@@ -3169,7 +3174,6 @@ const SearchPage = ({ setNotification }) => {
   );
 };
 
-// --- NEW: SettingsPage Component ---
 const SettingsPage = ({ account, setNotification }) => {
   const navigate = useNavigate();
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
@@ -3185,19 +3189,13 @@ const SettingsPage = ({ account, setNotification }) => {
     setNotification('Attempting to delete account...', 'info');
 
     try {
-      // IMPORTANT: Backend deletion logic is NOT implemented in server.js for this demo.
-      // This is a placeholder for future functionality.
-      // In a real application, you would make an API call here:
-      // await axios.delete(`${API_BASE_URL}/api/users/${account}`);
-
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
       setNotification('Account deletion initiated (backend logic not yet implemented). Your data will not be removed from the database in this demo.', 'info');
       console.warn('Account deletion backend logic is NOT implemented for this demo.');
 
-      // Optionally redirect after a delay, even if deletion is mocked
       setTimeout(() => {
-        navigate('/'); // Redirect to home or login page
+        navigate('/');
       }, 3000);
 
     } catch (error) {
@@ -3268,7 +3266,6 @@ const SettingsPage = ({ account, setNotification }) => {
   );
 };
 
-// New wrapper component for the main application content
 function MainAppContent() {
   const [walletClient, setWalletClient] = useState(null);
   const [publicClient, setPublicClient] = useState(null);
@@ -3276,19 +3273,18 @@ function MainAppContent() {
   const [notification, setNotification] = useState({ message: '', type: '' });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isInfoMenuOpen, setIsInfoMenuOpen] = useState(false);
-  const infoMenuRef = useRef(null); // Ref for the More Info dropdown
+  const infoMenuRef = useRef(null);
   const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
 
-  // Function to set a notification
   const showNotification = (message, type) => {
     setNotification({ message, type });
     setTimeout(() => {
-      setNotification({ message: '', type: '' }); // Clear after 5 seconds
+      setNotification({ message: '', type: '' });
     }, 5000);
   };
 
-  const initializeWeb3Clients = async (connectedAddress) => {
+  const initializeWeb3Clients = useCallback(async (connectedAddress) => {
     try {
       const client = createWalletClient({
         chain: liskSepolia,
@@ -3309,7 +3305,7 @@ function MainAppContent() {
       setWalletClient(null);
       setPublicClient(null);
     }
-  };
+  }, []);
 
   const connectWallet = async () => {
     showNotification('Connecting wallet...', 'info');
@@ -3319,9 +3315,8 @@ function MainAppContent() {
         return;
       }
 
-      // Request accounts directly from MetaMask
       const [address] = await window.ethereum.request({ method: 'eth_requestAccounts' });
-      await initializeWeb3Clients(address); // Initialize clients after getting address
+      await initializeWeb3Clients(address);
     } catch (error) {
       console.error("Error connecting wallet:", error);
       if (error.code === 4001) {
@@ -3335,7 +3330,6 @@ function MainAppContent() {
     }
   };
 
-  // Listen for account changes (e.g., user changes account in MetaMask)
   useEffect(() => {
     if (window.ethereum) {
       const handleAccountsChanged = async (accounts) => {
@@ -3349,11 +3343,11 @@ function MainAppContent() {
         }
       };
 
-      // Initial check for already connected account on component mount
       window.ethereum.request({ method: 'eth_accounts' })
         .then(async (accounts) => {
           if (accounts.length > 0) {
-            await initializeWeb3Clients(accounts[0]);
+            // Re-initialize clients on chain change to ensure correct chain context
+            initializeWeb3Clients(accounts[0]);
           } else {
             showNotification('No wallet connected initially.', 'info');
           }
@@ -3362,12 +3356,11 @@ function MainAppContent() {
 
       window.ethereum.on('accountsChanged', handleAccountsChanged);
       window.ethereum.on('chainChanged', (chainId) => {
-        // Re-initialize clients if chain changes to ensure they are bound to the new chain
-        // This also implicitly updates the account if MetaMask changes it on chain switch
         window.ethereum.request({ method: 'eth_accounts' })
           .then(async (accounts) => {
             if (accounts.length > 0) {
-              await initializeWeb3Clients(accounts[0]);
+              // Re-initialize clients on chain change to ensure correct chain context
+              initializeWeb3Clients(accounts[0]);
             } else {
               setAccount(null);
               setWalletClient(null);
@@ -3378,21 +3371,18 @@ function MainAppContent() {
           .catch(error => console.error("Error on chainChanged accounts check:", error));
       });
 
-
-      // Cleanup listener on component unmount
       return () => {
         window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
-        window.ethereum.removeListener('chainChanged', () => {}); // Remove anonymous function listener
+        window.ethereum.removeListener('chainChanged', () => {}); // No-op for cleanup
       };
     }
-  }, []); // Empty dependency array means this runs once on mount
+  }, [initializeWeb3Clients]);
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
-    if (isInfoMenuOpen) setIsInfoMenuOpen(false); // Close info menu if mobile menu is opened
+    if (isInfoMenuOpen) setIsInfoMenuOpen(false);
   };
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (infoMenuRef.current && !infoMenuRef.current.contains(event.target)) {
@@ -3415,7 +3405,7 @@ function MainAppContent() {
     e.preventDefault();
     if (searchQuery.trim()) {
       navigate(`/search?query=${encodeURIComponent(searchQuery.trim())}`);
-      setSearchQuery(''); // Clear search input after navigating
+      setSearchQuery('');
     } else {
       showNotification('Please enter a search query.', 'error');
     }
@@ -3430,16 +3420,15 @@ function MainAppContent() {
             <img src={logo} alt="FreelanceFlow Logo" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 border-white" />
             <span className="text-lg sm:text-2xl font-bold whitespace-nowrap">FreelanceFlow</span>
           </Link>
-          <nav className="hidden md:flex flex-1 justify-between items-center ml-4 sm:ml-8"> {/* Adjusted ml */}
-            <div className="flex items-center gap-x-4 lg:gap-x-6 text-lg"> {/* Adjusted gap-x */}
+          <nav className="hidden md:flex flex-1 justify-between items-center ml-4 sm:ml-8">
+            <div className="flex items-center gap-x-4 lg:gap-x-6 text-lg">
               <Link to="/" className="hover:text-blue-200 transition duration-300 ease-in-out">Home</Link>
               <Link to="/dashboard" className="hover:text-blue-200 transition duration-300 ease-in-out">Dashboard</Link>
               <Link to="/profile" className="hover:text-blue-200 transition duration-300 ease-in-out">Profile</Link>
               <Link to="/post-job" className="hover:text-blue-200 transition duration-300 ease-in-out">Post Job</Link>
               <Link to="/browse-jobs" className="hover:text-blue-200 transition duration-300 ease-in-out">Browse Jobs</Link>
             </div>
-            <div className="flex items-center gap-x-3 sm:gap-x-4"> {/* Adjusted gap-x */}
-              {/* Search Input in Header */}
+            <div className="flex items-center gap-x-3 sm:gap-x-4">
               <form onSubmit={handleSearchSubmit} className="relative flex items-center">
                 <input
                   type="text"
@@ -3455,7 +3444,7 @@ function MainAppContent() {
                 </button>
               </form>
 
-              <div className="relative" ref={infoMenuRef}> {/* Added ref here */}
+              <div className="relative" ref={infoMenuRef}>
                 <button
                   onClick={() => setIsInfoMenuOpen(!isInfoMenuOpen)}
                   className="px-3 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700 transition duration-300 ease-in-out flex items-center text-sm sm:text-base"
@@ -3473,6 +3462,7 @@ function MainAppContent() {
                     <Link to="/withdraw" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Withdraw Funds</Link>
                     <Link to="/settings" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Settings</Link>
                     <Link to="/support" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Customer Support</Link>
+                    <Link to="/get-usdc" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">How to Get USDC</Link>
                     <a href="#about" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">About</a>
                     <a href="#vision" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Vision</a>
                     <a href="#mission" onClick={() => setIsInfoMenuOpen(false)} className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Mission</a>
@@ -3484,10 +3474,9 @@ function MainAppContent() {
                   </div>
                 )}
               </div>
-              {/* Wallet Connect Button in Header */}
               <button
                 onClick={connectWallet}
-                className="px-4 py-2 bg-accent-green text-white font-semibold rounded-md shadow-lg hover:bg-green-600 transition duration-300 transform hover:scale-105 ml-2 sm:ml-4" 
+                className="px-4 py-2 bg-accent-green text-white font-semibold rounded-md shadow-lg hover:bg-green-600 transition duration-300 transform hover:scale-105 ml-2 sm:ml-4"
               >
                 {account ? truncateAddress(account) : 'Connect Wallet'}
               </button>
@@ -3504,7 +3493,6 @@ function MainAppContent() {
         {isMobileMenuOpen && (
           <nav className="md:hidden bg-primary-blue pb-2 pt-1 overflow-y-auto max-h-screen">
             <ul className="flex flex-col items-center space-y-3 text-lg py-2">
-              {/* Search Input for Mobile */}
               <li className="w-full px-4 mb-3">
                 <form onSubmit={handleSearchSubmit} className="relative flex items-center w-full">
                   <input
@@ -3517,346 +3505,348 @@ function MainAppContent() {
                   <button type="submit" className="absolute right-0 top-0 h-full w-10 flex items-center justify-center text-blue-200 hover:text-white">
                     <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  </button>
-                </form>
-              </li>
-              <li><Link to="/" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Home</Link></li>
-              <li><Link to="/dashboard" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Dashboard</Link></li>
-              <li><Link to="/profile" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Profile</Link></li>
-              <li><Link to="/post-job" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Post Job</Link></li>
-              <li><Link to="/browse-jobs" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Browse Jobs</Link></li>
-              <li className="text-gray-300 text-sm mt-4 mb-2">--- Information & Demos ---</li>
-              <li><Link to="/deposit-funds" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Deposit Funds</Link></li>
-              <li><Link to="/cross-chain-transfer" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Cross-Chain Transfer</Link></li>
-              <li><Link to="/dispute-resolution" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Dispute Resolution</Link></li>
-              <li><Link to="/withdraw" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Withdraw Funds</Link></li>
-              <li><Link to="/settings" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Settings</Link></li>
-              <li><Link to="/support" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Customer Support</Link></li>
-              <li><a href="#about" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">About</a></li>
-              <li><a href="#vision" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Vision</a></li>
-              <li><a href="#mission" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Mission</a></li>
-              <li><a href="#features" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Features</a></li>
-              <li><a href="#team" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Team</a></li>
-              <li><a href="#roadmap" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Roadmap</a></li>
-              <li><a href="/WHITEPAPER.pdf" target="_blank" rel="noopener noreferrer" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Whitepaper</a></li>
-              <li><a href="#contact" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Contact</a></li>
-              {/* Wallet Connect Button for Mobile Menu */}
-              <li className="w-full px-4 pt-4">
-                <button
-                  onClick={connectWallet}
-                  className="w-full px-6 py-3 bg-accent-green text-white font-semibold rounded-md shadow-lg hover:bg-green-600 transition duration-300 transform hover:scale-105"
-                >
-                  {account ? truncateAddress(account) : 'Connect Wallet'}
+                  </svg>
                 </button>
-              </li>
-            </ul>
-          </nav>
-        )}
-      </header>
+              </form>
+            </li>
+            <li><Link to="/" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Home</Link></li>
+            <li><Link to="/dashboard" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Dashboard</Link></li>
+            <li><Link to="/profile" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Profile</Link></li>
+            <li><Link to="/post-job" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Post Job</Link></li>
+            <li><Link to="/browse-jobs" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Browse Jobs</Link></li>
+            <li className="text-gray-300 text-sm mt-4 mb-2">--- Information & Demos ---</li>
+            <li><Link to="/deposit-funds" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Deposit Funds</Link></li>
+            <li><Link to="/cross-chain-transfer" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Cross-Chain Transfer</Link></li>
+            <li><Link to="/dispute-resolution" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Dispute Resolution</Link></li>
+            <li><Link to="/withdraw" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Withdraw Funds</Link></li>
+            <li><Link to="/settings" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Settings</Link></li>
+            <li><Link to="/support" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Customer Support</Link></li>
+            <li><Link to="/get-usdc" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">How to Get USDC</Link></li>
+            <li><a href="#about" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">About</a></li>
+            <li><a href="#vision" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Vision</a></li>
+            <li><a href="#mission" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Mission</a></li>
+            <li><a href="#features" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Features</a></li>
+            <li><a href="#team" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Team</a></li>
+            <li><a href="#roadmap" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Roadmap</a></li>
+            <li><a href="/WHITEPAPER.pdf" target="_blank" rel="noopener noreferrer" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Whitepaper</a></li>
+            <li><a href="#contact" onClick={toggleMobileMenu} className="block w-full text-center py-2 hover:bg-blue-700">Contact</a></li>
+            <li className="w-full px-4 pt-4">
+              <button
+                onClick={connectWallet}
+                className="w-full px-6 py-3 bg-accent-green text-white font-semibold rounded-md shadow-lg hover:bg-green-600 transition duration-300 transform hover:scale-105"
+              >
+                {account ? truncateAddress(account) : 'Connect Wallet'}
+              </button>
+            </li>
+          </ul>
+        </nav>
+      )}
+    </header>
 
-      <Routes>
-        <Route path="/" element={
-          <>
-            <section className="relative bg-gradient-to-br from-primary-blue to-secondary-purple text-white py-24 text-center overflow-hidden animate-gradient">
-              <div className="absolute inset-0 z-0 overflow-hidden">
-                <div className="absolute top-0 left-1/4 h-full w-px bg-white/20 animate-line-flow"></div>
-                <div className="absolute top-0 left-3/4 h-full w-px bg-white/20 animate-line-flow-delay-2"></div>
-                <div className="absolute top-0 left-1/6 h-full w-px bg-white/20 animate-line-flow-delay-1"></div>
-                <div className="absolute top-0 left-5/6 h-full w-px bg-white/20 animate-line-flow-delay-2"></div>
+    <Routes>
+      <Route path="/" element={
+        <>
+          <section className="relative bg-gradient-to-br from-primary-blue to-secondary-purple text-white py-24 text-center overflow-hidden animate-gradient">
+            <div className="absolute inset-0 z-0 overflow-hidden">
+              <div className="absolute top-0 left-1/4 h-full w-px bg-white/20 animate-line-flow"></div>
+              <div className="absolute top-0 left-3/4 h-full w-px bg-white/20 animate-line-flow-delay-2"></div>
+              <div className="absolute top-0 left-1/6 h-full w-px bg-white/20 animate-line-flow-delay-1"></div>
+              <div className="absolute top-0 left-5/6 h-full w-px bg-white/20 animate-line-flow-delay-2"></div>
+            </div>
+
+            <div className="max-w-5xl mx-auto relative z-10 px-4">
+              <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold mb-6 animate-fade-in-down tracking-tight animate-text-glow">
+                FreelanceFlow
+              </h1>
+              <p className="text-xl md:text-2xl lg:text-3xl font-light mb-8 animate-fade-in-up">
+                Your gateway to secure, low-cost USDC payments, empowering African freelancers to thrive globally.
+              </p>
+              <a
+                href="https://discord.gg/7TVd2ZdP9h"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block px-10 py-4 bg-white text-secondary-purple font-bold rounded-full shadow-lg hover:bg-gray-100 hover:scale-105 transition duration-300 ease-in-out transform animate-pulse-slow animate-glowing-border"
+              >
+                Join Our Community
+              </a>
+            </div>
+          </section>
+
+          <section id="how-it-works" className="py-16 sm:py-20 bg-white text-center shadow-inner">
+            <div className="max-w-6xl mx-auto px-4">
+              <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-8">How FreelanceFlow Works</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-10">
+                <div className="p-6 bg-gray-50 rounded-lg shadow-md text-center">
+                  <div className="text-5xl text-accent-green mb-4">1</div>
+                  <h3 className="text-xl font-semibold text-secondary-purple mb-2">Client Posts Job & Funds Escrow</h3>
+                  <p className="text-base text-gray-700">A client posts a job with a clear description and a set USDC amount. They then deposit the full job amount into a secure smart contract escrow.</p>
+                </div>
+                <div className="p-6 bg-gray-50 rounded-lg shadow-md text-center">
+                  <div className="text-5xl text-accent-green mb-4">2</div>
+                  <h3 className="text-xl font-semibold text-secondary-purple mb-2">Freelancer Applies & Works</h3>
+                  <p className="text-base text-gray-700">Interested freelancers apply. The client selects a freelancer, who then accepts the assignment and begins working on the task.</p>
+                </div>
+                <div className="p-6 bg-gray-50 rounded-lg shadow-md text-center">
+                  <div className="text-5xl text-accent-green mb-4">3</div>
+                  <h3 className="text-xl font-semibold text-secondary-purple mb-2">Funds Released or Disputed</h3>
+                  <p className="text-base text-gray-700">Once the job is completed, the freelancer marks it as done. The client verifies the work and releases the USDC from escrow to the freelancer. In case of disagreement, a dispute can be initiated.</p>
+                </div>
               </div>
+              <p className="text-lg text-gray-700 mt-8 max-w-3xl mx-auto">
+                This ensures fair and transparent transactions, protecting both clients and freelancers.
+              </p>
+            </div>
+          </section>
 
-              <div className="max-w-5xl mx-auto relative z-10 px-4">
-                <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold mb-6 animate-fade-in-down tracking-tight animate-text-glow">
-                  FreelanceFlow
-                </h1>
-                <p className="text-xl md:text-2xl lg:text-3xl font-light mb-8 animate-fade-in-up">
-                  Your gateway to secure, low-cost USDC payments, empowering African freelancers to thrive globally.
-                </p>
+
+          <section id="vision" className="py-16 sm:py-20 bg-gray-100 text-center shadow-inner">
+            <div className="max-w-5xl mx-auto px-4">
+              <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-6">Our Vision</h2>
+              <p className="text-lg sm:text-xl text-gray-700 max-w-3xl mx-auto leading-relaxed">
+                
+                To create a world where every African freelancer has seamless access to global opportunities, empowered by secure, transparent, and equitable payment solutions that truly value their work.
+              </p>
+            </div>
+          </section>
+
+          <section id="mission" className="py-16 sm:py-20 bg-white text-center shadow-inner">
+            <div className="max-w-5xl mx-auto px-4">
+              <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-6">Our Mission</h2>
+              <p className="text-lg sm:text-xl text-gray-700 max-w-3xl mx-auto leading-relaxed">
+                FreelanceFlow is dedicated to building and continuously refining a decentralized platform that provides African freelancers with the tools for secure, low-cost USDC payments, utilizing innovative blockchain technology to foster trust, efficiency, and financial growth.
+              </p>
+            </div>
+          </section>
+
+          <section id="about" className="py-16 sm:py-20 bg-gray-100 shadow-inner">
+            <div className="max-w-5xl mx-auto text-center px-4 transition duration-300 ease-in-out">
+              <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-6">About FreelanceFlow</h2>
+              <p className="text-lg sm:text-xl text-gray-700 max-w-3xl mx-auto leading-relaxed">
+                FreelanceFlow is a pioneering blockchain-powered platform dedicated to revolutionizing how African freelancers engage with the global gig economy. We provide a robust ecosystem enabling secure, transparent, and significantly low-cost stablecoin USDC payments through advanced smart contract escrow. Our solution leverages cutting-edge blockchain technology to ensure fast, reliable, and equitable transactions, empowering gig workers across the continent to maximize their earnings and opportunities.
+              </p>
+            </div>
+          </section>
+
+          <section id="features" className="py-16 sm:py-20 bg-white">
+            <div className="max-w-6xl mx-auto px-4 transition duration-300 ease-in-out">
+              <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue text-center mb-8 sm:mb-12">Key Features Designed for You</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-10">
+                <div className="bg-gray-50 p-6 sm:p-8 rounded-lg shadow-xl text-center hover:scale-105 transition duration-300 ease-in-out transform animate-icon-float animate-glowing-border">
+                  <UsdcIcon />
+                  <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple mt-4 mb-2">Low-Cost USDC Payments</h3>
+                  <p className="text-base sm:text-lg text-gray-700 transition duration-300 ease-in-out">Receive and send USDC stablecoin with significantly reduced transaction fees, maximizing your earnings.</p>
+                </div>
+
+                <div className="bg-gray-50 p-6 sm:p-8 rounded-lg shadow-xl text-center hover:scale-105 transition duration-300 ease-in-out transform animate-icon-float animate-glowing-border">
+                  <SecurityIcon />
+                  <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple mt-4 mb-2">Built-in Escrow Security</h3>
+                  <p className="text-base sm:text-lg text-gray-700">Funds are held securely by smart contracts and released only when both parties confirm work completion, ensuring trust and fairness and mitigating disputes.</p>
+                </div>
+
+                <div className="bg-gray-50 p-6 sm:p-8 rounded-lg shadow-xl text-center hover:scale-105 transition duration-300 ease-in-out transform animate-icon-float animate-glowing-border">
+                  <LiskIcon />
+                  <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple mt-4 mb-2">Robust Blockchain Infrastructure</h3>
+                  <p className="text-base sm:text-lg text-gray-700">Powered by a scalable and efficient Layer 2 blockchain, providing a reliable and future-proof foundation for decentralized payments worldwide.</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="team" className="py-16 sm:py-20 bg-white shadow-inner">
+            <div className="max-w-4xl mx-auto text-center px-4 transition duration-300 ease-in-out">
+              <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-8">Meet Our Visionary Team</h2>
+              <div className="flex flex-col md:flex-row justify-center items-start md:space-x-8 space-y-12 md:space-y-0">
+
+                <div className="flex flex-col items-center flex-1">
+                  <img
+                    src={process.env.PUBLIC_URL + "/images/Nick copy.webp"}
+                    alt="Nicodemus Kiptoo Profile"
+                    className="w-32 h-32 sm:w-40 sm:h-40 rounded-full object-cover object-top shadow-md mb-4 border-4 border-secondary-purple"
+                  />
+                  <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple">Nicodemus</h3>
+                  <p className="text-base sm:text-lg text-gray-700 mt-2 max-w-xs text-center">
+                    Founder. Nicodemus leads the effective use of innovative solutions that streamline work and transactions for the African gig economy.
+                  </p>
+
+                  <div className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-2">
+                    <a href="https://www.linkedin.com/in/nicodemus-kiptoo-4276b9364/" target="_blank" rel="noopener noreferrer" className="hover:text-primary-blue transition duration-300">LinkedIn</a>
+                    <a href="https://x.com/nicodemuskipto0" target="_blank" rel="noopener noreferrer" className="hover:text-primary-blue transition duration-300">X</a>
+                  </div>
+                </div>
+
+                <div className="flex flex-col items-center flex-1">
+                  <img
+                    src={process.env.PUBLIC_URL + "/images/Ashley.webp"}
+                    alt="Hacker Profile"
+                    className="w-32 h-32 sm:w-40 sm:h-40 rounded-full object-cover object-top shadow-md mb-4 border-4 border-secondary-purple"
+                  />
+                  <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple">Ashley</h3>
+                  <p className="text-base sm:text-lg text-gray-700 mt-2 max-w-xs text-center">
+                    Growth hacker. Ashley focuses on strategies that help freelancers have access to more secure gigs and diverse talent across the continent.
+                  </p>
+
+                  <div className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-2">
+                    <a href="https://www.linkedin.com/in/ashley-jepchirchir-9222982a9/" target="_blank" rel="noopener noreferrer" className="hover:text-primary-blue transition duration-300">LinkedIn</a>
+                    <a href="https://x.com/A_jepchirchir" target="_blank" rel="noopener noreferrer" className="hover:text-primary-blue transition duration-300">X</a>
+                  </div>
+                </div>
+
+                <div className="flex flex-col items-center flex-1">
+                  <img
+                    src={process.env.PUBLIC_URL + "/images/Joan.jpg"}
+                    alt="CMO Profile"
+                    className="w-32 h-32 sm:w-40 sm:h-40 rounded-full object-cover object-top shadow-md mb-4 border-4 border-secondary-purple"
+                  />
+                  <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple">Joan</h3>
+                  <p className="text-base sm:text-lg text-gray-700 mt-2 max-w-xs text-center">
+                    Business developer. Joan focuses on guiding market entry and growth strategies to connect FreelanceFlow with a global audience.
+                  </p>
+
+                  <div className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-2">
+                    <a href="https://www.linkedin.com/in/eng-joan-jerop-810106133/" target="_blank" rel="noopener noreferrer" className="hover:text-primary-blue transition duration-300">LinkedIn</a>
+                    <a href="https://x.com/jeropcrypto" target="_blank" rel="noopener noreferrer" className="hover:text-primary-blue transition duration-300">X</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+            </section>
+
+            <section id="roadmap" className="py-16 sm:py-20 bg-gray-100">
+              <div className="max-w-4xl mx-auto text-center px-4 transition duration-300 ease-in-out">
+                <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-8">Our Product Roadmap</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-left">
+                  <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl hover:scale-105 transition duration-300 ease-in-out transform">
+                    <div className="flex items-center mb-4">
+                      <h3 className="text-lg sm:text-xl font-bold text-primary-blue">Phase 1: Initial Launch & Foundation</h3>
+                      <span className="ml-auto bg-green-200 text-green-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">Completed</span>
+                    </div>
+                    <p className="text-base sm:text-lg text-gray-700 leading-relaxed">
+                      Core smart contracts deployed, secure payment infrastructure established, and initial community outreach.
+                    </p>
+                    <p className="text-sm text-gray-500 mt-2">(July 2025)</p>
+                  </div>
+
+                  <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl hover:scale-105 transition duration-300 ease-in-out transform">
+                    <div className="flex items-center mb-4">
+                      <h3 className="text-lg sm:text-xl font-bold text-primary-blue">Phase 2: Minimum Viable Product Beta</h3>
+                      <span className="ml-auto bg-blue-200 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">In Progress</span>
+                    </div>
+                    <p className="text-base sm:text-lg text-gray-700 leading-relaxed">
+                      Launch of the core platform to a curated group of 50 beta users, enabling USDC payment processing and escrow, gathering crucial feedback for optimization.
+                    </p>
+                    <p className="text-sm text-gray-500 mt-2">(Target: Q3 2025)</p>
+                  </div>
+
+                  <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl hover:scale-105 transition duration-300 ease-in-out transform">
+                    <div className="flex items-center mb-4">
+                      <h3 className="text-lg sm:text-xl font-bold text-primary-blue">Phase 3: Growth & Ecosystem Expansion</h3>
+                      <span className="ml-auto bg-purple-200 text-purple-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">Upcoming</span>
+                    </div>
+                    <p className="text-base sm:text-lg text-gray-700 leading-relaxed">
+                      Scaling user base to 150 active users, achieving $40,000 USDC Total Value Locked (TVL), and enhancing platform with advanced features.
+                    </p>
+                    <p className="text-sm text-gray-500 mt-2">(Target: Q4 2025)</p>
+                  </div>
+
+                  <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl hover:scale-105 transition duration-300 ease-in-out transform">
+                    <div className="flex items-center mb-4">
+                      <h3 className="text-lg sm:text-xl font-bold text-primary-blue">Future Enhancements: Scaling & Accessibility</h3>
+                      <span className="ml-auto bg-gray-200 text-gray-700 text-xs font-semibold px-2.5 py-0.5 rounded-full">Future</span>
+                    </div>
+                    <p className="text-base sm:text-lg text-gray-700 leading-relaxed">
+                      Plans include integrating seamless fiat on/off-ramps, implementing sophisticated dispute resolution mechanisms, and expanding global participation.
+                    </p>
+                    <p className="text-sm text-gray-500 mt-2">(Beyond Q4 2025)</p>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section id="whitepaper" className="py-12 sm:py-16 bg-white text-center shadow-inner">
+              <div className="max-w-4xl mx-auto px-4 transition duration-300 ease-in-out">
+                <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-4">Deep Dive: Our Whitepaper</h2>
+                <p className="text-lg sm:text-xl mb-8">Explore the comprehensive technical architecture, economic model, and long-term vision of FreelanceFlow in our detailed Whitepaper.</p>
                 <a
-                  href="https://discord.gg/7TVd2ZdP9h"
+                  href="/WHITEPAPER.pdf"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-block px-10 py-4 bg-white text-secondary-purple font-bold rounded-full shadow-lg hover:bg-gray-100 hover:scale-105 transition duration-300 ease-in-out transform animate-pulse-slow animate-glowing-border"
+                  className="inline-block px-8 py-3 bg-secondary-purple text-white font-semibold rounded-lg hover:bg-purple-700 shadow-lg transition duration-300"
                 >
-                  Join Our Community
+                  Read the Whitepaper
                 </a>
               </div>
             </section>
 
-            <section id="how-it-works" className="py-16 sm:py-20 bg-white text-center shadow-inner">
-              <div className="max-w-6xl mx-auto px-4">
-                <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-8">How FreelanceFlow Works</h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-10">
-                  <div className="p-6 bg-gray-50 rounded-lg shadow-md text-center">
-                    <div className="text-5xl text-accent-green mb-4">1</div>
-                    <h3 className="text-xl font-semibold text-secondary-purple mb-2">Client Posts Job & Funds Escrow</h3>
-                    <p className="text-base text-gray-700">A client posts a job with a clear description and a set USDC amount. They then deposit the full job amount into a secure smart contract escrow.</p>
-                  </div>
-                  <div className="p-6 bg-gray-50 rounded-lg shadow-md text-center">
-                    <div className="text-5xl text-accent-green mb-4">2</div>
-                    <h3 className="text-xl font-semibold text-secondary-purple mb-2">Freelancer Applies & Works</h3>
-                    <p className="text-base text-gray-700">Interested freelancers apply. The client selects a freelancer, who then accepts the assignment and begins working on the task.</p>
-                  </div>
-                  <div className="p-6 bg-gray-50 rounded-lg shadow-md text-center">
-                    <div className="text-5xl text-accent-green mb-4">3</div>
-                    <h3 className="text-xl font-semibold text-secondary-purple mb-2">Funds Released or Disputed</h3>
-                    <p className="text-base text-gray-700">Once the job is completed, the freelancer marks it as done. The client verifies the work and releases the USDC from escrow to the freelancer. In case of disagreement, a dispute can be initiated.</p>
-                  </div>
-                </div>
-                <p className="text-lg text-gray-700 mt-8 max-w-3xl mx-auto">
-                  This ensures fair and transparent transactions, protecting both clients and freelancers.
-                </p>
-              </div>
-            </section>
-
-
-            <section id="vision" className="py-16 sm:py-20 bg-gray-100 text-center shadow-inner">
-              <div className="max-w-5xl mx-auto px-4">
-                <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-6">Our Vision</h2>
-                <p className="text-lg sm:text-xl text-gray-700 max-w-3xl mx-auto leading-relaxed">
-                  To create a world where every African freelancer has seamless access to global opportunities, empowered by secure, transparent, and equitable payment solutions that truly value their work.
-                </p>
-              </div>
-            </section>
-
-            <section id="mission" className="py-16 sm:py-20 bg-white text-center shadow-inner">
-              <div className="max-w-5xl mx-auto px-4">
-                <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-6">Our Mission</h2>
-                <p className="text-lg sm:text-xl text-gray-700 max-w-3xl mx-auto leading-relaxed">
-                  FreelanceFlow is dedicated to building and continuously refining a decentralized platform that provides African freelancers with the tools for secure, low-cost USDC payments, utilizing innovative blockchain technology to foster trust, efficiency, and financial growth.
-                </p>
-              </div>
-            </section>
-
-            <section id="about" className="py-16 sm:py-20 bg-gray-100 shadow-inner">
-              <div className="max-w-5xl mx-auto text-center px-4 transition duration-300 ease-in-out">
-                <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-6">About FreelanceFlow</h2>
-                <p className="text-lg sm:text-xl text-gray-700 max-w-3xl mx-auto leading-relaxed">
-                  FreelanceFlow is a pioneering blockchain-powered platform dedicated to revolutionizing how African freelancers engage with the global gig economy. We provide a robust ecosystem enabling secure, transparent, and significantly low-cost stablecoin USDC payments through advanced smart contract escrow. Our solution leverages cutting-edge blockchain technology to ensure fast, reliable, and equitable transactions, empowering gig workers across the continent to maximize their earnings and opportunities.
-                </p>
-              </div>
-            </section>
-
-            <section id="features" className="py-16 sm:py-20 bg-white">
-              <div className="max-w-6xl mx-auto px-4 transition duration-300 ease-in-out">
-                <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue text-center mb-8 sm:mb-12">Key Features Designed for You</h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-10">
-                  <div className="bg-gray-50 p-6 sm:p-8 rounded-lg shadow-xl text-center hover:scale-105 transition duration-300 ease-in-out transform animate-icon-float animate-glowing-border">
-                    <UsdcIcon />
-                    <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple mt-4 mb-2">Low-Cost USDC Payments</h3>
-                    <p className="text-base sm:text-lg text-gray-700 transition duration-300 ease-in-out">Receive and send USDC stablecoin with significantly reduced transaction fees, maximizing your earnings.</p>
-                  </div>
-
-                  <div className="bg-gray-50 p-6 sm:p-8 rounded-lg shadow-xl text-center hover:scale-105 transition duration-300 ease-in-out transform animate-icon-float animate-glowing-border">
-                    <SecurityIcon />
-                    <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple mt-4 mb-2">Built-in Escrow Security</h3>
-                    <p className="text-base sm:text-lg text-gray-700">Funds are held securely by smart contracts and released only when both parties confirm work completion, ensuring trust and fairness and mitigating disputes.</p>
-                  </div>
-
-                  <div className="bg-gray-50 p-6 sm:p-8 rounded-lg shadow-xl text-center hover:scale-105 transition duration-300 ease-in-out transform animate-icon-float animate-glowing-border">
-                    <LiskIcon />
-                    <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple mt-4 mb-2">Robust Blockchain Infrastructure</h3>
-                    <p className="text-base sm:text-lg text-gray-700">Powered by a scalable and efficient Layer 2 blockchain, providing a reliable and future-proof foundation for decentralized payments worldwide.</p>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <section id="team" className="py-16 sm:py-20 bg-white shadow-inner">
-              <div className="max-w-4xl mx-auto text-center px-4 transition duration-300 ease-in-out">
-                <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-8">Meet Our Visionary Team</h2>
-                <div className="flex flex-col md:flex-row justify-center items-start md:space-x-8 space-y-12 md:space-y-0">
-
-                  <div className="flex flex-col items-center flex-1">
-                    <img
-                      src={process.env.PUBLIC_URL + "/images/Nick copy.webp"}
-                      alt="Nicodemus Kiptoo Profile"
-                      className="w-32 h-32 sm:w-40 sm:h-40 rounded-full object-cover object-top shadow-md mb-4 border-4 border-secondary-purple"
-                    />
-                    <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple">Nicodemus</h3>
-                    <p className="text-base sm:text-lg text-gray-700 mt-2 max-w-xs text-center">
-                      Founder. Nicodemus leads the effective use of innovative solutions that streamline work and transactions for the African gig economy.
-                    </p>
-
-                    <div className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-2">
-                      <a href="https://www.linkedin.com/in/nicodemus-kiptoo-4276b9364/" target="_blank" rel="noopener noreferrer" className="hover:text-primary-blue transition duration-300">LinkedIn</a>
-                      <a href="https://x.com/nicodemuskipto0" target="_blank" rel="noopener noreferrer" className="hover:text-primary-blue transition duration-300">X</a>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col items-center flex-1">
-                    <img
-                      src={process.env.PUBLIC_URL + "/images/Ashley.webp"}
-                      alt="Hacker Profile"
-                      className="w-32 h-32 sm:w-40 sm:h-40 rounded-full object-cover object-top shadow-md mb-4 border-4 border-secondary-purple"
-                    />
-                    <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple">Ashley</h3>
-                    <p className="text-base sm:text-lg text-gray-700 mt-2 max-w-xs text-center">
-                      Growth hacker. Ashley focuses on strategies that help freelancers have access to more secure gigs and diverse talent across the continent.
-                    </p>
-
-                    <div className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-2">
-                      <a href="https://www.linkedin.com/in/ashley-jepchirchir-9222982a9/" target="_blank" rel="noopener noreferrer" className="hover:text-primary-blue transition duration-300">LinkedIn</a>
-                      <a href="https://x.com/A_jepchirchir" target="_blank" rel="noopener noreferrer" className="hover:text-primary-blue transition duration-300">X</a>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col items-center flex-1">
-                    <img
-                      src={process.env.PUBLIC_URL + "/images/Joan.jpg"}
-                      alt="CMO Profile"
-                      className="w-32 h-32 sm:w-40 sm:h-40 rounded-full object-cover object-top shadow-md mb-4 border-4 border-secondary-purple"
-                    />
-                    <h3 className="text-xl sm:text-2xl font-semibold text-secondary-purple">Joan</h3>
-                    <p className="text-base sm:text-lg text-gray-700 mt-2 max-w-xs text-center">
-                      Business developer. Joan focuses on guiding market entry and growth strategies to connect FreelanceFlow with a global audience.
-                    </p>
-
-                    <div className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-2">
-                      <a href="https://www.linkedin.com/in/eng-joan-jerop-810106133/" target="_blank" rel="noopener noreferrer" className="hover:text-primary-blue transition duration-300">LinkedIn</a>
-                      <a href="https://x.com/jeropcrypto" target="_blank" rel="noopener noreferrer" className="hover:text-primary-blue transition duration-300">X</a>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              </section>
-
-              <section id="roadmap" className="py-16 sm:py-20 bg-gray-100">
-                <div className="max-w-4xl mx-auto text-center px-4 transition duration-300 ease-in-out">
-                  <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-8">Our Product Roadmap</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-left">
-                    <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl hover:scale-105 transition duration-300 ease-in-out transform">
-                      <div className="flex items-center mb-4">
-                        <h3 className="text-lg sm:text-xl font-bold text-primary-blue">Phase 1: Initial Launch & Foundation</h3>
-                        <span className="ml-auto bg-green-200 text-green-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">Completed</span>
-                      </div>
-                      <p className="text-base sm:text-lg text-gray-700 leading-relaxed">
-                        Core smart contracts deployed, secure payment infrastructure established, and initial community outreach.
-                      </p>
-                      <p className="text-sm text-gray-500 mt-2">(July 2025)</p>
-                    </div>
-
-                    <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl hover:scale-105 transition duration-300 ease-in-out transform">
-                      <div className="flex items-center mb-4">
-                        <h3 className="text-lg sm:text-xl font-bold text-primary-blue">Phase 2: Minimum Viable Product Beta</h3>
-                        <span className="ml-auto bg-blue-200 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">In Progress</span>
-                      </div>
-                      <p className="text-base sm:text-lg text-gray-700 leading-relaxed">
-                        Launch of the core platform to a curated group of 50 beta users, enabling USDC payment processing and escrow, gathering crucial feedback for optimization.
-                      </p>
-                      <p className="text-sm text-gray-500 mt-2">(Target: Q3 2025)</p>
-                    </div>
-
-                    <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl hover:scale-105 transition duration-300 ease-in-out transform">
-                      <div className="flex items-center mb-4">
-                        <h3 className="text-lg sm:text-xl font-bold text-primary-blue">Phase 3: Growth & Ecosystem Expansion</h3>
-                        <span className="ml-auto bg-purple-200 text-purple-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">Upcoming</span>
-                      </div>
-                      <p className="text-base sm:text-lg text-gray-700 leading-relaxed">
-                        Scaling user base to 150 active users, achieving $40,000 USDC Total Value Locked (TVL), and enhancing platform with advanced features.
-                      </p>
-                      <p className="text-sm text-gray-500 mt-2">(Target: Q4 2025)</p>
-                    </div>
-
-                    <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl hover:scale-105 transition duration-300 ease-in-out transform">
-                      <div className="flex items-center mb-4">
-                        <h3 className="text-lg sm:text-xl font-bold text-primary-blue">Future Enhancements: Scaling & Accessibility</h3>
-                        <span className="ml-auto bg-gray-200 text-gray-700 text-xs font-semibold px-2.5 py-0.5 rounded-full">Future</span>
-                      </div>
-                      <p className="text-base sm:text-lg text-gray-700 leading-relaxed">
-                        Plans include integrating seamless fiat on/off-ramps, implementing sophisticated dispute resolution mechanisms, and expanding global participation.
-                      </p>
-                      <p className="text-sm text-gray-500 mt-2">(Beyond Q4 2025)</p>
-                    </div>
-                  </div>
-                </div>
-              </section>
-
-              <section id="whitepaper" className="py-12 sm:py-16 bg-white text-center shadow-inner">
-                <div className="max-w-4xl mx-auto px-4 transition duration-300 ease-in-out">
-                  <h2 className="text-3xl sm:text-4xl font-bold text-primary-blue mb-4">Deep Dive: Our Whitepaper</h2>
-                  <p className="text-lg sm:text-xl mb-8">Explore the comprehensive technical architecture, economic model, and long-term vision of FreelanceFlow in our detailed Whitepaper.</p>
+            <section id="contact" className="py-12 sm:py-16 bg-primary-blue text-white text-center pb-20">
+              <div className="max-w-4xl mx-auto px-4 transition duration-300 ease-in-out">
+                <h2 className="text-3xl sm:text-4xl font-bold mb-4">Connect with FreelanceFlow</h2>
+                <p className="text-lg sm:text-xl mb-8">Have questions, feedback, or want to partner? Reach out to us!</p>
+                <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
                   <a
-                    href="/WHITEPAPER.pdf"
+                    href="https://github.com/TarusNicky8/FreelanceFlow/blob/main/README.md"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-block px-8 py-3 bg-secondary-purple text-white font-semibold rounded-lg hover:bg-purple-700 shadow-lg transition duration-300"
                   >
-                    Read the Whitepaper
+                    Explore Our GitHub
+                  </a>
+                  <a
+                    href="mailto:nicodemuskiptoo88@gmail.com"
+                    className="inline-block px-8 py-3 bg-gray-200 text-primary-blue font-semibold rounded-lg hover:bg-gray-300 shadow-lg transition duration-300"
+                  >
+                    Email Us Directly
                   </a>
                 </div>
-              </section>
+              </div>
+            </section>
 
-              <section id="contact" className="py-12 sm:py-16 bg-primary-blue text-white text-center pb-20">
-                <div className="max-w-4xl mx-auto px-4 transition duration-300 ease-in-out">
-                  <h2 className="text-3xl sm:text-4xl font-bold mb-4">Connect with FreelanceFlow</h2>
-                  <p className="text-lg sm:text-xl mb-8">Have questions, feedback, or want to partner? Reach out to us!</p>
-                  <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
-                    <a
-                      href="https://github.com/TarusNicky8/FreelanceFlow/blob/main/README.md"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-block px-8 py-3 bg-secondary-purple text-white font-semibold rounded-lg hover:bg-purple-700 shadow-lg transition duration-300"
-                    >
-                      Explore Our GitHub
-                    </a>
-                    <a
-                      href="mailto:nicodemuskiptoo88@gmail.com"
-                      className="inline-block px-8 py-3 bg-gray-200 text-primary-blue font-semibold rounded-lg hover:bg-gray-300 shadow-lg transition duration-300"
-                    >
-                      Email Us Directly
-                    </a>
-                  </div>
+
+            <footer className="bg-gray-800 text-white py-6 sm:py-8 text-center text-sm">
+              <div className="max-w-5xl mx-auto px-4 transition duration-300 ease-in-out">
+                <p className="mb-3">&copy; {new Date().getFullYear()} FreelanceFlow. All rights reserved. Your gateway to global opportunities.</p>
+                <div className="mt-2 flex flex-wrap justify-center gap-x-6 gap-y-3 text-2xl">
+                  <a href="https://github.com/TarusNicky8" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition duration-300">
+                    <i className="fab fa-github"></i>
+                  </a>
+                  <a href="https://discord.gg/7TVd2ZdP9h" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition duration-300">
+                    <i className="fab fa-discord"></i>
+                  </a>
+                  <a href="https://x.com/freelanceflo" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition duration-300">
+                    <i className="fab fa-twitter"></i>
+                  </a>
+                  <a href="https://www.linkedin.com/in/freelanceflow-usdc-29a495371/" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition duration-300">
+                    <i className="fab fa-linkedin"></i>
+                  </a>
                 </div>
-              </section>
-
-
-              <footer className="bg-gray-800 text-white py-6 sm:py-8 text-center text-sm">
-                <div className="max-w-5xl mx-auto px-4 transition duration-300 ease-in-out">
-                  <p className="mb-3">&copy; {new Date().getFullYear()} FreelanceFlow. All rights reserved. Your gateway to global opportunities.</p>
-                  <div className="mt-2 flex flex-wrap justify-center gap-x-6 gap-y-3 text-2xl">
-                    <a href="https://github.com/TarusNicky8" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition duration-300">
-                      <i className="fab fa-github"></i>
-                    </a>
-                    <a href="https://discord.gg/7TVd2ZdP9h" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition duration-300">
-                      <i className="fab fa-discord"></i>
-                    </a>
-                    <a href="https://x.com/freelanceflo" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition duration-300">
-                      <i className="fab fa-twitter"></i>
-                    </a>
-                    <a href="https://www.linkedin.com/in/freelanceflow-usdc-29a495371/" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition duration-300">
-                      <i className="fab fa-linkedin"></i>
-                    </a>
-                  </div>
-                  <p className="mt-4 text-gray-400">Connecting African Talent to Global Opportunities.</p>
-                </div>
-              </footer>
-            </>
-          } />
-          <Route path="/dashboard" element={<Dashboard account={account} />} />
-          <Route path="/profile/:address?" element={<Profile account={account} />} />
-          <Route path="/job/:id" element={<JobDetails account={account} publicClient={publicClient} walletClient={walletClient} setNotification={showNotification} />} />
-          <Route path="/deposit-funds" element={
-            <DivviIntegration
-              account={account}
-              walletClient={walletClient}
-              publicClient={publicClient}
-              setNotification={showNotification}
-            />
-          } />
-          <Route path="/post-job" element={<PostJob account={account} setNotification={showNotification} />} />
-          <Route path="/browse-jobs" element={<BrowseJobs setNotification={showNotification} />} />
-          <Route path="/cross-chain-transfer" element={<CrossChainIntegration account={account} publicClient={publicClient} walletClient={walletClient} setNotification={showNotification} />} />
-          <Route path="/dispute-resolution" element={<DisputeResolution account={account} setNotification={showNotification} />} />
-          <Route path="/withdraw" element={<Withdrawal account={account} setNotification={showNotification} />} />
-          <Route path="/admin" element={<AdminDashboard setNotification={showNotification} />} />
-          <Route path="/support" element={<CustomerSupport />} />
-          <Route path="/search" element={<SearchPage setNotification={showNotification} />} />
-          <Route path="/settings" element={<SettingsPage account={account} setNotification={showNotification} />} />
-        </Routes>
-        <Notification message={notification.message} type={notification.type} onClose={() => setNotification({ message: '', type: '' })} />
-      </div>
+                <p className="mt-4 text-gray-400">Connecting African Talent to Global Opportunities.</p>
+              </div>
+            </footer>
+          </>
+        } />
+        <Route path="/dashboard" element={<Dashboard account={account} />} />
+        <Route path="/profile/:address?" element={<Profile account={account} />} />
+        <Route path="/job/:id" element={<JobDetails account={account} publicClient={publicClient} walletClient={walletClient} setNotification={showNotification} />} />
+        <Route path="/deposit-funds" element={
+          <DivviIntegration
+            account={account}
+            walletClient={walletClient}
+            publicClient={publicClient}
+            setNotification={showNotification}
+          />
+        } />
+        <Route path="/post-job" element={<PostJob account={account} setNotification={showNotification} />} />
+        <Route path="/browse-jobs" element={<BrowseJobs setNotification={showNotification} />} />
+        <Route path="/cross-chain-transfer" element={<CrossChainIntegration account={account} publicClient={publicClient} walletClient={walletClient} setNotification={showNotification} />} />
+        <Route path="/dispute-resolution" element={<DisputeResolution account={account} setNotification={showNotification} />} />
+        <Route path="/withdraw" element={<Withdrawal account={account} setNotification={showNotification} />} />
+        <Route path="/admin" element={<AdminDashboard setNotification={showNotification} />} />
+        <Route path="/support" element={<CustomerSupport />} />
+        <Route path="/get-usdc" element={<GetUsdcOnLiskGuide />} />
+        <Route path="/search" element={<SearchPage setNotification={showNotification} />} />
+        <Route path="/settings" element={<SettingsPage account={account} setNotification={showNotification} />} />
+      </Routes>
+      <Notification message={notification.message} type={notification.type} onClose={() => setNotification({ message: '', type: '' })} />
+    </div>
   );
 }
 
