@@ -139,7 +139,7 @@ const escrowAbi = [
 ];
 
 const usdcContractAddress = '0xF242275d3a6527d877f2c927a82D9b057609cc71';
-const escrowContractAddress = '0x44e58cA9A3597d3f050322F167f29396d7c84F0a';
+const escrowContractAddress = '0xB5f7fa638DA58Bb43297e3Fd220C35830a4bd5c1'; 
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
 

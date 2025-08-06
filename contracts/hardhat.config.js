@@ -1,9 +1,11 @@
+// hardhat.config.js
 require("@nomicfoundation/hardhat-toolbox");
 require('dotenv').config();
+require("@openzeppelin/hardhat-upgrades"); 
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
-  solidity: "0.8.28",
+  solidity: "0.8.28", 
   networks: {
     liskSepolia: {
       url: "https://rpc.sepolia-api.lisk.com",
@@ -19,7 +21,7 @@ module.exports = {
   etherscan: {
     apiKey: {
       liskSepolia: process.env.LISK_EXPLORER_API_KEY || "",
-      liskMainnet: process.env.LISK_EXPLORER_API_KEY || "",
+      lisk: process.env.LISK_EXPLORER_API_KEY || "", 
     },
     customChains: [
       {
@@ -31,7 +33,7 @@ module.exports = {
         },
       },
       {
-        network: "liskMainnet",
+        network: "lisk", 
         chainId: 1135,
         urls: {
           apiURL: "https://blockscout.lisk.com/api",
