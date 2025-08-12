@@ -77,8 +77,386 @@ const usdcAbi = [
 
 const escrowAbi = [
   {
+    "inputs": [],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "anonymous": false,
     "inputs": [
-      { "internalType": "uint256", "name": "amount", "type": "uint256" }
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "previousAdmin",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "newAdmin",
+        "type": "address"
+      }
+    ],
+    "name": "AdminChanged",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "beacon",
+        "type": "address"
+      }
+    ],
+    "name": "BeaconUpgraded",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "string",
+        "name": "jobId",
+        "type": "string"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "feeAmount",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "originalAmount",
+        "type": "uint256"
+      }
+    ],
+    "name": "FeeCollected",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "string",
+        "name": "jobId",
+        "type": "string"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "freelancer",
+        "type": "address"
+      }
+    ],
+    "name": "FreelancerAssigned",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "depositor",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "GeneralDepositMade",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "recipient",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "GeneralFundsRefunded",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "recipient",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "GeneralFundsReleased",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint8",
+        "name": "version",
+        "type": "uint8"
+      }
+    ],
+    "name": "Initialized",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "string",
+        "name": "jobId",
+        "type": "string"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "client",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "freelancer",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "JobDepositMade",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "string",
+        "name": "jobId",
+        "type": "string"
+      },
+      {
+        "indexed": false,
+        "internalType": "enum Escrow.EscrowStatus",
+        "name": "newStatus",
+        "type": "uint8"
+      }
+    ],
+    "name": "JobEscrowStatusUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "string",
+        "name": "jobId",
+        "type": "string"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "client",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "freelancer",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "JobFundsRefunded",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "string",
+        "name": "jobId",
+        "type": "string"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "client",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "freelancer",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "JobFundsReleased",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "string",
+        "name": "jobId",
+        "type": "string"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "client",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "JobListingCreated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "previousOwner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnershipTransferred",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "newPercentage",
+        "type": "uint256"
+      }
+    ],
+    "name": "PlatformFeeUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "implementation",
+        "type": "address"
+      }
+    ],
+    "name": "Upgraded",
+    "type": "event"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "_jobId",
+        "type": "string"
+      },
+      {
+        "internalType": "address",
+        "name": "_freelancer",
+        "type": "address"
+      }
+    ],
+    "name": "assignFreelancerOnChain",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "_jobId",
+        "type": "string"
+      },
+      {
+        "internalType": "address",
+        "name": "_client",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "createJobListingOnChain",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
     ],
     "name": "depositGeneral",
     "outputs": [],
@@ -87,28 +465,204 @@ const escrowAbi = [
   },
   {
     "inputs": [
-      { "internalType": "string", "name": "_jobId", "type": "string" },
-      { "internalType": "address", "name": "_client", "type": "address" },
-      { "internalType": "address", "name": "_freelancer", "type": "address" },
-      { "internalType": "uint256", "name": "_amount", "type": "uint256" }
+      {
+        "internalType": "string",
+        "name": "_jobId",
+        "type": "string"
+      }
     ],
-    "name": "depositJob",
+    "name": "fundJob",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
   },
   {
     "inputs": [
-      { "internalType": "string", "name": "_jobId", "type": "string" }
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
     ],
-    "name": "releaseJob",
+    "name": "generalDeposits",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "_jobId",
+        "type": "string"
+      }
+    ],
+    "name": "getJobEscrowDetails",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "client",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "freelancer",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "enum Escrow.EscrowStatus",
+        "name": "status",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_usdc",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "_profitFlowAddress",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_initialFeePercentage",
+        "type": "uint256"
+      }
+    ],
+    "name": "initialize",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
   },
   {
     "inputs": [
-      { "internalType": "string", "name": "_jobId", "type": "string" }
+      {
+        "internalType": "string",
+        "name": "",
+        "type": "string"
+      }
+    ],
+    "name": "jobEscrows",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "client",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "freelancer",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "enum Escrow.EscrowStatus",
+        "name": "status",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "owner",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "platformFeePercentage",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "profitFlowAddress",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "proxiableUUID",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "recipient",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "refundGeneral",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "_jobId",
+        "type": "string"
+      }
     ],
     "name": "refundJob",
     "outputs": [],
@@ -117,24 +671,124 @@ const escrowAbi = [
   },
   {
     "inputs": [
-      { "internalType": "string", "name": "_jobId", "type": "string" }
+      {
+        "internalType": "address",
+        "name": "recipient",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
     ],
-    "name": "getJobEscrowDetails",
-    "outputs": [
-      { "internalType": "address", "name": "client", "type": "address" },
-      { "internalType": "address", "name": "freelancer", "type": "address" },
-      { "internalType": "uint256", "name": "amount", "type": "uint256" },
-      { "internalType": "uint8", "name": "status", "type": "uint8" }
-    ],
-    "stateMutability": "view",
+    "name": "releaseGeneral",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
-    "inputs": [{ "internalType": "address", "name": "", "type": "address" }],
-    "name": "generalDeposits",
-    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "_jobId",
+        "type": "string"
+      }
+    ],
+    "name": "releaseJob",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "renounceOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "_jobId",
+        "type": "string"
+      }
+    ],
+    "name": "setJobEscrowDisputed",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "transferOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "newPercentage",
+        "type": "uint256"
+      }
+    ],
+    "name": "updatePlatformFeePercentage",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newImplementation",
+        "type": "address"
+      }
+    ],
+    "name": "upgradeTo",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newImplementation",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes",
+        "name": "data",
+        "type": "bytes"
+      }
+    ],
+    "name": "upgradeToAndCall",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "usdc",
+    "outputs": [
+      {
+        "internalType": "contract IERC20Upgradeable",
+        "name": "",
+        "type": "address"
+      }
+    ],
     "stateMutability": "view",
-    "type": "function",
+    "type": "function"
   }
 ];
 
@@ -781,7 +1435,6 @@ const JobDetails = ({ account, setNotification }) => {
   const { data: walletClient } = useWalletClient();
   const publicClient = usePublicClient();
   const { switchChain } = useSwitchChain();
-
   const navigate = useNavigate();
 
   const fetchJobAndBalance = useCallback(async () => {
@@ -799,7 +1452,6 @@ const JobDetails = ({ account, setNotification }) => {
         });
         setClientUsdcBalance(parseFloat(formatUnits(balance, 6)));
       }
-
     } catch (error) {
       console.error('Error fetching job or balance:', error);
       setNotification(`Error loading job details: ${error.message || 'Network error'}`, 'error');
@@ -820,6 +1472,134 @@ const JobDetails = ({ account, setNotification }) => {
   const isFreelancer = account && job && job.freelancer && job.freelancer.toLowerCase() === account.toLowerCase();
   const hasApplied = account && job?.applicants?.some(app => app.address.toLowerCase() === account.toLowerCase());
 
+  // --- Core Escrow Functions (updated for new on-chain flow) ---
+
+  const handleInitiateRelease = async () => {
+    if (!account || !publicClient || !walletClient || !job) {
+      setNotification('Wallet not connected or blockchain clients not ready.', 'error');
+      return;
+    }
+    if (!isClient) {
+      setNotification('Only the client can release funds.', 'error');
+      return;
+    }
+    if (job.status !== 'completed' || job.escrowStatus !== 'deposited') {
+      setNotification('Job is not in a state for fund release (must be completed and funds deposited).', 'error');
+      return;
+    }
+
+    setModalAction(() => async () => {
+      setShowConfirmModal(false);
+      setIsProcessingTx(true);
+      setNotification('Initiating fund release...', 'info');
+
+      try {
+        const releaseCallData = encodeFunctionData({
+          abi: escrowAbi,
+          functionName: 'releaseJob',
+          args: [job._id], // Assuming job._id maps to on-chain jobId
+        });
+
+        const txHash = await walletClient.sendTransaction({
+          account,
+          to: escrowContractAddress,
+          data: releaseCallData,
+        });
+
+        setNotification(`Transaction sent! Hash: ${truncateAddress(txHash)}. Waiting for confirmation...`, 'info');
+        await publicClient.waitForTransactionReceipt({ hash: txHash });
+
+        await axios.put(`${API_BASE_URL}/api/jobs/${id}/release-confirmed`, {
+          freelancerAddress: account,
+          completionTxHash: txHash,
+        });
+
+        setJob(prevJob => ({ ...prevJob, status: 'Payment Released', escrowStatus: 'released' }));
+        setNotification('Funds successfully released to your wallet!', 'success');
+        setShowRatingModal(true);
+      } catch (error) {
+        console.error('Error confirming fund release:', error);
+        setNotification(`Transaction failed or error confirming funds: ${error.message || 'Please try again.'}`, 'error');
+      } finally {
+        setIsProcessingTx(false);
+      }
+    });
+    setShowConfirmModal(true);
+  };
+
+  const handleConfirmRelease = async () => {
+    if (!account || !publicClient || !walletClient || !job) {
+      setNotification('Wallet not connected or blockchain clients not ready.', 'error');
+      return;
+    }
+    if (!isFreelancer) {
+      setNotification('Only the freelancer can confirm funds.', 'error');
+      return;
+    }
+    // Note: 'Release Initiated' status is from your backend; ensure it maps correctly to on-chain state if applicable.
+    if (job.status !== 'Release Initiated') {
+      setNotification('Job is not in a state for fund confirmation.', 'error');
+      return;
+    }
+
+    try {
+      if (walletClient.chain.id !== liskMainnet.id) {
+        setNotification(`Wallet is on the wrong network. Please switch to ${liskMainnet.name} (Chain ID: ${liskMainnet.id}). Attempting to switch...`, 'error');
+        try {
+          await switchChain({ chainId: liskMainnet.id });
+          setNotification(`Successfully prompted to switch to ${liskMainnet.name}. Please confirm in your wallet and try confirming funds again.`, 'info');
+          return;
+        } catch (switchError) {
+          console.error("Error switching chain:", switchError);
+          setNotification(`Failed to switch to ${liskMainnet.name}. Please switch manually in your wallet. Error: ${switchError.message}`, 'error');
+          return;
+        }
+      }
+    } catch (chainCheckError) {
+      console.error("Error checking current chain ID:", chainCheckError);
+      setNotification(`Could not verify wallet chain. Please ensure your wallet is connected and on ${liskMainnet.name}. Error: ${chainCheckError.message}`, 'error');
+      return;
+    }
+
+    setModalAction(() => async () => {
+      setShowConfirmModal(false);
+      setIsProcessingTx(true);
+      setNotification('Confirming fund receipt on-chain...', 'info');
+
+      try {
+        const releaseCallData = encodeFunctionData({
+          abi: escrowAbi,
+          functionName: 'releaseJob',
+          args: [job._id], // Assuming job._id maps to on-chain jobId
+        });
+
+        const txHash = await walletClient.sendTransaction({
+          account,
+          to: escrowContractAddress,
+          data: releaseCallData,
+        });
+
+        setNotification(`Transaction sent! Hash: ${truncateAddress(txHash)}. Waiting for confirmation...`, 'info');
+        await publicClient.waitForTransactionReceipt({ hash: txHash });
+
+        await axios.put(`${API_BASE_URL}/api/jobs/${id}/release-confirmed`, {
+          freelancerAddress: account,
+          completionTxHash: txHash,
+        });
+
+        setJob(prevJob => ({ ...prevJob, status: 'Payment Released', escrowStatus: 'released' }));
+        setNotification('Funds successfully released to your wallet!', 'success');
+        setShowRatingModal(true);
+      } catch (error) {
+        console.error('Error confirming fund release:', error);
+        setNotification(`Transaction failed or error confirming funds: ${error.message || 'Please try again.'}`, 'error');
+      } finally {
+        setIsProcessingTx(false);
+      }
+    });
+    setShowConfirmModal(true);
+  };
+
 
   const handleFundEscrow = async () => {
     if (!account || !walletClient || !publicClient || !job) {
@@ -830,8 +1610,9 @@ const JobDetails = ({ account, setNotification }) => {
       setNotification('Only the client can fund this job.', 'error');
       return;
     }
+    // Condition for funding: Must be 'pending-deposit' in DB. No freelancer check here anymore.
     if (job.escrowStatus !== 'pending-deposit') {
-      setNotification('Job is not in a state to be funded.', 'error');
+      setNotification('Job is not in a state to be funded (must be pending deposit).', 'error');
       return;
     }
     if (clientUsdcBalance < job.amount) {
@@ -866,6 +1647,55 @@ const JobDetails = ({ account, setNotification }) => {
       try {
         const amountInSmallestUnit = parseUnits(job.amount.toString(), 6);
 
+        // Check if job exists on-chain; if not, call createJobListingOnChain first
+        // This read is optional but good for robust check, or you can rely on tx revert
+        let onChainJobExists = true;
+        try {
+            const onChainJob = await publicClient.readContract({
+                address: escrowContractAddress,
+                abi: escrowAbi,
+                functionName: 'jobEscrows',
+                args: [id],
+            });
+            // onChainJob.client will be 0x0...0 if not posted
+            if (getAddress(onChainJob.client) === '0x0000000000000000000000000000000000000000') {
+                onChainJobExists = false;
+            }
+        } catch (readError) {
+            console.warn("Could not read on-chain job details, assuming it doesn't exist yet:", readError.message);
+            onChainJobExists = false; // Assume not on-chain if read fails (e.g., contract not deployed, ABI mismatch)
+        }
+
+
+        if (!onChainJobExists) {
+            // --- Step 1A: ON-CHAIN: Create Job Listing (without freelancer) ---
+            setNotification('Creating on-chain job listing...', 'info');
+            const createListingCallData = encodeFunctionData({
+                abi: escrowAbi,
+                functionName: 'createJobListingOnChain', // NEW function
+                args: [
+                    id, // Job ID (from backend)
+                    getAddress(account), // Client's address
+                    amountInSmallestUnit // Job amount
+                ],
+            });
+
+            const createListingTxHash = await walletClient.sendTransaction({
+                account,
+                to: escrowContractAddress,
+                data: createListingCallData,
+                value: 0n,
+            });
+
+            setNotification(`On-chain listing sent! Hash: ${truncateAddress(createListingTxHash)}. Waiting for confirmation...`, 'info');
+            await publicClient.waitForTransactionReceipt({ hash: createListingTxHash });
+            setNotification('On-chain job listing created. Proceeding to USDC approval.', 'success');
+        } else {
+            setNotification('On-chain job listing already exists. Proceeding to USDC approval.', 'info');
+        }
+
+
+        // --- Step 2: Approve USDC for the Escrow contract ---
         const approveCallData = encodeFunctionData({
           abi: usdcAbi,
           functionName: 'approve',
@@ -883,26 +1713,28 @@ const JobDetails = ({ account, setNotification }) => {
         await publicClient.waitForTransactionReceipt({ hash: approveTxHash });
         setNotification('USDC Approved. Now depositing funds to job escrow...', 'info');
 
-        const depositJobCallData = encodeFunctionData({
+        // --- Step 3: Call the smart contract's `fundJob` function ---
+        const fundJobCallData = encodeFunctionData({
           abi: escrowAbi,
-          functionName: 'depositJob',
-          args: [job._id, getAddress(job.client), getAddress(job.freelancer || '0x0000000000000000000000000000000000000000'), amountInSmallestUnit],
+          functionName: 'fundJob',
+          args: [id], // Only the jobId is needed for fundJob
         });
 
-        const depositTxHash = await walletClient.sendTransaction({
+        const fundTxHash = await walletClient.sendTransaction({
           account,
           to: escrowContractAddress,
-          data: depositJobCallData,
-          value: 0n,
+          data: fundJobCallData,
+          value: 0n, // No ETH needed for USDC transfer
         });
 
-        setNotification(`Deposit transaction sent! Hash: ${truncateAddress(depositTxHash)}. Waiting for confirmation...`, 'info');
-        await publicClient.waitForTransactionReceipt({ hash: depositTxHash });
+        setNotification(`Deposit transaction sent! Hash: ${truncateAddress(fundTxHash)}. Waiting for confirmation...`, 'info');
+        await publicClient.waitForTransactionReceipt({ hash: fundTxHash });
         setNotification('Job funds deposited successfully on-chain!', 'success');
 
-        await axios.put(`${API_BASE_URL}/api/jobs/${id}/deposit-confirmed`, {
+        // Update backend with confirmation
+        await axios.put(`${API_BASE_URL}/api/jobs/${id}/fund-confirmed`, {
           clientAddress: account,
-          depositTxHash: depositTxHash,
+          depositTxHash: fundTxHash,
         });
 
         setJob(prevJob => ({ ...prevJob, escrowStatus: 'deposited' }));
@@ -918,6 +1750,7 @@ const JobDetails = ({ account, setNotification }) => {
     });
     setShowConfirmModal(true);
   };
+
 
   const handleApply = async () => {
     if (!account) {
@@ -961,32 +1794,75 @@ const JobDetails = ({ account, setNotification }) => {
   };
 
   const handleApproveApplicant = async (applicantAddress) => {
-    if (!account || !job || !isClient) {
-      setNotification('Wallet not connected or you are not the client.', 'error');
+    if (!account || !job || !isClient || !walletClient || !publicClient) {
+      setNotification('Wallet not connected, you are not the client, or blockchain clients not ready.', 'error');
       return;
     }
     if (job.status !== 'open' && job.status !== 'pending-client-approval') {
       setNotification('Job is not in a state to approve applicants.', 'error');
       return;
     }
+    // Check if a freelancer is already set (and is not the zero address)
+    if (job.freelancer && getAddress(job.freelancer) !== '0x0000000000000000000000000000000000000000') {
+        setNotification('A freelancer is already assigned to this job. Reject them first if you wish to approve another.', 'error');
+        return;
+    }
+
 
     setModalAction(() => async () => {
       setShowConfirmModal(false);
       setIsProcessingTx(true);
       setNotification(`Approving applicant ${truncateAddress(applicantAddress)}...`, 'info');
       try {
-        await axios.put(`${API_BASE_URL}/api/jobs/${id}/approve-applicant`, {
+        // --- Step 1: Update backend to assign freelancer and change status ---
+        const updatedJobResponse = await axios.put(`${API_BASE_URL}/api/jobs/${id}/approve-applicant`, {
           clientAddress: account,
           freelancerAddress: applicantAddress
         });
 
-        setJob(prevJob => ({
-          ...prevJob,
-          status: 'pending-client-approval',
-          freelancer: applicantAddress,
-          applicants: prevJob.applicants.filter(app => app.address.toLowerCase() !== applicantAddress.toLowerCase())
-        }));
-        setNotification(`Applicant ${truncateAddress(applicantAddress)} approved! Job is now pending freelancer acceptance.`, 'success');
+        setJob(updatedJobResponse.data); // Update local job state
+
+        setNotification(`Applicant ${truncateAddress(applicantAddress)} approved! Now assigning on-chain...`, 'info');
+
+        // --- Step 2: ON-CHAIN: Call `assignFreelancerOnChain` on the Escrow contract ---
+        try {
+          if (walletClient.chain.id !== liskMainnet.id) {
+            setNotification(`Wallet is on the wrong network. Please switch to ${liskMainnet.name} (Chain ID: ${liskMainnet.id}). Attempting to switch...`, 'error');
+            await switchChain({ chainId: liskMainnet.id });
+            setNotification(`Successfully prompted to switch to ${liskMainnet.name}. Please confirm in your wallet and try approving again.`, 'info');
+            setIsProcessingTx(false);
+            return; // Exit if chain switch is needed
+          }
+
+          const assignFreelancerCallData = encodeFunctionData({
+            abi: escrowAbi,
+            functionName: 'assignFreelancerOnChain', // NEW function
+            args: [
+              id, // Job ID (from backend)
+              getAddress(applicantAddress), // Approved freelancer's address
+            ],
+          });
+
+          setNotification('Sending on-chain "assignFreelancerOnChain" transaction...', 'info');
+          const assignTxHash = await walletClient.sendTransaction({
+            account,
+            to: escrowContractAddress,
+            data: assignFreelancerCallData,
+            value: 0n,
+          });
+
+          setNotification(`On-chain "assignFreelancerOnChain" transaction sent! Hash: ${truncateAddress(assignTxHash)}. Waiting for confirmation...`, 'info');
+          await publicClient.waitForTransactionReceipt({ hash: assignTxHash });
+          setNotification('Freelancer successfully assigned on-chain!', 'success');
+
+          fetchJobAndBalance(); // Re-fetch job details to ensure all statuses are current
+
+        } catch (onChainError) {
+          console.error('Error calling assignFreelancerOnChain on-chain:', onChainError);
+          setNotification(`Failed to assign freelancer on-chain: ${onChainError.message || 'Please try again.'}`, 'error');
+          // Important: If on-chain fails, you might want to revert the backend
+          // assignment or have an admin step to re-attempt.
+        }
 
       } catch (error) {
         console.error('Error approving applicant:', error);
@@ -1033,7 +1909,6 @@ const JobDetails = ({ account, setNotification }) => {
     });
     setShowConfirmModal(true);
   };
-
 
   const handleAcceptAssignedJob = async () => {
     if (!account || !job || !isFreelancer) {
@@ -1088,7 +1963,6 @@ const JobDetails = ({ account, setNotification }) => {
     setShowConfirmModal(true);
   };
 
-
   const handleMarkCompleted = async () => {
     if (!account || !job || !isFreelancer) {
       setNotification('Wallet not connected or you are not the assigned freelancer.', 'error');
@@ -1135,80 +2009,6 @@ const JobDetails = ({ account, setNotification }) => {
       } catch (error) {
         console.error('Error marking job as completed:', error);
         setNotification(`Error marking job as completed: ${error.message || 'Please try again.'}`, 'error');
-      } finally {
-        setIsProcessingTx(false);
-      }
-    });
-    setShowConfirmModal(true);
-  };
-
-
-  const handleReleaseFunds = async () => {
-    if (!account || !publicClient || !walletClient || !job) {
-      setNotification('Wallet not connected or blockchain clients not ready.', 'error');
-      return;
-    }
-    if (!isClient) {
-      setNotification('Only the client can release funds.', 'error');
-      return;
-    }
-    if (job.status !== 'completed' || job.escrowStatus !== 'deposited') {
-      setNotification('Job is not in a state for fund release (must be completed and funds deposited).', 'error');
-      return;
-    }
-
-    try {
-      if (walletClient.chain.id !== liskMainnet.id) {
-        setNotification(`Wallet is on the wrong network. Please switch to ${liskMainnet.name} (Chain ID: ${liskMainnet.id}). Attempting to switch...`, 'error');
-        try {
-          await switchChain({ chainId: liskMainnet.id });
-          setNotification(`Successfully prompted to switch to ${liskMainnet.name}. Please confirm in your wallet and try releasing funds again.`, 'info');
-          return;
-        } catch (switchError) {
-          console.error("Error switching chain:", switchError);
-          setNotification(`Failed to switch to ${liskMainnet.name}. Please switch manually in your wallet. Error: ${switchError.message}`, 'error');
-          return;
-        }
-      }
-    } catch (chainCheckError) {
-      console.error("Error checking current chain ID:", chainCheckError);
-      setNotification(`Could not verify wallet chain. Please ensure your wallet is connected and on ${liskMainnet.name}. Error: ${chainCheckError.message}`, 'error');
-      return;
-    }
-
-    setModalAction(() => async () => {
-      setShowConfirmModal(false);
-      setIsProcessingTx(true);
-      setNotification('Initiating fund release on-chain...', 'info');
-      try {
-        const releaseCallData = encodeFunctionData({
-          abi: escrowAbi,
-          functionName: 'releaseJob',
-          args: [job._id],
-        });
-
-        const txHash = await walletClient.sendTransaction({
-          account,
-          to: escrowContractAddress,
-          data: releaseCallData,
-        });
-
-        setNotification(`Transaction sent! Hash: ${truncateAddress(txHash)}. Waiting for confirmation...`, 'info');
-        await publicClient.waitForTransactionReceipt({ hash: txHash });
-
-        await axios.put(`${API_BASE_URL}/api/jobs/${id}/release-confirmed`, {
-          clientAddress: account,
-          completionTxHash: txHash,
-        });
-
-        setJob(prevJob => ({ ...prevJob, escrowStatus: 'released' }));
-        setNotification('Funds released successfully, job marked as completed!', 'success');
-
-        setShowRatingModal(true);
-
-      } catch (error) {
-        console.error('Error releasing funds:', error);
-        setNotification(`Transaction failed or error releasing funds: ${error.message || 'Please try again.'}`, 'error');
       } finally {
         setIsProcessingTx(false);
       }
@@ -1361,7 +2161,6 @@ const JobDetails = ({ account, setNotification }) => {
     }
   };
 
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8 text-primary-blue">
@@ -1389,12 +2188,16 @@ const JobDetails = ({ account, setNotification }) => {
     );
   }
 
+  // Conditional rendering flags
+  // showFundEscrowButton is visible if client AND job is pending deposit in DB (on-chain listing/funding happens here)
   const showFundEscrowButton = isClient && job.escrowStatus === 'pending-deposit';
   const showApplyButton = !isClient && !job.freelancer && job.status === 'open' && job.escrowStatus === 'deposited' && !hasApplied;
-  const showAcceptAssignedJobButton = isFreelancer && job.status === 'pending-client-approval' && job.freelancer.toLowerCase() === account.toLowerCase();
-  const showClientApplicantActions = isClient && job.status === 'open' && job.escrowStatus === 'deposited' && job.applicants && job.applicants.length > 0 && !job.freelancer;
+  const showAcceptAssignedJobButton = isFreelancer && job.status === 'pending-client-approval' && job.freelancer && job.freelancer.toLowerCase() === account.toLowerCase();
+  // showClientApplicantActions visible if client, job is open, deposited, has applicants, and no freelancer assigned yet (pre-approval)
+  const showClientApplicantActions = isClient && job.status === 'open' && job.escrowStatus === 'deposited' && job.applicants && job.applicants.length > 0 && (!job.freelancer || getAddress(job.freelancer) === '0x0000000000000000000000000000000000000000');
   const showMarkCompletedButton = isFreelancer && job.status === 'in-progress';
-  const showReleaseFundsButton = isClient && job.status === 'completed' && job.escrowStatus === 'deposited';
+  const showInitiateReleaseButton = isClient && job.status === 'completed' && job.escrowStatus === 'deposited';
+  const showConfirmReleaseButton = isFreelancer && job.status === 'Release Initiated';
   const showRefundFundsButton = isClient && (job.escrowStatus === 'deposited' || job.escrowStatus === 'disputed');
   const showRateFreelancerButton = isClient && job.escrowStatus === 'released' && job.freelancer && !job.rated;
 
@@ -1414,14 +2217,14 @@ const JobDetails = ({ account, setNotification }) => {
           ) : 'N/A'}
         </span></p>
         <p className="text-lg">Freelancer: <span className="font-mono text-secondary-purple">
-          {job.freelancer ? (
+          {job.freelancer && getAddress(job.freelancer) !== '0x0000000000000000000000000000000000000000' ? (
             <Link to={`/profile/${job.freelancer}`} className="text-primary-blue hover:underline">
               {truncateAddress(job.freelancer)}
             </Link>
           ) : 'Not assigned'}
         </span></p>
         <p className="text-lg">
-          Current Status: <span className={`font-semibold ${job.status === 'open' ? 'text-blue-600' : job.status === 'pending-client-approval' ? 'text-orange-500' : job.status === 'in-progress' ? 'text-yellow-600' : job.status === 'completed' ? 'text-green-600' : job.status === 'disputed' ? 'text-red-600' : 'text-gray-600'}`}>
+          Current Status: <span className={`font-semibold ${job.status === 'open' ? 'text-blue-600' : job.status === 'pending-client-approval' || job.status === 'Release Initiated' ? 'text-orange-500' : job.status === 'in-progress' ? 'text-yellow-600' : job.status === 'completed' || job.status === 'Payment Released' ? 'text-green-600' : job.status === 'disputed' ? 'text-red-600' : 'text-gray-600'}`}>
             {job.status}
             {job.status === 'disputed' && <span className="ml-2 text-red-700">(Disputed!)</span>}
           </span>
@@ -1471,13 +2274,23 @@ const JobDetails = ({ account, setNotification }) => {
           </button>
         )}
 
-        {showReleaseFundsButton && (
+        {showInitiateReleaseButton && (
           <button
-            className="px-6 py-3 bg-accent-green text-white font-semibold rounded-md hover:bg-green-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={handleReleaseFunds}
+            onClick={handleInitiateRelease}
             disabled={isProcessingTx || !account}
+            className="px-6 py-3 bg-accent-green text-white font-semibold rounded-md hover:bg-green-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isProcessingTx ? 'Releasing Funds...' : 'Release Funds'}
+            {isProcessingTx ? 'Initiating...' : 'Initiate Fund Release'}
+          </button>
+        )}
+
+        {showConfirmReleaseButton && (
+          <button
+            onClick={handleConfirmRelease}
+            disabled={isProcessingTx || !account}
+            className="px-6 py-3 bg-primary-blue text-white font-semibold rounded-md hover:bg-blue-700 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isProcessingTx ? 'Confirming...' : 'Confirm Fund Receipt'}
           </button>
         )}
 
@@ -1501,6 +2314,20 @@ const JobDetails = ({ account, setNotification }) => {
           </button>
         )}
       </div>
+
+      {isClient && job.status === 'Release Initiated' && (
+        <div className="mt-8 p-4 bg-blue-100 text-blue-700 rounded-md">
+          <p className="font-semibold">Fund release initiated.</p>
+          <p>Waiting for the freelancer to confirm receipt and finalize the transaction.</p>
+        </div>
+      )}
+
+      {job.status === 'Payment Released' && (
+        <div className="mt-8 p-4 bg-green-100 text-green-700 rounded-md">
+          <p className="font-semibold">This job is complete!</p>
+          <p>Funds have been successfully released to the freelancer's wallet.</p>
+        </div>
+      )}
 
       {showClientApplicantActions && (
         <div className="mt-8 p-4 bg-blue-50 rounded-lg shadow-inner">
@@ -1624,18 +2451,20 @@ const JobDetails = ({ account, setNotification }) => {
           modalAction === handleRejectApplicant ? "Confirm Applicant Rejection" :
           modalAction === handleAcceptAssignedJob ? "Confirm Job Acceptance" :
           modalAction === handleMarkCompleted ? "Confirm Job Completion" :
-          modalAction === handleReleaseFunds ? "Confirm Fund Release" :
+          modalAction === handleInitiateRelease ? "Confirm Fund Release Initiation" :
+          modalAction === handleConfirmRelease ? "Confirm Fund Receipt" :
           modalAction === handleRefundFunds ? "Confirm Fund Refund" :
           "Confirm Action"
         }
         message={
-          modalAction === handleFundEscrow ? `Are you sure you want to fund this job with ${job?.amount} USDC? You will be prompted to approve USDC and then confirm the deposit transaction in your wallet.` :
+          modalAction === handleFundEscrow ? `Are you sure you want to fund this job with ${job?.amount} USDC? You will be prompted to create the on-chain listing, then approve USDC and confirm the deposit transaction in your wallet.` : // Updated message
           modalAction === handleApply ? `Are you sure you want to apply for the job "${job?.title}"?` :
-          modalAction === handleApproveApplicant ? `Are you sure you want to approve this applicant? They will be assigned to the job.` :
+          modalAction === handleApproveApplicant ? `Are you sure you want to approve this applicant? They will be assigned to the job and assigned on-chain.` : // Updated message
           modalAction === handleRejectApplicant ? `Are you sure you want to reject this applicant? They will be removed from the applicant list.` :
           modalAction === handleAcceptAssignedJob ? `Are you sure you want to accept the assigned job "${job?.title}"? This will mark the job as 'in-progress'.` :
           modalAction === handleMarkCompleted ? `Are you sure you want to mark the job "${job?.title}" as completed? The client will then be able to release funds.` :
-          modalAction === handleReleaseFunds ? `Are you sure you want to release ${job?.amount} USDC to ${truncateAddress(job?.freelancer)} for job "${job?.title}"? This action is irreversible on-chain.` :
+          modalAction === handleInitiateRelease ? `Are you sure you want to initiate the fund release for job "${job?.title}"? This will allow the freelancer to confirm the transaction on-chain.` :
+          modalAction === handleConfirmRelease ? `Are you sure you want to confirm receipt of funds for job "${job?.title}"? This will finalize the transaction on-chain.` :
           modalAction === handleRefundFunds ? `Are you sure you want to refund ${job?.amount} USDC to yourself for job "${job?.title}"? This will cancel the job.` :
           "Please confirm your action."
         }
@@ -1651,11 +2480,12 @@ const JobDetails = ({ account, setNotification }) => {
         confirmButtonText={
           modalAction === handleFundEscrow ? "Fund Escrow" :
           modalAction === handleApply ? "Apply" :
-          modalAction === handleApproveApplicant ? "Approve" :
+          modalAction === handleApproveApplicant ? "Approve & Assign On-Chain" : // Updated button text
           modalAction === handleRejectApplicant ? "Reject" :
           modalAction === handleAcceptAssignedJob ? "Accept Job" :
           modalAction === handleMarkCompleted ? "Mark Completed" :
-          modalAction === handleReleaseFunds ? "Release Funds" :
+          modalAction === handleInitiateRelease ? "Initiate Release" :
+          modalAction === handleConfirmRelease ? "Confirm Receipt" :
           modalAction === handleRefundFunds ? "Refund Funds" :
           "Confirm"
         }
@@ -1703,7 +2533,7 @@ const PostJob = ({ account, setNotification }) => {
     try {
       const skillsArray = requiredSkillsInput.split(',').map(s => s.trim()).filter(s => s !== '');
 
-      const response = await axios.post(`${API_BASE_URL}/api/jobs`, {
+      const response = await axios.post(`${API_BASE_URL}/api/jobs/post`, {
         title: jobTitle,
         description: jobDescription,
         amount: parseFloat(jobAmount),

@@ -40,7 +40,7 @@ app.use(cors({
 app.use(express.json());
 
 const liskNetwork = {
-    id: process.env.NODE_ENV === 'production' ? 1135 : 4202,
+    id: process.env.NODE_ENV === 'production' ? 1135 : 4202, // Lisk Mainnet ID is 1135, Sepolia Testnet is 4202
     name: process.env.NODE_ENV === 'production' ? 'Lisk' : 'Lisk Sepolia Testnet',
     rpcUrls: {
         default: {
@@ -104,10 +104,11 @@ const jobSchema = new mongoose.Schema({
     description: { type: String, required: true },
     amount: { type: Number, required: true, min: 0 },
     client: { type: String, required: true, lowercase: true },
-    freelancer: { type: String, default: null, lowercase: true },
+    freelancer: { type: String, default: null, lowercase: true }, // Default to null for unassigned freelancer
     status: {
         type: String,
-        enum: ['open', 'pending-client-approval', 'in-progress', 'completed', 'disputed', 'cancelled'],
+        // *** IMPORTANT UPDATE HERE: Added new statuses used in frontend ***
+        enum: ['open', 'pending-client-approval', 'in-progress', 'completed', 'disputed', 'cancelled', 'Release Initiated', 'Payment Released'],
         default: 'open'
     },
     escrowStatus: {
@@ -115,9 +116,9 @@ const jobSchema = new mongoose.Schema({
         enum: ['pending-deposit', 'deposited', 'active', 'released', 'refunded', 'disputed'],
         default: 'pending-deposit'
     },
-    clientApprovedFreelancer: { type: Boolean, default: false },
+    clientApprovedFreelancer: { type: Boolean, default: false }, // Consider if this is still necessary with new flow
     depositTxHash: { type: String, default: null },
-    completionTxHash: { type: String, default: null },
+    completionTxHash: { type: String, default: null }, // Used for release/refund tx hash
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
     applicants: [
@@ -168,6 +169,7 @@ const Withdrawal = mongoose.model('Withdrawal', withdrawalSchema);
 
 const authenticateAdmin = (req, res, next) => {
     const adminKey = req.headers['x-admin-key'];
+    // In a real application, replace with a more secure authentication mechanism (e.g., JWT)
     if (adminKey === process.env.ADMIN_SECRET_KEY) {
         next();
     } else {
@@ -175,6 +177,7 @@ const authenticateAdmin = (req, res, next) => {
     }
 };
 
+// --- User Routes ---
 app.post('/api/users', async (req, res) => {
     try {
         const user = new User(req.body);
@@ -210,14 +213,20 @@ app.put('/api/users/:address', async (req, res) => {
     }
 });
 
-app.post('/api/jobs', async (req, res) => {
+// --- Job Routes ---
+
+// API endpoint to handle the initial job creation in the database.
+// This route simply saves the job details. The on-chain 'createJobListingOnChain'
+// and 'fundJob' calls are handled separately from the frontend in JobDetails.js.
+app.post('/api/jobs/post', async (req, res) => {
     try {
         const jobData = {
             ...req.body,
             client: req.body.client.toLowerCase(),
-            status: 'open',
-            escrowStatus: 'pending-deposit',
+            status: 'open', // Job is open for applications in backend
+            escrowStatus: 'pending-deposit', // Initial state, awaiting client funding
             requiredSkills: req.body.requiredSkills || [],
+            freelancer: null, // Ensure freelancer is null on initial post
         };
         const job = new Job(jobData);
         await job.save();
@@ -228,6 +237,41 @@ app.post('/api/jobs', async (req, res) => {
     }
 });
 
+// API endpoint to confirm job funding after on-chain 'fundJob' is successful.
+app.put('/api/jobs/:id/fund-confirmed', async (req, res) => {
+    try {
+        const job = await Job.findById(req.params.id);
+        if (!job) return res.status(404).json({ error: 'Job not found' });
+
+        if (job.client.toLowerCase() !== req.body.clientAddress.toLowerCase()) {
+            return res.status(403).json({ error: 'Unauthorized: Only the client can confirm funding.' });
+        }
+
+        // The job should ideally be 'pending-deposit' in backend before funding
+        // This check ensures the backend state is as expected for funding confirmation.
+        if (job.escrowStatus !== 'pending-deposit') {
+            return res.status(400).json({ error: 'Job is not in a pending deposit state.' });
+        }
+
+        const updatedJob = await Job.findByIdAndUpdate(
+            req.params.id,
+            {
+                $set: {
+                    escrowStatus: 'deposited', // Marks as deposited in DB
+                    depositTxHash: req.body.depositTxHash,
+                    status: 'open', // Ensures it's open for applications after funding
+                }
+            },
+            { new: true, runValidators: true }
+        );
+        res.json(updatedJob);
+    } catch (error) {
+        console.error('Error confirming job funding:', error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get all jobs (with optional filters for status, escrowStatus, skills)
 app.get('/api/jobs', async (req, res) => {
     try {
         const queryFilter = {};
@@ -252,6 +296,7 @@ app.get('/api/jobs', async (req, res) => {
     }
 });
 
+// Get job by ID
 app.get('/api/jobs/:id', async (req, res) => {
     try {
         const job = await Job.findById(req.params.id);
@@ -263,6 +308,7 @@ app.get('/api/jobs/:id', async (req, res) => {
     }
 });
 
+// Get jobs associated with a specific user (client, freelancer, or applicant)
 app.get('/api/jobs/forUser/:address', async (req, res) => {
     try {
         const userAddress = req.params.address.toLowerCase();
@@ -280,6 +326,7 @@ app.get('/api/jobs/forUser/:address', async (req, res) => {
     }
 });
 
+// General job update route (might be used for various updates, but specific actions have their own routes)
 app.put('/api/jobs/:id', async (req, res) => {
     try {
         const updateData = { ...req.body };
@@ -291,32 +338,6 @@ app.put('/api/jobs/:id', async (req, res) => {
         res.json(job);
     } catch (error) {
         console.error('Error updating job:', error);
-        res.status(400).json({ error: error.message });
-    }
-});
-
-app.put('/api/jobs/:id/deposit-confirmed', async (req, res) => {
-    try {
-        const job = await Job.findById(req.params.id);
-        if (!job) return res.status(404).json({ error: 'Job not found' });
-
-        if (job.client.toLowerCase() !== req.body.clientAddress.toLowerCase()) {
-            return res.status(403).json({ error: 'Unauthorized: Only the client can confirm deposit.' });
-        }
-
-        const updatedJob = await Job.findByIdAndUpdate(
-            req.params.id,
-            {
-                $set: {
-                    escrowStatus: 'deposited',
-                    depositTxHash: req.body.depositTxHash
-                }
-            },
-            { new: true, runValidators: true }
-        );
-        res.json(updatedJob);
-    } catch (error) {
-        console.error('Error confirming job deposit:', error);
         res.status(400).json({ error: error.message });
     }
 });
@@ -372,12 +393,14 @@ app.put('/api/jobs/:id/approve-applicant', async (req, res) => {
     if (!job.applicants.some(app => app.address.toLowerCase() === freelancerAddress.toLowerCase())) {
       return res.status(404).json({ message: 'Applicant not found for this job.' });
     }
-    if (job.freelancer) {
+    // Allow assignment if freelancer is null or 0x0...0 (meaning not yet assigned on-chain or in DB)
+    if (job.freelancer && job.freelancer.toLowerCase() !== '0x0000000000000000000000000000000000000000') {
         return res.status(400).json({ message: 'A freelancer is already assigned to this job. Reject them first if you wish to approve another.' });
     }
 
     job.freelancer = freelancerAddress.toLowerCase();
-    job.status = 'pending-client-approval';
+    job.status = 'pending-client-approval'; // Job status updates in DB
+    // Remove the approved freelancer from applicants list
     job.applicants = job.applicants.filter(app => app.address.toLowerCase() !== freelancerAddress.toLowerCase());
     await job.save();
     res.status(200).json({ message: 'Applicant approved successfully.', job });
@@ -439,6 +462,7 @@ app.put('/api/jobs/:id/accept-assigned', async (req, res) => {
       return res.status(400).json({ message: 'Job is not in pending client approval state.' });
     }
 
+    // Now that the freelancer has accepted, the job is in progress
     job.status = 'in-progress';
     await job.save();
     res.status(200).json({ message: 'Job successfully accepted by assigned freelancer.', job });
@@ -477,6 +501,8 @@ app.put('/api/jobs/:id/mark-completed', async (req, res) => {
     }
 });
 
+// This route now confirms the release of funds and also handles
+// the platform fee, aligning with the new smart contract.
 app.put('/api/jobs/:id/release-confirmed', async (req, res) => {
     try {
         const job = await Job.findById(req.params.id);
@@ -486,11 +512,13 @@ app.put('/api/jobs/:id/release-confirmed', async (req, res) => {
             return res.status(403).json({ error: 'Unauthorized: Only the client can confirm fund release.' });
         }
 
+        // The job status here from frontend will be 'Release Initiated'
         const updatedJob = await Job.findByIdAndUpdate(
             req.params.id,
             {
                 $set: {
-                    escrowStatus: 'released',
+                    escrowStatus: 'released', // Set escrowStatus to released in DB
+                    status: 'Payment Released', // Set job status to Payment Released
                     completionTxHash: req.body.completionTxHash
                 }
             },
@@ -503,6 +531,8 @@ app.put('/api/jobs/:id/release-confirmed', async (req, res) => {
     }
 });
 
+// This route now confirms the refund and handles the new 'disputed'
+// escrow status, aligning with the new smart contract.
 app.put('/api/jobs/:id/refund-confirmed', async (req, res) => {
     try {
         const job = await Job.findById(req.params.id);
@@ -517,7 +547,7 @@ app.put('/api/jobs/:id/refund-confirmed', async (req, res) => {
             {
                 $set: {
                     escrowStatus: 'refunded',
-                    status: 'cancelled'
+                    status: 'cancelled' // Job is cancelled if refunded
                 }
             },
             { new: true, runValidators: true }
@@ -532,6 +562,7 @@ app.put('/api/jobs/:id/refund-confirmed', async (req, res) => {
 app.get('/api/deposits/total/:account', async (req, res) => {
     try {
         const addressToCheck = req.params.account;
+        // ABI for generalDeposits view function
         const escrowAbiForGeneralDeposits = [
             {
                 inputs: [{ internalType: 'address', name: '', type: 'address' }],
@@ -549,7 +580,7 @@ app.get('/api/deposits/total/:account', async (req, res) => {
             args: [addressToCheck],
         });
 
-        const totalDeposits = formatUnits(depositBigInt, 6);
+        const totalDeposits = parseFloat(formatUnits(depositBigInt, 6)); // Ensure it's a number
         res.json({ totalDeposits });
     } catch (error) {
         console.error('Error fetching total general deposits:', error);
@@ -562,6 +593,7 @@ app.post('/api/disputes', async (req, res) => {
         const disputeData = { ...req.body, reporterAddress: req.body.reporterAddress.toLowerCase() };
         const dispute = new Dispute(disputeData);
         await dispute.save();
+        // Update job status and escrow status to disputed
         await Job.findByIdAndUpdate(dispute.jobId, { status: 'disputed', escrowStatus: 'disputed' });
         res.status(201).json(dispute);
     } catch (error) {
@@ -590,52 +622,52 @@ app.post('/api/withdrawals', async (req, res) => {
 });
 
 app.post('/api/jobs/:id/messages', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { sender, text } = req.body;
+    try {
+        const { id } = req.params;
+        const { sender, text } = req.body;
 
-    if (!sender || !text || !mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: 'Invalid job ID, sender, or message text.' });
+        if (!sender || !text || !mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ message: 'Invalid job ID, sender, or message text.' });
+        }
+
+        const job = await Job.findById(id);
+        if (!job) {
+            return res.status(404).json({ message: 'Job not found.' });
+        }
+
+        const isAuthorized = job.client.toLowerCase() === sender.toLowerCase() ||
+                             (job.freelancer && job.freelancer.toLowerCase() === sender.toLowerCase());
+
+        if (!isAuthorized) {
+            return res.status(403).json({ message: 'Only the client or assigned freelancer can send messages for this job.' });
+        }
+
+        const newMessage = { sender: sender.toLowerCase(), text };
+        job.messages.push(newMessage);
+        await job.save();
+        res.status(201).json(newMessage);
+    } catch (error) {
+        console.error('Error sending message:', error);
+        res.status(500).json({ message: error.message });
     }
-
-    const job = await Job.findById(id);
-    if (!job) {
-      return res.status(404).json({ message: 'Job not found.' });
-    }
-
-    const isAuthorized = job.client.toLowerCase() === sender.toLowerCase() ||
-                         (job.freelancer && job.freelancer.toLowerCase() === sender.toLowerCase());
-
-    if (!isAuthorized) {
-      return res.status(403).json({ message: 'Only the client or assigned freelancer can send messages for this job.' });
-    }
-
-    const newMessage = { sender: sender.toLowerCase(), text };
-    job.messages.push(newMessage);
-    await job.save();
-    res.status(201).json(newMessage);
-  } catch (error) {
-    console.error('Error sending message:', error);
-    res.status(500).json({ message: error.message });
-  }
 });
 
 app.get('/api/jobs/:id/messages', async (req, res) => {
-  try {
-    const { id } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: 'Invalid job ID.' });
-    }
+    try {
+        const { id } = req.params;
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ message: 'Invalid job ID.' });
+        }
 
-    const job = await Job.findById(id).select('messages');
-    if (!job) {
-      return res.status(404).json({ message: 'Job not found.' });
+        const job = await Job.findById(id).select('messages');
+        if (!job) {
+            return res.status(404).json({ message: 'Job not found.' });
+        }
+        res.status(200).json(job.messages);
+    } catch (error) {
+        console.error('Error fetching messages:', error);
+        res.status(500).json({ message: error.message });
     }
-    res.status(200).json(job.messages);
-  } catch (error) {
-    console.error('Error fetching messages:', error);
-    res.status(500).json({ message: error.message });
-  }
 });
 
 app.put('/api/jobs/:id/rate-freelancer', async (req, res) => {
@@ -835,12 +867,14 @@ app.put('/api/admin/jobs/:id/update-status', authenticateAdmin, async (req, res)
 
         const updateFields = {};
         if (status) {
+            // Validate against enum values
             if (!Job.schema.path('status').enumValues.includes(status)) {
                 return res.status(400).json({ message: `Invalid job status: ${status}.` });
             }
             updateFields.status = status;
         }
         if (escrowStatus) {
+            // Validate against enum values
             if (!Job.schema.path('escrowStatus').enumValues.includes(escrowStatus)) {
                 return res.status(400).json({ message: `Invalid escrow status: ${escrowStatus}.` });
             }
